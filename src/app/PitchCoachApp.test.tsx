@@ -6,6 +6,7 @@ import {
   buildTargetNotes,
   DEFAULT_SCORING_POLICY,
   DEFAULT_SETTINGS,
+  getExerciseById,
   MAJOR_TRIAD_EXERCISE
 } from "../domain/exercise";
 import { parseNoteName } from "../domain/music";
@@ -20,14 +21,16 @@ describe("PitchCoachApp", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
     expect(screen.getByRole("heading", { name: "Pitch Coach" })).toBeTruthy();
-    expect(screen.getByText("A3 major")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Single Note Match/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 
   it("advances a half step after a passing attempt", async () => {
     vi.useFakeTimers();
     render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await flushReact();
@@ -46,6 +49,7 @@ describe("PitchCoachApp", () => {
     vi.useFakeTimers();
     render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await flushReact();
@@ -59,6 +63,7 @@ describe("PitchCoachApp", () => {
     vi.useFakeTimers();
     render(<PitchCoachApp services={createServices(scoopedFrames())} initialSettings={DEFAULT_SETTINGS} />);
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await flushReact();
@@ -86,6 +91,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await flushReact();
@@ -97,6 +103,7 @@ describe("PitchCoachApp", () => {
     vi.useFakeTimers();
     render(<PitchCoachApp services={createServices(slowTriadFrames())} initialSettings={DEFAULT_SETTINGS} />);
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await flushReact();
@@ -113,6 +120,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await flushReact();
@@ -134,6 +142,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await act(async () => {
@@ -153,6 +162,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
+    openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await act(async () => {});
 
@@ -162,10 +172,67 @@ describe("PitchCoachApp", () => {
   it("keeps local clip capture off by default", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
+    openMajorTriad();
     const checkbox = screen.getByLabelText("Local clips") as HTMLInputElement;
     expect(checkbox.checked).toBe(false);
     fireEvent.click(checkbox);
     expect(checkbox.checked).toBe(true);
+  });
+
+  it("opens a selected exercise detail screen from the library", async () => {
+    vi.useFakeTimers();
+    const exercise = getExerciseById("single-note-match");
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm);
+    render(
+      <PitchCoachApp
+        services={createServices(stableFramesForTargets(targets, 0))}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+    expect(screen.getByText("72 BPM")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+
+    expect(screen.getByText(/Nice work/)).toBeTruthy();
+  });
+
+  it("uses a chord-then-sequence prompt for the major triad", async () => {
+    vi.useFakeTimers();
+    const services = createServices(stableFrames(0));
+    render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+
+    expect(services.promptPlayer.playPrompt).toHaveBeenCalledWith(
+      expect.any(Array),
+      80,
+      "chord-then-sequence"
+    );
+  });
+
+  it("uses a sequence-only prompt for scale exercises", async () => {
+    vi.useFakeTimers();
+    const exercise = getExerciseById("five-note-scale");
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm);
+    const services = createServices(stableFramesForTargets(targets, 0));
+    render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Five-Note Major Scale/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+
+    expect(services.promptPlayer.playPrompt).toHaveBeenCalledWith(
+      expect.any(Array),
+      92,
+      "sequence-only"
+    );
   });
 });
 
@@ -196,6 +263,26 @@ function triadFrames(options: {
   );
   const finalTargetStartMs = starts.at(-1) ?? 0;
   const finalSilenceStartMs = rawStartMs + finalTargetStartMs + 760;
+  const silenceFrames = [0, 150, 300].map((offsetMs) => ({
+    timeMs: finalSilenceStartMs + offsetMs,
+    frequencyHz: null,
+    clarity: 0,
+    rms: 0.001
+  }));
+
+  return [...sungFrames, ...silenceFrames];
+}
+
+function stableFramesForTargets(targets: ReturnType<typeof buildTargetNotes>, offsetCents: number): PitchFrame[] {
+  const sungFrames = targets.flatMap((target) =>
+    [0, 100, 200, 300, 400, 500, 620].map((offsetMs) => ({
+      timeMs: target.startMs + offsetMs,
+      frequencyHz: target.frequencyHz * 2 ** (offsetCents / 1200),
+      clarity: 0.96,
+      rms: 0.08
+    }))
+  );
+  const finalSilenceStartMs = (targets.at(-1)?.startMs ?? 0) + 760;
   const silenceFrames = [0, 150, 300].map((offsetMs) => ({
     timeMs: finalSilenceStartMs + offsetMs,
     frequencyHz: null,
@@ -248,7 +335,7 @@ function createServices(frames: PitchFrame[], rejection?: Error): {
       detectPitch: vi.fn()
     },
     promptPlayer: {
-      playPrompt: vi.fn(() => Promise.resolve()),
+      playPrompt: vi.fn((_targetNotes, _tempoBpm, _promptStyle) => Promise.resolve()),
       cancel: vi.fn()
     }
   };
@@ -277,6 +364,10 @@ class MockAudioEngine implements AudioInputEngine {
 
 const _settingsCheck: CoachSettings = DEFAULT_SETTINGS;
 void _settingsCheck;
+
+function openMajorTriad() {
+  fireEvent.click(screen.getByRole("button", { name: /Major Triad/i }));
+}
 
 async function flushReact() {
   await act(async () => {

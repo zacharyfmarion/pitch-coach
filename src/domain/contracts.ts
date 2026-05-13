@@ -5,12 +5,37 @@ export type PitchFrame = {
   rms: number;
 };
 
+export type ExerciseId =
+  | "single-note-match"
+  | "single-note-sustain"
+  | "step-up-back"
+  | "third-up-back"
+  | "major-triad"
+  | "descending-triad"
+  | "five-note-scale"
+  | "octave-arpeggio";
+
+export type ExerciseCategory = "pitch" | "interval" | "arpeggio" | "scale";
+
+export type ScoringProfile = "pitch-first" | "sustain" | "sequence";
+
+export type PromptStyle = "sequence-only" | "chord-then-sequence";
+
 export type ExerciseDefinition = {
-  id: "major-triad";
-  patternDegrees: [1, 3, 5];
+  id: ExerciseId;
+  title: string;
+  description: string;
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  category: ExerciseCategory;
+  focus: string;
+  patternDegrees: readonly number[];
   startRootMidi: number;
-  stepSemitones: 1;
-  direction: "up-then-down";
+  stepSemitones: number;
+  direction: "up-then-down" | "ascending" | "static";
+  defaultTempoBpm: number;
+  scoringProfile: ScoringProfile;
+  promptStyle: PromptStyle;
+  noteDurationBeats?: number;
 };
 
 export type VocalRange = {
@@ -22,7 +47,7 @@ export type CoachSettings = {
   range: VocalRange;
   tempoBpm: number;
   toleranceCents: number;
-  exerciseId: ExerciseDefinition["id"];
+  exerciseId: ExerciseId;
   saveLocalClips: boolean;
   timingMode: TimingMode;
 };
@@ -94,7 +119,7 @@ export type SungNoteEvent = {
 };
 
 export type TargetNote = {
-  degree: 1 | 3 | 5;
+  degree: number;
   midi: number;
   label: string;
   frequencyHz: number;

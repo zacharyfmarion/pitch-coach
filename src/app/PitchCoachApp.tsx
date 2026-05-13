@@ -1,4 +1,6 @@
+import { useState } from "react";
 import {
+  ArrowLeft,
   Gauge,
   Mic2,
   Music2,
@@ -18,10 +20,55 @@ export type PitchCoachAppProps = PitchCoachControllerOptions;
 
 export function PitchCoachApp(props: PitchCoachAppProps) {
   const coach = usePitchCoachController(props);
+  const [screen, setScreen] = useState<"library" | "practice">("library");
+
+  const openExercise = (exerciseId: (typeof coach.exercises)[number]["id"]) => {
+    coach.selectExercise(exerciseId);
+    setScreen("practice");
+  };
+
+  const backToLibrary = async () => {
+    await coach.stopAttempt();
+    setScreen("library");
+  };
+
+  if (screen === "library") {
+    return (
+      <main className="app-shell">
+        <section className="coach-workspace" aria-label="Pitch coach exercises">
+          <header className="top-bar">
+            <div className="brand-lockup">
+              <div className="brand-mark" aria-hidden="true">
+                <Mic2 size={22} />
+              </div>
+              <div>
+                <h1>Pitch Coach</h1>
+                <p>Vocal exercise library</p>
+              </div>
+            </div>
+            <div className="session-readout" aria-live="polite">
+              <span className="readout-label">Selected</span>
+              <strong>{coach.selectedExercise.title}</strong>
+            </div>
+          </header>
+
+          <ExerciseLibrary
+            exercises={coach.exercises}
+            selectedExerciseId={coach.selectedExercise.id}
+            onSelectExercise={openExercise}
+            disabled={coach.isBusy}
+          />
+        </section>
+      </main>
+    );
+  }
+
   const primaryAction = coach.lessonState.status === "complete" ? coach.resetLesson : coach.startAttempt;
   const primaryLabel =
     coach.lessonState.status === "retry"
-      ? "Retry triad"
+      ? coach.selectedExercise.id === "major-triad"
+        ? "Retry triad"
+        : "Retry exercise"
       : coach.lessonState.status === "complete"
         ? "Reset lesson"
         : "Start lesson";
@@ -31,12 +78,21 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
       <section className="coach-workspace" aria-label="Pitch coach exercise">
         <header className="top-bar">
           <div className="brand-lockup">
+            <button
+              className="icon-action back-action"
+              type="button"
+              onClick={() => void backToLibrary()}
+              aria-label="Back to exercises"
+              title="Back to exercises"
+            >
+              <ArrowLeft size={18} />
+            </button>
             <div className="brand-mark" aria-hidden="true">
               <Mic2 size={22} />
             </div>
             <div>
               <h1>Pitch Coach</h1>
-              <p>Major triad sing-back</p>
+              <p>{coach.selectedExercise.title}</p>
             </div>
           </div>
           <div className="session-readout" aria-live="polite">
@@ -48,6 +104,10 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
         <section className="practice-layout">
           <div className="lesson-panel">
             <div className="exercise-strip">
+              <div>
+                <span className="readout-label">Exercise</span>
+                <strong>{coach.selectedExercise.title}</strong>
+              </div>
               <div>
                 <span className="readout-label">Pattern</span>
                 <strong>{coach.exerciseLabel}</strong>
@@ -275,4 +335,64 @@ const statusCopy = {
 
 function formatClipDuration(durationMs: number) {
   return `${Math.max(0, durationMs / 1000).toFixed(1)}s`;
+}
+
+type ExerciseLibraryProps = {
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"];
+  selectedExerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"];
+  onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
+  disabled: boolean;
+};
+
+function ExerciseLibrary({
+  exercises,
+  selectedExerciseId,
+  onSelectExercise,
+  disabled
+}: ExerciseLibraryProps) {
+  return (
+    <section className="exercise-library" aria-label="Exercise library">
+      <div className="library-heading">
+        <div>
+          <span className="readout-label">Exercises</span>
+          <h2>Practice Library</h2>
+        </div>
+        <span>{exercises.length} drills</span>
+      </div>
+      <div className="exercise-list">
+        {exercises.map((exercise) => {
+          const isSelected = exercise.id === selectedExerciseId;
+          return (
+            <button
+              key={exercise.id}
+              className={`exercise-option ${isSelected ? "exercise-option-active" : ""}`}
+              type="button"
+              onClick={() => onSelectExercise(exercise.id)}
+              aria-pressed={isSelected}
+              disabled={disabled}
+            >
+              <span className="difficulty-meter" aria-label={`Difficulty ${exercise.difficulty} of 5`}>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <span key={index} className={index < exercise.difficulty ? "difficulty-on" : ""} />
+                ))}
+              </span>
+              <span className="exercise-copy">
+                <strong>{exercise.title}</strong>
+                <span>{exercise.description}</span>
+              </span>
+              <span className="exercise-meta">
+                <span>{exercise.focus}</span>
+                <span>{formatExercisePatternText(exercise.patternDegrees)}</span>
+              </span>
+              <span className="exercise-start">Start</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function formatExercisePatternText(patternDegrees: readonly number[]) {
+  return patternDegrees.join("-");
 }

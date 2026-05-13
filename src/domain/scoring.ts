@@ -543,7 +543,9 @@ function createAttemptSummary(notes: ScoredTargetNote[], passed: boolean) {
     return `${firstWarning.label} was in tune, with a ${describeWarning(firstWarning.score.warnings[0])}. Moving on.`;
   }
 
-  return "Nice triad. Moving up a half step.";
+  return isMajorTriadScore(notes)
+    ? "Nice triad. Moving up a half step."
+    : "Nice work. Moving up a half step.";
 }
 
 function createFailureSummary(note: ScoredTargetNote) {
@@ -560,11 +562,20 @@ function createFailureSummary(note: ScoredTargetNote) {
     case "unclear":
       return `${note.label} was unclear. Sing a bit more directly into the mic.`;
     case "missed":
-      return `${note.label} was missed. Try the triad again.`;
+      return `${note.label} was missed. Try the exercise again.`;
     case "pass":
     case "passWithWarning":
       return "Try that again.";
   }
+}
+
+function isMajorTriadScore(notes: ScoredTargetNote[]) {
+  return (
+    notes.length === 3 &&
+    notes[0]?.degree === 1 &&
+    notes[1]?.degree === 3 &&
+    notes[2]?.degree === 5
+  );
 }
 
 function createWarningInstruction(warnings: NoteWarning[], medianCents: number) {

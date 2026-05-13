@@ -1,5 +1,5 @@
 import type { CoachSettings } from "../domain/contracts";
-import { DEFAULT_SETTINGS, normalizeRange } from "../domain/exercise";
+import { DEFAULT_SETTINGS, isExerciseId, normalizeRange } from "../domain/exercise";
 
 const STORAGE_KEY = "pitch-coach-settings-v1";
 
@@ -33,7 +33,7 @@ export function saveSettings(settings: CoachSettings) {
 
 export function normalizeSettings(settings: CoachSettings): CoachSettings {
   return {
-    exerciseId: "major-triad",
+    exerciseId: isExerciseId(settings.exerciseId) ? settings.exerciseId : DEFAULT_SETTINGS.exerciseId,
     timingMode: "pitch-first",
     saveLocalClips: Boolean(settings.saveLocalClips),
     tempoBpm: clampNumber(Math.round(settings.tempoBpm), 50, 140, DEFAULT_SETTINGS.tempoBpm),

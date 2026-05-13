@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AttemptScore, CoachSettings, PitchFrame } from "../domain/contracts";
+import type { AttemptScore, CoachSettings, ExerciseId, PitchFrame } from "../domain/contracts";
 import {
   buildTargetNotes,
   createNoteOptions,
   createScoringPolicy,
+  EXERCISES,
   formatExercisePattern,
-  MAJOR_TRIAD_EXERCISE
+  getExerciseById
 } from "../domain/exercise";
 import {
   advanceAfterPass,
@@ -48,8 +49,9 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const [settings, setSettingsState] = useState<CoachSettings>(() =>
     normalizeSettings(options.initialSettings ?? loadSettings())
   );
+  const selectedExercise = useMemo(() => getExerciseById(settings.exerciseId), [settings.exerciseId]);
   const [lessonState, setLessonState] = useState(() =>
-    createLessonState(MAJOR_TRIAD_EXERCISE, settings.range)
+    createLessonState(getExerciseById(settings.exerciseId), settings.range)
   );
   const [pitchFrames, setPitchFrames] = useState<PitchFrame[]>([]);
   const [attemptScore, setAttemptScore] = useState<AttemptScore | null>(null);
@@ -69,10 +71,10 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const listeningTimerRef = useRef<number | null>(null);
   const passTimerRef = useRef<number | null>(null);
 
-  const currentRootMidi = getCurrentRootMidi(lessonState) ?? MAJOR_TRIAD_EXERCISE.startRootMidi;
+  const currentRootMidi = getCurrentRootMidi(lessonState) ?? selectedExercise.startRootMidi;
   const targetNotes = useMemo(
-    () => buildTargetNotes(currentRootMidi, MAJOR_TRIAD_EXERCISE, settings.tempoBpm),
-    [currentRootMidi, settings.tempoBpm]
+    () => buildTargetNotes(currentRootMidi, selectedExercise, settings.tempoBpm),
+    [currentRootMidi, selectedExercise, settings.tempoBpm]
   );
   const noteOptions = useMemo(() => createNoteOptions(), []);
   const scoringPolicy = useMemo(() => createScoringPolicy(settings), [settings]);
@@ -138,6 +140,17 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     setSettingsState(normalizeSettings(nextSettings));
   }, []);
 
+  const selectExercise = useCallback((exerciseId: ExerciseId) => {
+    const exercise = getExerciseById(exerciseId);
+    setSettingsState((current) =>
+      normalizeSettings({
+        ...current,
+        exerciseId,
+        tempoBpm: exercise.defaultTempoBpm
+      })
+    );
+  }, []);
+
   const finishAttempt = useCallback(
     async (runId: number, attemptTargets = targetNotes) => {
       if (runId !== runIdRef.current || finishStartedRef.current) {
@@ -178,7 +191,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const startAttempt = useCallback(async () => {
     const rootMidi = getCurrentRootMidi(lessonStateRef.current);
     if (rootMidi === null) {
-      setErrorMessage("Your range is too narrow for a full 1-3-5 triad.");
+      setErrorMessage("Your range is too narrow for this exercise.");
       return;
     }
 
@@ -194,7 +207,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     pendingClipRef.current = null;
     setPitchFrames([]);
 
-    const attemptTargets = buildTargetNotes(rootMidi, MAJOR_TRIAD_EXERCISE, settings.tempoBpm);
+    const attemptTargets = buildTargetNotes(rootMidi, selectedExercise, settings.tempoBpm);
     const bounds = {
       minFrequencyHz: midiToFrequency(settings.range.lowestMidi),
       maxFrequencyHz: midiToFrequency(settings.range.highestMidi)
@@ -202,7 +215,11 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
     try {
       setLessonState((current) => startPrompt(current));
-      await services.promptPlayer.playPrompt(attemptTargets, settings.tempoBpm);
+      await services.promptPlayer.playPrompt(
+        attemptTargets,
+        settings.tempoBpm,
+        selectedExercise.promptStyle
+      );
       if (runId !== runIdRef.current) {
         return;
       }
@@ -272,6 +289,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     finishAttempt,
     scoringPolicy,
     services,
+    selectedExercise,
     settings.range,
     settings.saveLocalClips,
     settings.tempoBpm
@@ -300,14 +318,14 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
   useEffect(() => {
     void stopAttempt();
-    setLessonState(createLessonState(MAJOR_TRIAD_EXERCISE, settings.range));
+    setLessonState(createLessonState(selectedExercise, settings.range));
     setAttemptScore(null);
     setPitchFrames([]);
-  }, [settings.range.lowestMidi, settings.range.highestMidi, stopAttempt]);
+  }, [selectedExercise, settings.range.lowestMidi, settings.range.highestMidi, stopAttempt]);
 
   const resetLesson = useCallback(async () => {
     await stopAttempt();
-    setLessonState(createLessonState(MAJOR_TRIAD_EXERCISE, settings.range));
+    setLessonState(createLessonState(selectedExercise, settings.range));
     setAttemptScore(null);
     setPitchFrames([]);
     framesRef.current = [];
@@ -315,7 +333,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     lastCompletionCheckMsRef.current = 0;
     finishStartedRef.current = false;
     pendingClipRef.current = null;
-  }, [settings.range, stopAttempt]);
+  }, [selectedExercise, settings.range, stopAttempt]);
 
   const deleteLocalClip = useCallback(async () => {
     revokeLocalClipUrl();
@@ -331,13 +349,16 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   return {
     settings,
     setSettings,
+    selectExercise,
+    selectedExercise,
+    exercises: EXERCISES,
     lessonState,
     pitchFrames,
     attemptScore,
     targetNotes,
     currentRootMidi,
     currentKeyLabel: `${midiToNoteName(currentRootMidi)} major`,
-    exerciseLabel: formatExercisePattern(MAJOR_TRIAD_EXERCISE),
+    exerciseLabel: formatExercisePattern(selectedExercise),
     noteOptions,
     listeningDurationMs: timelineDurationMs,
     errorMessage,

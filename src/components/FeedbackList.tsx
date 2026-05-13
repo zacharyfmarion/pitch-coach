@@ -10,8 +10,8 @@ export function FeedbackList({ targetNotes, attemptScore }: FeedbackListProps) {
 
   return (
     <ol className="feedback-list">
-      {notes.map((note) => (
-        <li key={`${note.degree}-${note.midi}`}>
+      {notes.map((note, index) => (
+        <li key={`${index}-${note.degree}-${note.midi}`}>
           <span className="degree-pill">{note.degree}</span>
           <span className="note-copy">
             <span className="note-name">{note.label}</span>

@@ -71,18 +71,20 @@ export function parseNoteName(noteName: string) {
   return (Number(rawOctave) + 1) * 12 + semitone;
 }
 
-export function degreeToSemitones(degree: 1 | 3 | 5) {
-  switch (degree) {
-    case 1:
-      return 0;
-    case 3:
-      return 4;
-    case 5:
-      return 7;
+const MAJOR_SCALE_OFFSETS = [0, 2, 4, 5, 7, 9, 11] as const;
+
+export function degreeToSemitones(degree: number) {
+  if (!Number.isInteger(degree) || degree < 1) {
+    throw new Error(`Invalid scale degree: ${degree}`);
   }
+
+  const zeroBasedDegree = degree - 1;
+  const octave = Math.floor(zeroBasedDegree / MAJOR_SCALE_OFFSETS.length);
+  const scaleIndex = zeroBasedDegree % MAJOR_SCALE_OFFSETS.length;
+  return octave * 12 + MAJOR_SCALE_OFFSETS[scaleIndex];
 }
 
-export function buildMajorTriad(rootMidi: number, degrees: readonly (1 | 3 | 5)[]) {
+export function buildMajorTriad(rootMidi: number, degrees: readonly number[]) {
   return degrees.map((degree) => rootMidi + degreeToSemitones(degree));
 }
 
