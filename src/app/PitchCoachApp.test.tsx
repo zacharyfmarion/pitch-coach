@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AudioCaptureConfig, AudioInputEngine, PitchDetectorAdapter, PromptPlayer } from "../audio/types";
 import type { CoachSettings, PitchFrame } from "../domain/contracts";
 import {
@@ -13,8 +13,13 @@ import { parseNoteName } from "../domain/music";
 import { PitchCoachApp } from "./PitchCoachApp";
 
 describe("PitchCoachApp", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
   afterEach(() => {
     vi.useRealTimers();
+    window.history.replaceState(null, "", "/");
   });
 
   it("renders the initial exercise screen", () => {
@@ -193,12 +198,52 @@ describe("PitchCoachApp", () => {
     fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
     expect(screen.getByText("72 BPM")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/exercises/single-note-match");
 
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
     await flushReact();
 
     expect(screen.getByText(/Nice work/)).toBeTruthy();
+  });
+
+  it("returns to the library when browser history goes back from practice", async () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    expect(window.location.pathname).toBe("/exercises/major-triad");
+    expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
+
+    await act(async () => {
+      window.history.back();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/");
+      expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+    });
+    expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
+  });
+
+  it("opens directly to an exercise route", () => {
+    window.history.replaceState(null, "", "/exercises/five-note-scale");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getAllByText("Five-Note Major Scale").length).toBeGreaterThan(0);
+    expect(screen.getByText("92 BPM")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
+  });
+
+  it("replaces invalid exercise routes with the library route", async () => {
+    window.history.replaceState(null, "", "/exercises/not-real");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 
   it("uses a chord-then-sequence prompt for the major triad", async () => {

@@ -493,11 +493,7 @@ output {
 
 .score-flat,
 .score-sharp,
-.score-wrongNote {
-  color: #6f3c00;
-  background: #fff0cc;
-}
-
+.score-wrongNote,
 .score-unstable,
 .score-unclear,
 .score-missed {

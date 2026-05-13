@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   Gauge,
@@ -13,26 +13,46 @@ import {
 } from "lucide-react";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
+import type { ExerciseId } from "../domain/contracts";
+import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
 
 export type PitchCoachAppProps = PitchCoachControllerOptions;
 
 export function PitchCoachApp(props: PitchCoachAppProps) {
-  const coach = usePitchCoachController(props);
-  const [screen, setScreen] = useState<"library" | "practice">("library");
+  const router = usePitchCoachRouter();
+  const coach = usePitchCoachController({
+    ...props,
+    initialExerciseId: router.route.screen === "practice" ? router.route.exerciseId : undefined
+  });
+
+  useEffect(() => {
+    if (
+      router.route.screen === "practice" &&
+      router.route.exerciseId !== coach.selectedExercise.id
+    ) {
+      coach.selectExercise(router.route.exerciseId);
+    }
+  }, [coach.selectedExercise.id, coach.selectExercise, router.route]);
+
+  useEffect(() => {
+    if (router.route.screen === "library") {
+      void coach.stopAttempt();
+    }
+  }, [coach.stopAttempt, router.route.screen]);
 
   const openExercise = (exerciseId: (typeof coach.exercises)[number]["id"]) => {
     coach.selectExercise(exerciseId);
-    setScreen("practice");
+    router.navigateToExercise(exerciseId);
   };
 
   const backToLibrary = async () => {
     await coach.stopAttempt();
-    setScreen("library");
+    router.goBackToLibraryFallback();
   };
 
-  if (screen === "library") {
+  if (router.route.screen === "library") {
     return (
       <main className="app-shell">
         <section className="coach-workspace" aria-label="Pitch coach exercises">
@@ -335,6 +355,189 @@ const statusCopy = {
 
 function formatClipDuration(durationMs: number) {
   return `${Math.max(0, durationMs / 1000).toFixed(1)}s`;
+}
+
+type AppRoute =
+  | {
+      screen: "library";
+      fromAppNavigation: boolean;
+    }
+  | {
+      screen: "practice";
+      exerciseId: ExerciseId;
+      fromAppNavigation: boolean;
+    };
+
+type RouteLocation =
+  | {
+      screen: "library";
+    }
+  | {
+      screen: "practice";
+      exerciseId: ExerciseId;
+    };
+
+type ParsedRoute = {
+  route: RouteLocation;
+  invalid: boolean;
+};
+
+type PitchCoachHistoryState = {
+  pitchCoach?: {
+    fromAppNavigation: boolean;
+  };
+};
+
+function usePitchCoachRouter() {
+  const [route, setRoute] = useState<AppRoute>(() => readCurrentRoute());
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const parsed = parsePathname(window.location.pathname);
+      if (parsed.invalid) {
+        window.history.replaceState(createHistoryState(false), "", "/");
+        setRoute({
+          screen: "library",
+          fromAppNavigation: false
+        });
+        return;
+      }
+
+      if (!isPitchCoachHistoryState(window.history.state)) {
+        window.history.replaceState(
+          createHistoryState(false),
+          "",
+          routePath(parsed.route)
+        );
+      }
+
+      setRoute(readCurrentRoute());
+    };
+
+    syncRoute();
+    window.addEventListener("popstate", syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  const navigateToLibrary = useCallback((options: { replace?: boolean } = {}) => {
+    const nextRoute = {
+      screen: "library" as const,
+      fromAppNavigation: true
+    };
+    const state = createHistoryState(true);
+    if (options.replace) {
+      window.history.replaceState(state, "", "/");
+    } else {
+      window.history.pushState(state, "", "/");
+    }
+    setRoute(nextRoute);
+  }, []);
+
+  const navigateToExercise = useCallback((exerciseId: ExerciseId) => {
+    const nextRoute = {
+      screen: "practice" as const,
+      exerciseId,
+      fromAppNavigation: true
+    };
+    window.history.pushState(createHistoryState(true), "", `/exercises/${exerciseId}`);
+    setRoute(nextRoute);
+  }, []);
+
+  const goBackToLibraryFallback = useCallback(() => {
+    if (route.screen === "practice" && route.fromAppNavigation) {
+      window.history.back();
+      return;
+    }
+
+    navigateToLibrary({ replace: true });
+  }, [navigateToLibrary, route]);
+
+  return {
+    route,
+    navigateToLibrary,
+    navigateToExercise,
+    goBackToLibraryFallback
+  };
+}
+
+function readCurrentRoute(): AppRoute {
+  const parsed = parsePathname(window.location.pathname);
+  if (parsed.invalid) {
+    return {
+      screen: "library",
+      fromAppNavigation: false
+    };
+  }
+
+  return {
+    ...parsed.route,
+    fromAppNavigation: isPitchCoachHistoryState(window.history.state)
+      ? window.history.state.pitchCoach.fromAppNavigation
+      : false
+  };
+}
+
+function parsePathname(pathname: string): ParsedRoute {
+  if (pathname === "/" || pathname === "") {
+    return {
+      route: { screen: "library" },
+      invalid: false
+    };
+  }
+
+  const exerciseMatch = pathname.match(/^\/exercises\/([^/]+)\/?$/);
+  if (!exerciseMatch) {
+    return {
+      route: { screen: "library" },
+      invalid: true
+    };
+  }
+
+  let exerciseId: string;
+  try {
+    exerciseId = decodeURIComponent(exerciseMatch[1]);
+  } catch {
+    return {
+      route: { screen: "library" },
+      invalid: true
+    };
+  }
+
+  if (!isExerciseId(exerciseId)) {
+    return {
+      route: { screen: "library" },
+      invalid: true
+    };
+  }
+
+  return {
+    route: {
+      screen: "practice",
+      exerciseId
+    },
+    invalid: false
+  };
+}
+
+function routePath(route: RouteLocation) {
+  return route.screen === "library" ? "/" : `/exercises/${route.exerciseId}`;
+}
+
+function createHistoryState(fromAppNavigation: boolean): PitchCoachHistoryState {
+  return {
+    pitchCoach: {
+      fromAppNavigation
+    }
+  };
+}
+
+function isPitchCoachHistoryState(value: unknown): value is Required<PitchCoachHistoryState> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "pitchCoach" in value &&
+    typeof (value as PitchCoachHistoryState).pitchCoach?.fromAppNavigation === "boolean"
+  );
 }
 
 type ExerciseLibraryProps = {

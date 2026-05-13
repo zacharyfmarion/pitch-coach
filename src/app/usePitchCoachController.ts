@@ -36,6 +36,7 @@ const MAX_RENDERED_FRAMES = 1000;
 export type PitchCoachControllerOptions = {
   services?: PitchCoachServices;
   initialSettings?: CoachSettings;
+  initialExerciseId?: ExerciseId;
 };
 
 export type LocalClipView = {
@@ -46,9 +47,19 @@ export type LocalClipView = {
 
 export function usePitchCoachController(options: PitchCoachControllerOptions = {}) {
   const services = useMemo(() => options.services ?? createPitchCoachServices(), [options.services]);
-  const [settings, setSettingsState] = useState<CoachSettings>(() =>
-    normalizeSettings(options.initialSettings ?? loadSettings())
-  );
+  const [settings, setSettingsState] = useState<CoachSettings>(() => {
+    const loadedSettings = normalizeSettings(options.initialSettings ?? loadSettings());
+    if (!options.initialExerciseId) {
+      return loadedSettings;
+    }
+
+    const exercise = getExerciseById(options.initialExerciseId);
+    return normalizeSettings({
+      ...loadedSettings,
+      exerciseId: options.initialExerciseId,
+      tempoBpm: exercise.defaultTempoBpm
+    });
+  });
   const selectedExercise = useMemo(() => getExerciseById(settings.exerciseId), [settings.exerciseId]);
   const [lessonState, setLessonState] = useState(() =>
     createLessonState(getExerciseById(settings.exerciseId), settings.range)
