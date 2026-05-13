@@ -166,3 +166,34 @@ export type LessonState = {
   attemptNumber: number;
   lastScore?: AttemptScore;
 };
+
+export type AttemptHistoryNote = {
+  degree: number;
+  label: string;
+  midi: number;
+  status: NoteAssessmentStatus;
+  medianCents?: number;
+  stabilityCents?: number;
+  warnings: NoteWarning[];
+};
+
+export type AttemptHistoryRecord = {
+  id: string;
+  exerciseId: ExerciseId;
+  createdAt: string;
+  rootMidi: number;
+  tempoBpm: number;
+  toleranceCents: number;
+  passed: boolean;
+  summary: string;
+  durationMs: number;
+  notes: AttemptHistoryNote[];
+};
+
+export type ExerciseProgressSummary = {
+  exerciseId: ExerciseId;
+  attemptCount: number;
+  lastPracticedAt?: string;
+  recentPassRate?: number;
+  commonIssue?: NoteAssessmentStatus;
+};

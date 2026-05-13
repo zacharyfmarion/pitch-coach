@@ -10,15 +10,21 @@ import {
   MAJOR_TRIAD_EXERCISE
 } from "../domain/exercise";
 import { parseNoteName } from "../domain/music";
+import type { AttemptHistoryRecord } from "../domain/contracts";
+import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
+import { installFakeIndexedDB } from "../test/fakeIndexedDB";
 import { PitchCoachApp } from "./PitchCoachApp";
 
 describe("PitchCoachApp", () => {
   beforeEach(() => {
+    installFakeIndexedDB();
     window.history.replaceState(null, "", "/");
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     window.history.replaceState(null, "", "/");
   });
 
@@ -40,7 +46,7 @@ describe("PitchCoachApp", () => {
     await flushReact();
     await flushReact();
 
-    expect(screen.getByText(/Nice triad/)).toBeTruthy();
+    expect(screen.getAllByText(/Nice triad/).length).toBeGreaterThan(0);
 
     await act(async () => {
       vi.advanceTimersByTime(950);
@@ -101,7 +107,7 @@ describe("PitchCoachApp", () => {
     await flushReact();
     await flushReact();
 
-    expect(screen.getByText(/Nice triad/)).toBeTruthy();
+    expect(screen.getAllByText(/Nice triad/).length).toBeGreaterThan(0);
   });
 
   it("passes slow singing without depending on the guide tempo", async () => {
@@ -113,7 +119,7 @@ describe("PitchCoachApp", () => {
     await flushReact();
     await flushReact();
 
-    expect(screen.getByText(/Nice triad/)).toBeTruthy();
+    expect(screen.getAllByText(/Nice triad/).length).toBeGreaterThan(0);
   });
 
   it("labels a wrong stable note while still scoring later notes", async () => {
@@ -204,7 +210,55 @@ describe("PitchCoachApp", () => {
     await flushReact();
     await flushReact();
 
-    expect(screen.getByText(/Nice work/)).toBeTruthy();
+    expect(screen.getAllByText(/Nice work/).length).toBeGreaterThan(0);
+  });
+
+  it("records attempt history and updates exercise progress", async () => {
+    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Attempt history").textContent).toContain("Pass");
+      expect(screen.getByLabelText("Attempt history").textContent).toMatch(/Nice triad/);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to exercises" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy());
+    expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("100% recent pass");
+  });
+
+  it("loads selected exercise history on a direct exercise route", async () => {
+    await saveAttemptHistoryRecord(historyRecord("five-note-scale", 0, true));
+    window.history.replaceState(null, "", "/exercises/five-note-scale");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Attempt history").textContent).toContain("Pass");
+      expect(screen.getByLabelText("Attempt history").textContent).toContain("Scale felt good.");
+    });
+  });
+
+  it("clears local attempt history after confirmation", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+
+    await waitFor(() => expect(screen.getByLabelText("Attempt history").textContent).toContain("Retry"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear history" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("No attempts yet for this exercise.")).toBeTruthy()
+    );
+    expect(window.confirm).toHaveBeenCalledWith("Clear all local attempt history?");
   });
 
   it("returns to the library when browser history goes back from practice", async () => {
@@ -369,6 +423,34 @@ function stableFramesForTargets(targets: ReturnType<typeof buildTargetNotes>, of
   }));
 
   return [...sungFrames, ...silenceFrames];
+}
+
+function historyRecord(
+  exerciseId: AttemptHistoryRecord["exerciseId"],
+  index: number,
+  passed: boolean
+): AttemptHistoryRecord {
+  return {
+    id: `${exerciseId}-${index}`,
+    exerciseId,
+    createdAt: new Date(Date.UTC(2026, 4, 13, 18, index)).toISOString(),
+    rootMidi: parseNoteName("A3"),
+    tempoBpm: exerciseId === "five-note-scale" ? 92 : 80,
+    toleranceCents: 35,
+    passed,
+    summary: passed ? "Scale felt good." : "A3 was flat.",
+    durationMs: 2400,
+    notes: [
+      {
+        degree: 1,
+        label: "A3",
+        midi: parseNoteName("A3"),
+        status: passed ? "pass" : "flat",
+        medianCents: passed ? 0 : -45,
+        warnings: []
+      }
+    ]
+  };
 }
 
 function scoopedFrames(): PitchFrame[] {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   Gauge,
+  History,
   Mic2,
   Music2,
   Play,
@@ -14,7 +15,7 @@ import {
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
-import type { ExerciseId } from "../domain/contracts";
+import type { ExerciseId, ExerciseProgressSummary, NoteAssessmentStatus } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
@@ -86,6 +87,7 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
           <ExerciseLibrary
             exercises={coach.exercises}
             selectedExerciseId={coach.selectedExercise.id}
+            exerciseProgress={coach.exerciseProgress}
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
@@ -353,6 +355,45 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
               </p>
               <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
             </section>
+
+            <section className="control-group history-panel" aria-label="Attempt history">
+              <div className="group-heading">
+                <History size={17} />
+                <h2>History</h2>
+              </div>
+              {coach.selectedExerciseHistory.length > 0 ? (
+                <ol className="history-list">
+                  {coach.selectedExerciseHistory.map((attempt) => (
+                    <li key={attempt.id}>
+                      <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
+                        {attempt.passed ? "Pass" : "Retry"}
+                      </span>
+                      <span className="history-copy">
+                        <strong>
+                          {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
+                        </strong>
+                        <span>{attempt.summary}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="history-empty">No attempts yet for this exercise.</p>
+              )}
+              <button
+                className="text-action"
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Clear all local attempt history?")) {
+                    void coach.clearLocalAttemptHistory();
+                  }
+                }}
+                disabled={coach.attemptHistoryCount === 0}
+              >
+                <Trash2 size={16} />
+                <span>Clear history</span>
+              </button>
+            </section>
           </aside>
         </section>
       </section>
@@ -611,6 +652,7 @@ function withAppBase(pathname: string) {
 type ExerciseLibraryProps = {
   exercises: ReturnType<typeof usePitchCoachController>["exercises"];
   selectedExerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"];
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
   disabled: boolean;
 };
@@ -618,6 +660,7 @@ type ExerciseLibraryProps = {
 function ExerciseLibrary({
   exercises,
   selectedExerciseId,
+  exerciseProgress,
   onSelectExercise,
   disabled
 }: ExerciseLibraryProps) {
@@ -650,6 +693,9 @@ function ExerciseLibrary({
               <span className="exercise-copy">
                 <strong>{exercise.title}</strong>
                 <span>{exercise.description}</span>
+                <span className="exercise-progress">
+                  {formatProgressSummary(exerciseProgress[exercise.id])}
+                </span>
               </span>
               <span className="exercise-meta">
                 <span>{exercise.focus}</span>
@@ -666,4 +712,77 @@ function ExerciseLibrary({
 
 function formatExercisePatternText(patternDegrees: readonly number[]) {
   return patternDegrees.join("-");
+}
+
+function formatProgressSummary(progress: ExerciseProgressSummary) {
+  if (progress.attemptCount === 0 || progress.recentPassRate === undefined) {
+    return "No attempts yet";
+  }
+
+  const issue = progress.commonIssue ? ` · Issue: ${describeIssue(progress.commonIssue)}` : "";
+  return `${progress.recentPassRate}% recent pass · ${formatLastPracticed(
+    progress.lastPracticedAt
+  )}${issue}`;
+}
+
+function formatLastPracticed(createdAt: string | undefined) {
+  if (!createdAt) {
+    return "Last unknown";
+  }
+
+  const timestamp = Date.parse(createdAt);
+  if (!Number.isFinite(timestamp)) {
+    return "Last unknown";
+  }
+
+  const elapsedMs = Date.now() - timestamp;
+  const elapsedDays = Math.floor(elapsedMs / 86400000);
+  if (elapsedDays <= 0) {
+    return "Last today";
+  }
+  if (elapsedDays === 1) {
+    return "Last yesterday";
+  }
+  if (elapsedDays < 14) {
+    return `Last ${elapsedDays}d ago`;
+  }
+
+  return `Last ${new Date(timestamp).toLocaleDateString([], {
+    month: "short",
+    day: "numeric"
+  })}`;
+}
+
+function formatHistoryDate(createdAt: string) {
+  const timestamp = Date.parse(createdAt);
+  if (!Number.isFinite(timestamp)) {
+    return "Unknown time";
+  }
+
+  return new Date(timestamp).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function describeIssue(status: NoteAssessmentStatus) {
+  switch (status) {
+    case "flat":
+      return "flat";
+    case "sharp":
+      return "sharp";
+    case "wrongNote":
+      return "wrong note";
+    case "unstable":
+      return "unstable";
+    case "unclear":
+      return "unclear";
+    case "missed":
+      return "missed";
+    case "pass":
+    case "passWithWarning":
+      return "none";
+  }
 }

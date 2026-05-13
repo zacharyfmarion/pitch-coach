@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AttemptScore, CoachSettings, ExerciseId, PitchFrame } from "../domain/contracts";
+import type {
+  AttemptHistoryRecord,
+  AttemptScore,
+  CoachSettings,
+  ExerciseId,
+  PitchFrame
+} from "../domain/contracts";
 import {
   buildTargetNotes,
   createNoteOptions,
@@ -19,9 +25,20 @@ import {
   startPrompt
 } from "../domain/lessonMachine";
 import { midiToFrequency, midiToNoteName } from "../domain/music";
+import {
+  createAttemptHistoryRecord,
+  getRecentAttemptsForExercise,
+  pruneAttemptHistory,
+  summarizeExerciseProgress
+} from "../domain/progress";
 import { isPitchFirstAttemptComplete, scoreAttempt } from "../domain/scoring";
 import type { CapturedAudioClip } from "../audio/types";
 import { createPitchCoachServices, type PitchCoachServices } from "../audio/services";
+import {
+  clearAttemptHistory,
+  loadAttemptHistory,
+  saveAttemptHistoryRecord
+} from "../storage/attemptHistoryStorage";
 import {
   deleteLatestAttemptClip,
   loadLatestAttemptClip,
@@ -70,6 +87,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const [queuedAutoStart, setQueuedAutoStart] = useState(false);
   const [localClip, setLocalClip] = useState<LocalClipView | null>(null);
   const [clipErrorMessage, setClipErrorMessage] = useState<string | null>(null);
+  const [attemptHistory, setAttemptHistory] = useState<AttemptHistoryRecord[]>([]);
 
   const runIdRef = useRef(0);
   const framesRef = useRef<PitchFrame[]>([]);
@@ -89,6 +107,14 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   );
   const noteOptions = useMemo(() => createNoteOptions(), []);
   const scoringPolicy = useMemo(() => createScoringPolicy(settings), [settings]);
+  const exerciseProgress = useMemo(
+    () => summarizeExerciseProgress(attemptHistory, EXERCISES),
+    [attemptHistory]
+  );
+  const selectedExerciseHistory = useMemo(
+    () => getRecentAttemptsForExercise(attemptHistory, selectedExercise.id),
+    [attemptHistory, selectedExercise.id]
+  );
   const timelineDurationMs = useMemo(() => {
     const latestFrameMs = pitchFrames.at(-1)?.timeMs ?? 0;
     return Math.min(
@@ -119,6 +145,19 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     return () => {
       cancelled = true;
       revokeLocalClipUrl();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAttemptHistory().then((history) => {
+      if (!cancelled) {
+        setAttemptHistory((current) => mergeAttemptHistory(current, history));
+      }
+    });
+
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -163,7 +202,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   }, []);
 
   const finishAttempt = useCallback(
-    async (runId: number, attemptTargets = targetNotes) => {
+    async (runId: number, attemptTargets = targetNotes, attemptRootMidi = currentRootMidi) => {
       if (runId !== runIdRef.current || finishStartedRef.current) {
         return;
       }
@@ -175,6 +214,14 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
       const score = scoreAttempt(framesRef.current, attemptTargets, scoringPolicy, settings.range);
       setAttemptScore(score);
+      const historyRecord = createAttemptHistoryRecord({
+        exerciseId: selectedExercise.id,
+        rootMidi: attemptRootMidi,
+        tempoBpm: settings.tempoBpm,
+        toleranceCents: settings.toleranceCents,
+        score
+      });
+      await persistAttemptHistory(historyRecord);
       await persistPendingClip(score);
       setLessonState((current) => resolveAttempt(current, score));
 
@@ -191,10 +238,14 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     },
     [
       clearListeningTimer,
+      currentRootMidi,
       scoringPolicy,
       services.audioEngine,
+      selectedExercise.id,
       settings.range,
       settings.saveLocalClips,
+      settings.tempoBpm,
+      settings.toleranceCents,
       targetNotes
     ]
   );
@@ -256,7 +307,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
             voiceStartMsRef.current = frame.timeMs;
             setLessonState((current) => beginListening(current));
             listeningTimerRef.current = window.setTimeout(
-              () => void finishAttempt(runId, attemptTargets),
+              () => void finishAttempt(runId, attemptTargets, rootMidi),
               scoringPolicy.attemptMaxDurationMs
             );
           }
@@ -281,7 +332,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
                 settings.range
               )
             ) {
-              void finishAttempt(runId, attemptTargets);
+              void finishAttempt(runId, attemptTargets, rootMidi);
             }
           }
         }
@@ -357,6 +408,11 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     }
   }, []);
 
+  const clearLocalAttemptHistory = useCallback(async () => {
+    setAttemptHistory([]);
+    await clearAttemptHistory();
+  }, []);
+
   return {
     settings,
     setSettings,
@@ -373,8 +429,12 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     noteOptions,
     listeningDurationMs: timelineDurationMs,
     errorMessage,
+    exerciseProgress,
+    attemptHistoryCount: attemptHistory.length,
+    selectedExerciseHistory,
     localClip,
     clipErrorMessage,
+    clearLocalAttemptHistory,
     deleteLocalClip,
     startAttempt,
     stopAttempt,
@@ -404,6 +464,11 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     } catch {
       setClipErrorMessage("Could not save the latest local clip.");
     }
+  }
+
+  async function persistAttemptHistory(record: AttemptHistoryRecord) {
+    setAttemptHistory((current) => mergeAttemptHistory([record], current));
+    await saveAttemptHistoryRecord(record);
   }
 
   function setLocalClipFromBlob(clip: CapturedAudioClip) {
@@ -439,4 +504,15 @@ function createAudioErrorMessage(error: unknown) {
   }
 
   return "Microphone setup failed. Check your browser permissions and audio input.";
+}
+
+function mergeAttemptHistory(
+  primary: AttemptHistoryRecord[],
+  secondary: AttemptHistoryRecord[]
+) {
+  const recordsById = new Map<string, AttemptHistoryRecord>();
+  [...primary, ...secondary].forEach((record) => {
+    recordsById.set(record.id, record);
+  });
+  return pruneAttemptHistory([...recordsById.values()]);
 }
