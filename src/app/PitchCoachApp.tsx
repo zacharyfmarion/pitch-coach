@@ -11,6 +11,7 @@ import {
   Trash2,
   Volume2
 } from "lucide-react";
+import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
 import type { ExerciseId } from "../domain/contracts";
@@ -45,8 +46,16 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
   }, [coach.stopAttempt, router.route.screen]);
 
   const openExercise = (exerciseId: (typeof coach.exercises)[number]["id"]) => {
+    if (router.route.screen === "practice" && exerciseId === coach.selectedExercise.id) {
+      return;
+    }
+
     coach.selectExercise(exerciseId);
-    router.navigateToExercise(exerciseId);
+    router.navigateToExercise(exerciseId, {
+      replace: router.route.screen === "practice",
+      fromAppNavigation:
+        router.route.screen === "practice" ? router.route.fromAppNavigation : true
+    });
   };
 
   const backToLibrary = async () => {
@@ -94,6 +103,14 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
       : coach.lessonState.status === "complete"
         ? "Reset lesson"
         : "Start lesson";
+  const exerciseOptions = coach.exercises.map((exercise) => ({
+    value: exercise.id,
+    label: exercise.title
+  })) satisfies DropdownOption<(typeof coach.exercises)[number]["id"]>[];
+  const noteOptions = coach.noteOptions.map((note) => ({
+    value: note.midi,
+    label: note.label
+  })) satisfies DropdownOption<number>[];
 
   return (
     <main className="app-shell">
@@ -126,9 +143,16 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
         <section className="practice-layout">
           <div className="lesson-panel">
             <div className="exercise-strip">
-              <div>
+              <div className="exercise-select-card">
                 <span className="readout-label">Exercise</span>
-                <strong>{coach.selectedExercise.title}</strong>
+                <Dropdown
+                  ariaLabel="Exercise"
+                  value={coach.selectedExercise.id}
+                  options={exerciseOptions}
+                  onValueChange={openExercise}
+                  disabled={coach.isBusy}
+                  triggerClassName="readout-dropdown-trigger"
+                />
               </div>
               <div>
                 <span className="readout-label">Pattern</span>
@@ -202,45 +226,37 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
               </div>
               <label>
                 <span>Low</span>
-                <select
+                <Dropdown
+                  ariaLabel="Low"
                   value={coach.settings.range.lowestMidi}
-                  onChange={(event) =>
+                  options={noteOptions}
+                  onValueChange={(lowestMidi) =>
                     coach.setSettings({
                       ...coach.settings,
                       range: {
                         ...coach.settings.range,
-                        lowestMidi: Number(event.target.value)
+                        lowestMidi
                       }
                     })
                   }
-                >
-                  {coach.noteOptions.map((note) => (
-                    <option key={note.midi} value={note.midi}>
-                      {note.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <label>
                 <span>High</span>
-                <select
+                <Dropdown
+                  ariaLabel="High"
                   value={coach.settings.range.highestMidi}
-                  onChange={(event) =>
+                  options={noteOptions}
+                  onValueChange={(highestMidi) =>
                     coach.setSettings({
                       ...coach.settings,
                       range: {
                         ...coach.settings.range,
-                        highestMidi: Number(event.target.value)
+                        highestMidi
                       }
                     })
                   }
-                >
-                  {coach.noteOptions.map((note) => (
-                    <option key={note.midi} value={note.midi}>
-                      {note.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
             </section>
 
@@ -435,15 +451,24 @@ function usePitchCoachRouter() {
     setRoute(nextRoute);
   }, []);
 
-  const navigateToExercise = useCallback((exerciseId: ExerciseId) => {
-    const nextRoute = {
-      screen: "practice" as const,
-      exerciseId,
-      fromAppNavigation: true
-    };
-    window.history.pushState(createHistoryState(true), "", routePath({ screen: "practice", exerciseId }));
-    setRoute(nextRoute);
-  }, []);
+  const navigateToExercise = useCallback(
+    (exerciseId: ExerciseId, options: { replace?: boolean; fromAppNavigation?: boolean } = {}) => {
+      const nextRoute = {
+        screen: "practice" as const,
+        exerciseId,
+        fromAppNavigation: options.fromAppNavigation ?? true
+      };
+      const state = createHistoryState(nextRoute.fromAppNavigation);
+      const path = routePath({ screen: "practice", exerciseId });
+      if (options.replace) {
+        window.history.replaceState(state, "", path);
+      } else {
+        window.history.pushState(state, "", path);
+      }
+      setRoute(nextRoute);
+    },
+    []
+  );
 
   const goBackToLibraryFallback = useCallback(() => {
     if (route.screen === "practice" && route.fromAppNavigation) {

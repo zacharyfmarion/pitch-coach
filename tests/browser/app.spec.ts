@@ -10,6 +10,12 @@ test("renders the pitch coach workspace", async ({ page }) => {
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
   await expect(page.getByText("Guide tempo")).toBeVisible();
   await expect(page.getByText("A3 major")).toBeVisible();
+  await expect(page.locator("select")).toHaveCount(0);
+
+  await page.getByRole("combobox", { name: "Exercise" }).click();
+  await page.getByRole("option", { name: "Single Note Match" }).click();
+  await expect(page).toHaveURL(/\/exercises\/single-note-match$/);
+  await expect(page.getByText("72 BPM")).toBeVisible();
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);

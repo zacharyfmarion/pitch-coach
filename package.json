@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "playwright test",
@@ -13,6 +14,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@radix-ui/react-select": "2.2.6",
     "lucide-react": "1.14.0",
     "pitchy": "4.1.0",
     "react": "19.2.6",
@@ -20,14 +22,18 @@
     "tone": "15.1.22"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.60.0",
     "@testing-library/react": "16.3.2",
     "@types/node": "25.7.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
+    "eslint": "10.3.0",
+    "globals": "17.6.0",
     "jsdom": "29.1.1",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.59.3",
     "vite": "8.0.12",
     "vitest": "4.1.6"
   },

@@ -39,6 +39,25 @@ class TestResizeObserver implements ResizeObserver {
 
 globalThis.ResizeObserver = TestResizeObserver;
 
+if (!globalThis.PointerEvent) {
+  globalThis.PointerEvent = MouseEvent as unknown as typeof PointerEvent;
+}
+
+Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+  value: vi.fn(),
+  configurable: true
+});
+
+Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", {
+  value: vi.fn(() => false),
+  configurable: true
+});
+
+Object.defineProperty(HTMLElement.prototype, "releasePointerCapture", {
+  value: vi.fn(),
+  configurable: true
+});
+
 const canvasContext = {
   arc: vi.fn(),
   beginPath: vi.fn(),

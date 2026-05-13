@@ -236,6 +236,39 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
   });
 
+  it("changes lessons from the exercise dropdown", async () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+    expect(window.location.pathname).toBe("/exercises/single-note-match");
+
+    const exerciseDropdown = screen.getByRole("combobox", { name: "Exercise" });
+    expect(exerciseDropdown.tagName).toBe("BUTTON");
+
+    await chooseDropdownOption(exerciseDropdown, "Major Triad");
+
+    expect(window.location.pathname).toBe("/exercises/major-triad");
+    expect(screen.getByText("A3 major")).toBeTruthy();
+
+    await act(async () => {
+      window.history.back();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+  });
+
+  it("uses shared dropdown controls instead of native selects", () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+
+    expect(document.querySelector("select")).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Exercise" }).tagName).toBe("BUTTON");
+    expect(screen.getByRole("combobox", { name: "Low" }).tagName).toBe("BUTTON");
+    expect(screen.getByRole("combobox", { name: "High" }).tagName).toBe("BUTTON");
+  });
+
   it("replaces invalid exercise routes with the library route", async () => {
     window.history.replaceState(null, "", "/exercises/not-real");
 
@@ -412,6 +445,12 @@ void _settingsCheck;
 
 function openMajorTriad() {
   fireEvent.click(screen.getByRole("button", { name: /Major Triad/i }));
+}
+
+async function chooseDropdownOption(trigger: HTMLElement, optionName: string) {
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1, pointerType: "mouse" });
+  const option = await screen.findByRole("option", { name: optionName });
+  fireEvent.click(option);
 }
 
 async function flushReact() {
