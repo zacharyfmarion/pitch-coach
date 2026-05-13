@@ -1,0 +1,34 @@
+{
+  "name": "pitch-coach",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "playwright test",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "lucide-react": "1.14.0",
+    "pitchy": "4.1.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tone": "15.1.22"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "25.7.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "jsdom": "29.1.1",
+    "typescript": "6.0.3",
+    "vite": "8.0.12",
+    "vitest": "4.1.6"
+  },
+  "packageManager": "pnpm@8.6.0+sha512.b8c69619796f1be9b934825a47824411e9c285b83ed403f8cd5a6ab383c4719838b87fa55cc4ddfd7fe58ab29903e4c2d30d1dfbefb2ddbb4835cc322acbb000"
+}
