@@ -45,6 +45,7 @@ jobs:
         run: pnpm build
         env:
           GITHUB_PAGES: 'true'
+          GITHUB_PAGES_BASE_PATH: '/pitch-coach/'
 
       - name: Add single-page app fallback
         run: cp dist/index.html dist/404.html

@@ -3,8 +3,15 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 const githubPagesBase =
   process.env.GITHUB_PAGES === "true"
-    ? `/${process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "pitch_coach"}/`
+    ? normalizeBasePath(
+        process.env.GITHUB_PAGES_BASE_PATH ?? process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "pitch-coach"
+      )
     : "/";
+
+function normalizeBasePath(path: string) {
+  const withLeadingSlash = path.startsWith("/") ? path : `/${path}`;
+  return withLeadingSlash.endsWith("/") ? withLeadingSlash : `${withLeadingSlash}/`;
+}
 
 export default defineConfig({
   base: githubPagesBase,

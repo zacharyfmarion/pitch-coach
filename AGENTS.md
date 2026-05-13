@@ -68,7 +68,7 @@ GitHub Actions workflows live under `.github/workflows/`.
 
 - `ci.yml` runs dependency install, unit tests, production build, and Playwright browser coverage.
 - `deploy-pages.yml` builds on pushes to `main` and deploys `dist/` to GitHub Pages when Pages is enabled for the repository. Private repositories must set `ENABLE_PRIVATE_PAGES_DEPLOY=true` after Pages support is available.
-- The deployment workflow sets `GITHUB_PAGES=true`; `vite.config.ts` uses that to build assets under the repository base path.
+- The deployment workflow sets `GITHUB_PAGES=true` and `GITHUB_PAGES_BASE_PATH=/pitch-coach/`; `vite.config.ts` uses that to build assets under the public Pages path.
 - The workflow copies `dist/index.html` to `dist/404.html` so direct exercise URLs can fall back to the single-page app on GitHub Pages.
 
 ## `/create` Workflow

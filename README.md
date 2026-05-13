@@ -6,7 +6,7 @@ A privacy-first web MVP for vocal exercise practice. The app plays a major triad
 
 GitHub Actions includes CI and a GitHub Pages deployment workflow for `main`. The app publishes here:
 
-https://zac.is-a.dev/pitch_coach/
+https://zac.is-a.dev/pitch-coach/
 
 Microphone input requires HTTPS or localhost.
 
