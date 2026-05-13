@@ -20,6 +20,8 @@ import { usePitchCoachController, type PitchCoachControllerOptions } from "./use
 
 export type PitchCoachAppProps = PitchCoachControllerOptions;
 
+const APP_BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
+
 export function PitchCoachApp(props: PitchCoachAppProps) {
   const router = usePitchCoachRouter();
   const coach = usePitchCoachController({
@@ -395,7 +397,7 @@ function usePitchCoachRouter() {
     const syncRoute = () => {
       const parsed = parsePathname(window.location.pathname);
       if (parsed.invalid) {
-        window.history.replaceState(createHistoryState(false), "", "/");
+        window.history.replaceState(createHistoryState(false), "", routePath({ screen: "library" }));
         setRoute({
           screen: "library",
           fromAppNavigation: false
@@ -426,9 +428,9 @@ function usePitchCoachRouter() {
     };
     const state = createHistoryState(true);
     if (options.replace) {
-      window.history.replaceState(state, "", "/");
+      window.history.replaceState(state, "", routePath({ screen: "library" }));
     } else {
-      window.history.pushState(state, "", "/");
+      window.history.pushState(state, "", routePath({ screen: "library" }));
     }
     setRoute(nextRoute);
   }, []);
@@ -439,7 +441,7 @@ function usePitchCoachRouter() {
       exerciseId,
       fromAppNavigation: true
     };
-    window.history.pushState(createHistoryState(true), "", `/exercises/${exerciseId}`);
+    window.history.pushState(createHistoryState(true), "", routePath({ screen: "practice", exerciseId }));
     setRoute(nextRoute);
   }, []);
 
@@ -478,14 +480,16 @@ function readCurrentRoute(): AppRoute {
 }
 
 function parsePathname(pathname: string): ParsedRoute {
-  if (pathname === "/" || pathname === "") {
+  const appPathname = stripAppBase(pathname);
+
+  if (appPathname === "/" || appPathname === "") {
     return {
       route: { screen: "library" },
       invalid: false
     };
   }
 
-  const exerciseMatch = pathname.match(/^\/exercises\/([^/]+)\/?$/);
+  const exerciseMatch = appPathname.match(/^\/exercises\/([^/]+)\/?$/);
   if (!exerciseMatch) {
     return {
       route: { screen: "library" },
@@ -520,7 +524,8 @@ function parsePathname(pathname: string): ParsedRoute {
 }
 
 function routePath(route: RouteLocation) {
-  return route.screen === "library" ? "/" : `/exercises/${route.exerciseId}`;
+  const pathname = route.screen === "library" ? "/" : `/exercises/${route.exerciseId}`;
+  return withAppBase(pathname);
 }
 
 function createHistoryState(fromAppNavigation: boolean): PitchCoachHistoryState {
@@ -538,6 +543,44 @@ function isPitchCoachHistoryState(value: unknown): value is Required<PitchCoachH
     "pitchCoach" in value &&
     typeof (value as PitchCoachHistoryState).pitchCoach?.fromAppNavigation === "boolean"
   );
+}
+
+function normalizeBasePath(baseUrl: string) {
+  const pathname = new URL(baseUrl, "https://pitch-coach.local").pathname;
+  if (!pathname || pathname === "/") {
+    return "/";
+  }
+
+  return pathname.endsWith("/") ? pathname : `${pathname}/`;
+}
+
+function stripAppBase(pathname: string) {
+  if (APP_BASE_PATH === "/") {
+    return pathname || "/";
+  }
+
+  const baseWithoutTrailingSlash = APP_BASE_PATH.replace(/\/$/, "");
+  if (pathname === baseWithoutTrailingSlash) {
+    return "/";
+  }
+
+  if (pathname.startsWith(`${baseWithoutTrailingSlash}/`)) {
+    return pathname.slice(baseWithoutTrailingSlash.length) || "/";
+  }
+
+  return pathname;
+}
+
+function withAppBase(pathname: string) {
+  if (APP_BASE_PATH === "/") {
+    return pathname;
+  }
+
+  if (pathname === "/" || pathname === "") {
+    return APP_BASE_PATH;
+  }
+
+  return `${APP_BASE_PATH.replace(/\/$/, "")}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
 }
 
 type ExerciseLibraryProps = {

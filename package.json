@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "playwright test",
+    "validate:changes": "bash scripts/validate-changes.sh",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
