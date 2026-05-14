@@ -88,6 +88,7 @@ export type SongReferenceQuality = {
 
 export type SongReference = {
   analysisVersion?: string;
+  analysisRange?: VocalRange;
   frames: SongReferenceFrame[];
   notes: SongReferenceNote[];
   contour: SongReferenceContourPoint[];

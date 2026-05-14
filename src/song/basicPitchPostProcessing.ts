@@ -74,6 +74,10 @@ export function createReferenceFromBasicPitchNotes(
 
   return {
     analysisVersion: SONG_REFERENCE_ANALYSIS_VERSION,
+    analysisRange: {
+      lowestMidi: options.lowestMidi,
+      highestMidi: options.highestMidi
+    },
     frames,
     notes,
     contour,

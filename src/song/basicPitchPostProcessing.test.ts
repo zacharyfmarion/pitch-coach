@@ -17,6 +17,7 @@ describe("Basic Pitch song reference post-processing", () => {
     const reference = decodeBasicPitchOutputToReference(output, decodeOptions());
 
     expect(reference.analysisVersion).toBe(SONG_REFERENCE_ANALYSIS_VERSION);
+    expect(reference.analysisRange).toEqual({ lowestMidi: 48, highestMidi: 72 });
     expect(reference.notes).toHaveLength(2);
     expect(reference.notes[0].midi).toBe(60);
     expect(reference.notes[1].startMs - reference.notes[0].endMs).toBeGreaterThan(80);

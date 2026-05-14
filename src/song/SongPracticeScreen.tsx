@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createSongDebugInfo, createVocalEnergyTrace } from "./debugDiagnostics";
+import { formatSongReferenceRange } from "./referenceRange";
 import { SongPitchTimeline } from "./SongPitchTimeline";
 import { SONG_SECTION_LIMITS, useSongPracticeController } from "./useSongPracticeController";
 import type { SongModeServices } from "./types";
@@ -257,6 +258,7 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                       <span>{formatCount(song.reference.quality.noteCount, "note")}</span>
                       <span>{formatCount(song.reference.phrases.length, "phrase")}</span>
                       <span>{song.reference.quality.lowConfidenceCount} low confidence</span>
+                      <span>range {formatSongReferenceRange(song.reference.analysisRange)}</span>
                       {song.reference.quality.suggestion ? (
                         <p className="history-empty">{song.reference.quality.suggestion}</p>
                       ) : null}

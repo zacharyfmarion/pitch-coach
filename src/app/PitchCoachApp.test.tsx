@@ -128,6 +128,51 @@ describe("PitchCoachApp", () => {
     expect(songServices.separator.separate).toHaveBeenCalledTimes(1);
   });
 
+  it("does not filter song transcription to a narrow exercise range", async () => {
+    const songServices = createSongServices({ supported: true, referenceMidis: [61, 64] });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={{
+          ...DEFAULT_SETTINGS,
+          range: {
+            lowestMidi: parseNoteName("C3"),
+            highestMidi: parseNoteName("D4")
+          }
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+
+    await screen.findByText(/range C3-C5/i);
+    expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        range: {
+          lowestMidi: parseNoteName("C3"),
+          highestMidi: parseNoteName("C5")
+        }
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
+    await waitFor(() => expect(songServices.practiceEngine.lastConfig).not.toBeNull());
+    expect(songServices.practiceEngine.lastConfig?.bounds.maxFrequencyHz).toBeGreaterThan(
+      midiToFrequency(parseNoteName("D#4"))
+    );
+  });
+
   it("advances a half step after a passing attempt", async () => {
     vi.useFakeTimers();
     render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
@@ -691,9 +736,14 @@ function mockPreferredColorScheme(initialMatches: boolean) {
   };
 }
 
-function createSongServices(options: { supported: boolean; referenceAnalysisVersion?: string }): SongModeServices & {
+function createSongServices(options: {
+  supported: boolean;
+  referenceAnalysisVersion?: string;
+  referenceMidis?: number[];
+}): SongModeServices & {
   separator: SongModeServices["separator"] & { separate: ReturnType<typeof vi.fn> };
   transcriber: SongModeServices["transcriber"] & { transcribe: ReturnType<typeof vi.fn> };
+  practiceEngine: MockSongPracticeEngine;
 } {
   const audio = createTestSongBuffer();
   const separated = {
@@ -726,7 +776,7 @@ function createSongServices(options: { supported: boolean; referenceAnalysisVers
     transcriber: {
       transcribe: vi.fn((_vocals, transcriptionOptions) => {
         transcriptionOptions.onProgress?.({ progress: 1 });
-        return Promise.resolve(createTestSongReference(options.referenceAnalysisVersion));
+        return Promise.resolve(createTestSongReference(options.referenceAnalysisVersion, options.referenceMidis));
       })
     },
     practiceEngine,
@@ -742,36 +792,37 @@ function createSongServices(options: { supported: boolean; referenceAnalysisVers
 }
 
 function createTestSongReference(
-  analysisVersion: string | undefined = SONG_REFERENCE_ANALYSIS_VERSION
+  analysisVersion: string | undefined = SONG_REFERENCE_ANALYSIS_VERSION,
+  midis: number[] = [60]
 ): SongReference {
+  const firstMidi = midis[0] ?? 60;
   return {
     analysisVersion,
+    analysisRange: DEFAULT_SETTINGS.range,
     durationMs: 1200,
     frames: [0, 100, 200, 300, 400, 500].map((timeMs) => ({
       timeMs,
-      frequencyHz: midiToFrequency(60),
-      midi: 60,
+      frequencyHz: midiToFrequency(firstMidi),
+      midi: firstMidi,
       clarity: 0.9,
       rms: 0.08
     })),
-    notes: [
-      {
-        id: "note-0",
-        startMs: 0,
-        endMs: 600,
-        midi: 60,
-        medianMidi: 60,
-        confidence: 0.9,
-        amplitude: 0.9,
-        pitchBends: []
-      }
-    ],
-    contour: [
-      { timeMs: 0, midi: 60, confidence: 0.9, noteId: "note-0" },
-      { timeMs: 600, midi: 60, confidence: 0.9, noteId: "note-0" }
-    ],
-    phrases: [{ id: "phrase-0", startMs: 0, endMs: 600, medianMidi: 60 }],
-    quality: { noteCount: 1, lowConfidenceCount: 0, suggestion: null }
+    notes: midis.map((midi, index) => ({
+      id: `note-${index}`,
+      startMs: index * 300,
+      endMs: index * 300 + 240,
+      midi,
+      medianMidi: midi,
+      confidence: 0.9,
+      amplitude: 0.9,
+      pitchBends: []
+    })),
+    contour: midis.flatMap((midi, index) => [
+      { timeMs: index * 300, midi, confidence: 0.9, noteId: `note-${index}` },
+      { timeMs: index * 300 + 240, midi, confidence: 0.9, noteId: `note-${index}` }
+    ]),
+    phrases: [{ id: "phrase-0", startMs: 0, endMs: Math.max(240, midis.length * 300), medianMidi: firstMidi }],
+    quality: { noteCount: midis.length, lowConfidenceCount: 0, suggestion: null }
   };
 }
 
@@ -804,9 +855,11 @@ class MockAudioEngine implements AudioInputEngine {
 
 class MockSongPracticeEngine {
   private running = false;
+  lastConfig: SongPracticeConfig | null = null;
 
   async start(config: SongPracticeConfig) {
     this.running = true;
+    this.lastConfig = config;
     Array.from({ length: 12 }, (_, index) => index * 100).forEach((timeMs) =>
       config.onPitchFrame({
         timeMs,

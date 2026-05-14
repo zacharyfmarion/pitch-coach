@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PitchFrame } from "../domain/contracts";
-import { midiToFrequency } from "../domain/music";
 import { loadSettings, normalizeSettings, saveSettings } from "../storage/settingsStorage";
 import { sliceStereoBuffer } from "./audioData";
+import { createSongPracticePitchBounds, createSongReferenceRange } from "./referenceRange";
 import { isCurrentSongReference } from "./referenceVersion";
 import { createSongModeServices } from "./services";
 import { scoreSongAttempt } from "./songScoring";
@@ -235,8 +235,9 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
         return;
       }
 
+      const songReferenceRange = createSongReferenceRange(settings.range);
       const nextReference = await services.transcriber.transcribe(separated.vocals, {
-        range: settings.range,
+        range: songReferenceRange,
         detail: referenceDetail,
         onProgress: (progress) =>
           setAnalysisProgress((current) => ({
@@ -275,7 +276,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     services.transcriber,
     separation,
     referenceDetail,
-    settings.range,
+    settings.range.highestMidi,
+    settings.range.lowestMidi,
     support.supported,
     trimEndMs,
     trimStartMs
@@ -300,10 +302,10 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
         accompaniment: separation.accompaniment,
         vocals: separation.vocals,
         detector: services.detector,
-        bounds: {
-          minFrequencyHz: midiToFrequency(settings.range.lowestMidi),
-          maxFrequencyHz: midiToFrequency(settings.range.highestMidi)
-        },
+        bounds: createSongPracticePitchBounds(
+          reference,
+          reference.analysisRange ?? createSongReferenceRange(settings.range)
+        ),
         vocalGuideGain,
         onPitchFrame: (frame) => {
           if (runId !== runIdRef.current) {
