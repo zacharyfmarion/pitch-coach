@@ -4,6 +4,7 @@ import {
   Gauge,
   Headphones,
   Music2,
+  Pause,
   Play,
   RotateCcw,
   SlidersHorizontal,
@@ -11,6 +12,7 @@ import {
   Upload
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { usePitchCoachTheme } from "../app/theme";
 import { createSongDebugInfo, createVocalEnergyTrace } from "./debugDiagnostics";
 import { formatSongReferenceRange } from "./referenceRange";
 import { SongPitchTimeline } from "./SongPitchTimeline";
@@ -24,7 +26,10 @@ export type SongPracticeScreenProps = {
 
 export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeScreenProps) {
   const song = useSongPracticeController({ services });
+  const theme = usePitchCoachTheme(song.themePreference);
   const [debugEnabled, setDebugEnabled] = useState(false);
+  const isActivePractice = song.stage === "practicing" || song.stage === "paused";
+  const pauseResumeLabel = song.stage === "paused" ? "Resume" : "Pause";
   const durationMs = song.reference?.durationMs ?? song.selectedDurationMs ?? SONG_SECTION_LIMITS.defaultMs;
   const debugEnergy = useMemo(
     () => (debugEnabled ? createVocalEnergyTrace(song.separation?.vocals ?? null) : []),
@@ -91,6 +96,7 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
               totalDurationMs={Math.max(durationMs, 1000)}
               currentTimeMs={song.currentPlaybackTimeMs}
               isPlaying={song.stage === "practicing"}
+              theme={theme}
               debugEnabled={debugEnabled}
               debugEnergy={debugEnergy}
             />
@@ -110,8 +116,20 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
               <button
                 className="icon-action"
                 type="button"
+                onClick={() =>
+                  song.stage === "paused" ? void song.resumePractice() : void song.pausePractice()
+                }
+                disabled={!isActivePractice}
+                aria-label={pauseResumeLabel}
+                title={pauseResumeLabel}
+              >
+                {song.stage === "paused" ? <Play size={18} /> : <Pause size={18} />}
+              </button>
+              <button
+                className="icon-action"
+                type="button"
                 onClick={() => void song.stopPractice()}
-                disabled={song.stage !== "practicing"}
+                disabled={!isActivePractice}
                 aria-label="Stop"
                 title="Stop"
               >
@@ -401,6 +419,8 @@ function formatStage(stage: string) {
       return "Practice ready";
     case "practicing":
       return "Listening";
+    case "paused":
+      return "Paused";
     case "complete":
       return "Complete";
     case "error":

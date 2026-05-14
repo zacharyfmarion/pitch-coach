@@ -12,9 +12,12 @@ type SongPitchTimelineProps = {
   totalDurationMs: number;
   currentTimeMs: number;
   isPlaying: boolean;
+  theme: SongTimelineTheme;
   debugEnabled?: boolean;
   debugEnergy?: SongDebugEnergyPoint[];
 };
+
+export type SongTimelineTheme = "light" | "dark";
 
 export function SongPitchTimeline({
   reference,
@@ -23,6 +26,7 @@ export function SongPitchTimeline({
   totalDurationMs,
   currentTimeMs,
   isPlaying,
+  theme,
   debugEnabled = false,
   debugEnergy = []
 }: SongPitchTimelineProps) {
@@ -58,6 +62,7 @@ export function SongPitchTimeline({
       totalDurationMs,
       currentTimeMs,
       isPlaying,
+      theme,
       debugEnabled,
       debugEnergy,
       width: size.width,
@@ -73,6 +78,7 @@ export function SongPitchTimeline({
     score,
     size.height,
     size.width,
+    theme,
     totalDurationMs
   ]);
 
@@ -93,7 +99,69 @@ type DrawSongTimelineOptions = SongPitchTimelineProps & {
   height: number;
 };
 
+type SongTimelinePalette = {
+  surface: string;
+  statusText: string;
+  gridBorder: string;
+  gridLine: string;
+  gridStrongLine: string;
+  gridLabel: string;
+  timeMarker: string;
+  missedRegion: string;
+  offPitchRegion: string;
+  referenceBand: string;
+  referenceBorder: string;
+  referenceLine: string;
+  liveLine: string;
+  playhead: string;
+  debugSurface: string;
+  debugBorder: string;
+  debugBar: string;
+};
+
+const songTimelinePalettes = {
+  light: {
+    surface: "#fcfbf7",
+    statusText: "#6b6256",
+    gridBorder: "#e4ded4",
+    gridLine: "#eee8df",
+    gridStrongLine: "#d5cdc0",
+    gridLabel: "#83796d",
+    timeMarker: "#ded6ca",
+    missedRegion: "rgba(207, 93, 72, 0.14)",
+    offPitchRegion: "rgba(125, 76, 194, 0.13)",
+    referenceBand: "rgba(27, 148, 127, 0.18)",
+    referenceBorder: "rgba(27, 148, 127, 0.58)",
+    referenceLine: "rgba(27, 148, 127, 0.92)",
+    liveLine: "rgba(125, 76, 194, 0.62)",
+    playhead: "#1f6f64",
+    debugSurface: "#f5efe6",
+    debugBorder: "#dfd5c7",
+    debugBar: "rgba(31, 111, 100, 0.46)"
+  },
+  dark: {
+    surface: "#1f2420",
+    statusText: "#cfc6b8",
+    gridBorder: "#353d36",
+    gridLine: "#2f3630",
+    gridStrongLine: "#485044",
+    gridLabel: "#b8afa2",
+    timeMarker: "#40493f",
+    missedRegion: "rgba(243, 161, 145, 0.18)",
+    offPitchRegion: "rgba(185, 152, 239, 0.16)",
+    referenceBand: "rgba(101, 200, 183, 0.18)",
+    referenceBorder: "rgba(101, 200, 183, 0.62)",
+    referenceLine: "rgba(101, 200, 183, 0.92)",
+    liveLine: "rgba(185, 152, 239, 0.72)",
+    playhead: "#65c8b7",
+    debugSurface: "#252b26",
+    debugBorder: "#485044",
+    debugBar: "rgba(101, 200, 183, 0.54)"
+  }
+} satisfies Record<SongTimelineTheme, SongTimelinePalette>;
+
 function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOptions) {
+  const palette = songTimelinePalettes[options.theme];
   const pixelRatio = window.devicePixelRatio || 1;
   canvas.width = Math.floor(options.width * pixelRatio);
   canvas.height = Math.floor(options.height * pixelRatio);
@@ -105,7 +173,7 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
 
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, options.width, options.height);
-  context.fillStyle = "#fcfbf7";
+  context.fillStyle = palette.surface;
   context.fillRect(0, 0, options.width, options.height);
 
   const debugStripHeight = options.debugEnabled ? 30 : 0;
@@ -135,10 +203,22 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
     padding.top + (1 - (midi - minMidi) / Math.max(maxMidi - minMidi, 1)) * plotHeight;
 
   const timeLabelY = padding.top + plotHeight + debugStripHeight + 17;
-  drawSongGrid(context, padding, plotWidth, plotHeight, xForTime, yForMidi, minMidi, maxMidi, viewport, timeLabelY);
-  drawScoreRegions(context, options.score, padding, plotHeight, xForTime, viewport);
-  drawReferenceNotes(context, options.reference, xForTime, yForMidi, viewport);
-  drawLiveContour(context, options.liveFrames, xForTime, yForMidi, viewport);
+  drawSongGrid(
+    context,
+    padding,
+    plotWidth,
+    plotHeight,
+    xForTime,
+    yForMidi,
+    minMidi,
+    maxMidi,
+    viewport,
+    timeLabelY,
+    palette
+  );
+  drawScoreRegions(context, options.score, padding, plotHeight, xForTime, viewport, palette);
+  drawReferenceNotes(context, options.reference, xForTime, yForMidi, viewport, palette);
+  drawLiveContour(context, options.liveFrames, xForTime, yForMidi, viewport, palette);
   if (options.debugEnabled) {
     drawVocalEnergyStrip(
       context,
@@ -148,12 +228,13 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
       plotWidth,
       Math.max(18, debugStripHeight - 8),
       xForTime,
-      viewport
+      viewport,
+      palette
     );
   }
-  drawPlayhead(context, options.currentTimeMs, padding, plotHeight, xForTime, viewport);
+  drawPlayhead(context, options.currentTimeMs, padding, plotHeight, xForTime, viewport, palette);
 
-  context.fillStyle = "#6b6256";
+  context.fillStyle = palette.statusText;
   context.font = "600 12px system-ui, sans-serif";
   context.fillText(
     options.reference
@@ -174,22 +255,23 @@ function drawSongGrid(
   minMidi: number,
   maxMidi: number,
   viewport: SongTimelineViewport,
-  timeLabelY: number
+  timeLabelY: number,
+  palette: SongTimelinePalette
 ) {
-  context.strokeStyle = "#e4ded4";
+  context.strokeStyle = palette.gridBorder;
   context.lineWidth = 1;
   context.strokeRect(padding.left, padding.top, plotWidth, plotHeight);
 
   for (let midi = Math.ceil(minMidi); midi <= Math.floor(maxMidi); midi += 1) {
     const y = yForMidi(midi);
-    context.strokeStyle = midi % 12 === 0 ? "#d5cdc0" : "#eee8df";
+    context.strokeStyle = midi % 12 === 0 ? palette.gridStrongLine : palette.gridLine;
     context.beginPath();
     context.moveTo(padding.left, y);
     context.lineTo(padding.left + plotWidth, y);
     context.stroke();
 
     if (midi % 2 === 0) {
-      context.fillStyle = "#83796d";
+      context.fillStyle = palette.gridLabel;
       context.font = "11px system-ui, sans-serif";
       context.fillText(midiToNoteName(midi), 10, y + 4);
     }
@@ -200,13 +282,13 @@ function drawSongGrid(
   const firstTickMs = Math.ceil(viewport.startMs / tickMs) * tickMs;
   for (let timeMs = firstTickMs; timeMs <= viewport.endMs; timeMs += tickMs) {
     const x = xForTime(timeMs);
-    context.strokeStyle = "#ded6ca";
+    context.strokeStyle = palette.timeMarker;
     context.beginPath();
     context.moveTo(x, padding.top);
     context.lineTo(x, padding.top + plotHeight);
     context.stroke();
 
-    context.fillStyle = "#83796d";
+    context.fillStyle = palette.gridLabel;
     context.font = "10px system-ui, sans-serif";
     context.fillText(formatTime(timeMs), x - 11, timeLabelY);
   }
@@ -218,7 +300,8 @@ function drawScoreRegions(
   padding: { top: number; right: number; bottom: number; left: number },
   plotHeight: number,
   xForTime: (timeMs: number) => number,
-  viewport: SongTimelineViewport
+  viewport: SongTimelineViewport,
+  palette: SongTimelinePalette
 ) {
   if (!score) {
     return;
@@ -236,8 +319,8 @@ function drawScoreRegions(
     const width = Math.max(4, xForTime(Math.min(region.endMs, viewport.endMs)) - x);
     context.fillStyle =
       region.status === "missed" || region.status === "unclear"
-        ? "rgba(207, 93, 72, 0.14)"
-        : "rgba(125, 76, 194, 0.13)";
+        ? palette.missedRegion
+        : palette.offPitchRegion;
     context.fillRect(x, padding.top, width, plotHeight);
   });
 }
@@ -247,14 +330,15 @@ function drawReferenceNotes(
   reference: SongReference | null,
   xForTime: (timeMs: number) => number,
   yForMidi: (midi: number) => number,
-  viewport: SongTimelineViewport
+  viewport: SongTimelineViewport,
+  palette: SongTimelinePalette
 ) {
   if (!reference) {
     return;
   }
 
   context.lineWidth = 6;
-  context.strokeStyle = "rgba(27, 148, 127, 0.82)";
+  context.strokeStyle = palette.referenceLine;
   context.lineJoin = "round";
   context.lineCap = "round";
   reference.notes.forEach((note) => {
@@ -267,8 +351,8 @@ function drawReferenceNotes(
     const yTop = yForMidi(note.midi + 0.42);
     const yBottom = yForMidi(note.midi - 0.42);
     const height = Math.max(8, yBottom - yTop);
-    context.fillStyle = "rgba(27, 148, 127, 0.18)";
-    context.strokeStyle = "rgba(27, 148, 127, 0.58)";
+    context.fillStyle = palette.referenceBand;
+    context.strokeStyle = palette.referenceBorder;
     context.lineWidth = 1;
     context.fillRect(xStart, yTop, Math.max(4, xEnd - xStart), height);
     context.strokeRect(xStart, yTop, Math.max(4, xEnd - xStart), height);
@@ -280,7 +364,7 @@ function drawReferenceNotes(
             { timeMs: note.startMs, midi: note.midi },
             { timeMs: note.endMs, midi: note.midi }
           ];
-    context.strokeStyle = "rgba(27, 148, 127, 0.92)";
+    context.strokeStyle = palette.referenceLine;
     context.lineWidth = 2;
     context.beginPath();
     let drawing = false;
@@ -312,10 +396,11 @@ function drawLiveContour(
   frames: PitchFrame[],
   xForTime: (timeMs: number) => number,
   yForMidi: (midi: number) => number,
-  viewport: SongTimelineViewport
+  viewport: SongTimelineViewport,
+  palette: SongTimelinePalette
 ) {
   context.lineWidth = 3;
-  context.strokeStyle = "rgba(125, 76, 194, 0.62)";
+  context.strokeStyle = palette.liveLine;
   context.lineJoin = "round";
   context.lineCap = "round";
   drawMidiLine(
@@ -336,21 +421,22 @@ function drawPlayhead(
   padding: { top: number; right: number; bottom: number; left: number },
   plotHeight: number,
   xForTime: (timeMs: number) => number,
-  viewport: SongTimelineViewport
+  viewport: SongTimelineViewport,
+  palette: SongTimelinePalette
 ) {
   if (currentTimeMs < viewport.startMs || currentTimeMs > viewport.endMs) {
     return;
   }
 
   const x = xForTime(currentTimeMs);
-  context.strokeStyle = "#1f6f64";
+  context.strokeStyle = palette.playhead;
   context.lineWidth = 2;
   context.beginPath();
   context.moveTo(x, padding.top);
   context.lineTo(x, padding.top + plotHeight);
   context.stroke();
 
-  context.fillStyle = "#1f6f64";
+  context.fillStyle = palette.playhead;
   context.beginPath();
   context.moveTo(x, padding.top - 1);
   context.lineTo(x - 5, padding.top - 9);
@@ -369,11 +455,12 @@ function drawVocalEnergyStrip(
   width: number,
   height: number,
   xForTime: (timeMs: number) => number,
-  viewport: SongTimelineViewport
+  viewport: SongTimelineViewport,
+  palette: SongTimelinePalette
 ) {
-  context.fillStyle = "#f5efe6";
+  context.fillStyle = palette.debugSurface;
   context.fillRect(x, y, width, height);
-  context.strokeStyle = "#dfd5c7";
+  context.strokeStyle = palette.debugBorder;
   context.lineWidth = 1;
   context.strokeRect(x, y, width, height);
 
@@ -382,14 +469,14 @@ function drawVocalEnergyStrip(
   );
   const maxRms = Math.max(0.0001, ...visibleEnergy.map((point) => point.rms));
 
-  context.fillStyle = "rgba(31, 111, 100, 0.46)";
+  context.fillStyle = palette.debugBar;
   visibleEnergy.forEach((point) => {
     const barHeight = Math.max(1, (point.rms / maxRms) * (height - 4));
     const barX = xForTime(point.timeMs);
     context.fillRect(barX, y + height - 2 - barHeight, 2, barHeight);
   });
 
-  context.fillStyle = "#6b6256";
+  context.fillStyle = palette.statusText;
   context.font = "9px system-ui, sans-serif";
   context.fillText("vocal rms", x + 5, y + 10);
 }

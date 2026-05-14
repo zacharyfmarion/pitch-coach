@@ -141,9 +141,12 @@ export type SongPracticeConfig = {
 
 export interface SongPracticeEngine {
   start(config: SongPracticeConfig): Promise<void>;
+  pause(): Promise<void>;
+  resume(): Promise<void>;
   stop(): Promise<void>;
   setVocalGuideGain(gain: number): void;
   isRunning(): boolean;
+  isPaused(): boolean;
 }
 
 export type SongModeServices = {

@@ -32,6 +32,7 @@ export type SongPracticeStage =
   | "analyzing"
   | "ready"
   | "practicing"
+  | "paused"
   | "complete"
   | "error";
 
@@ -112,7 +113,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     decodedAudio !== null &&
     selectedDurationFits &&
     stage !== "analyzing" &&
-    stage !== "practicing";
+    stage !== "practicing" &&
+    stage !== "paused";
   const canPractice = Boolean(reference && separation && (stage === "ready" || stage === "complete"));
 
   const clearAttemptState = useCallback((options: { clearSeparation: boolean }) => {
@@ -362,6 +364,34 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     }
   }, [services.practiceEngine, settings.toleranceCents]);
 
+  const pausePractice = useCallback(async () => {
+    if (stage !== "practicing") {
+      return;
+    }
+
+    try {
+      await services.practiceEngine.pause();
+      if (services.practiceEngine.isPaused()) {
+        setStage("paused");
+      }
+    } catch (error) {
+      setErrorMessage(createSongErrorMessage(error));
+    }
+  }, [services.practiceEngine, stage]);
+
+  const resumePractice = useCallback(async () => {
+    if (stage !== "paused") {
+      return;
+    }
+
+    try {
+      await services.practiceEngine.resume();
+      setStage(services.practiceEngine.isPaused() ? "paused" : "practicing");
+    } catch (error) {
+      setErrorMessage(createSongErrorMessage(error));
+    }
+  }, [services.practiceEngine, stage]);
+
   const resetSong = useCallback(async () => {
     runIdRef.current += 1;
     await services.practiceEngine.stop();
@@ -382,7 +412,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const setReferenceDetail = useCallback(
     (detail: SongReferenceDetail) => {
       setReferenceDetailState(detail);
-      if (reference && stage !== "practicing") {
+      if (reference && stage !== "practicing" && stage !== "paused") {
         clearAttemptState({ clearSeparation: false });
         setStage("decoded");
         setAnalysisProgress((current) => ({
@@ -420,7 +450,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   );
 
   useEffect(() => {
-    if (!reference || isCurrentSongReference(reference) || stage === "practicing") {
+    if (!reference || isCurrentSongReference(reference) || stage === "practicing" || stage === "paused") {
       return;
     }
 
@@ -459,12 +489,15 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setTrimEndMs,
     analyzeSong,
     startPractice,
+    pausePractice,
+    resumePractice,
     stopPractice,
     resetSong,
     setReferenceDetail,
     setToleranceCents,
     setVocalGuideGain,
-    isBusy: stage === "decoding" || stage === "analyzing" || stage === "practicing"
+    themePreference: settings.themePreference,
+    isBusy: stage === "decoding" || stage === "analyzing" || stage === "practicing" || stage === "paused"
   };
 }
 

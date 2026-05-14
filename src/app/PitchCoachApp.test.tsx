@@ -61,6 +61,21 @@ describe("PitchCoachApp", () => {
     expect(screen.getByLabelText("Song mode unavailable").textContent).toMatch(/WebGPU/i);
   });
 
+  it("applies the resolved theme on direct song mode navigation", async () => {
+    mockPreferredColorScheme(true);
+    window.history.replaceState(null, "", "/songs");
+
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={createSongServices({ supported: true })}
+      />
+    );
+
+    await screen.findByRole("heading", { name: "Song Practice" });
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+  });
+
   it("uploads, analyzes, and scores a song practice attempt with fake local services", async () => {
     const songServices = createSongServices({ supported: true });
     render(
@@ -97,6 +112,40 @@ describe("PitchCoachApp", () => {
       expect.anything(),
       expect.objectContaining({ detail: "sensitive" })
     );
+  });
+
+  it("pauses and resumes an active song practice attempt", async () => {
+    const songServices = createSongServices({ supported: true, autoEndPractice: false });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+    await screen.findByText(/1 note/i);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
+    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    await waitFor(() => expect(screen.getByText("Paused")).toBeTruthy());
+    expect(songServices.practiceEngine.pause).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+    expect(songServices.practiceEngine.resume).toHaveBeenCalled();
   });
 
   it("clears stale song references from an older transcription build", async () => {
@@ -740,6 +789,7 @@ function createSongServices(options: {
   supported: boolean;
   referenceAnalysisVersion?: string;
   referenceMidis?: number[];
+  autoEndPractice?: boolean;
 }): SongModeServices & {
   separator: SongModeServices["separator"] & { separate: ReturnType<typeof vi.fn> };
   transcriber: SongModeServices["transcriber"] & { transcribe: ReturnType<typeof vi.fn> };
@@ -756,7 +806,7 @@ function createSongServices(options: {
       vocals: audio
     }
   };
-  const practiceEngine = new MockSongPracticeEngine();
+  const practiceEngine = new MockSongPracticeEngine(options.autoEndPractice ?? true);
   return {
     detectSupport: vi.fn(() =>
       Promise.resolve(
@@ -855,10 +905,14 @@ class MockAudioEngine implements AudioInputEngine {
 
 class MockSongPracticeEngine {
   private running = false;
+  private paused = false;
   lastConfig: SongPracticeConfig | null = null;
+
+  constructor(private readonly autoEndPractice: boolean) {}
 
   async start(config: SongPracticeConfig) {
     this.running = true;
+    this.paused = false;
     this.lastConfig = config;
     Array.from({ length: 12 }, (_, index) => index * 100).forEach((timeMs) =>
       config.onPitchFrame({
@@ -868,18 +922,33 @@ class MockSongPracticeEngine {
         rms: 0.08
       })
     );
-    this.running = false;
-    config.onEnded();
+    if (this.autoEndPractice) {
+      this.running = false;
+      config.onEnded();
+    }
   }
+
+  pause = vi.fn(async () => {
+    this.paused = true;
+  });
+
+  resume = vi.fn(async () => {
+    this.paused = false;
+  });
 
   async stop() {
     this.running = false;
+    this.paused = false;
   }
 
   setVocalGuideGain() {}
 
   isRunning() {
     return this.running;
+  }
+
+  isPaused() {
+    return this.paused;
   }
 }
 

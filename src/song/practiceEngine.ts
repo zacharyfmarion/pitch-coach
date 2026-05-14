@@ -21,7 +21,10 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
   private vocalSource: AudioBufferSourceNode | null = null;
   private vocalGain: GainNode | null = null;
   private playbackTimer: number | null = null;
+  private playbackTimeCallback: ((timeMs: number) => void) | null = null;
+  private playbackDurationMs = 0;
   private running = false;
+  private paused = false;
   private playbackStartMs = 0;
   private endedCallback: (() => void) | null = null;
 
@@ -71,7 +74,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     this.playbackStartMs = (this.context.currentTime + 0.1) * 1000;
     this.endedCallback = config.onEnded;
     this.worklet.port.onmessage = (event: MessageEvent<AudioFrameMessage>) => {
-      if (!this.running || event.data.type !== "audio-frame") {
+      if (!this.running || this.paused || event.data.type !== "audio-frame") {
         return;
       }
 
@@ -101,31 +104,52 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     };
 
     this.running = true;
+    this.paused = false;
+    this.playbackDurationMs = config.accompaniment.durationMs;
+    this.playbackTimeCallback = config.onPlaybackTime ?? null;
     const startAt = this.playbackStartMs / 1000;
     config.onPlaybackTime?.(0);
-    this.playbackTimer = window.setInterval(() => {
-      if (!this.running || !this.context) {
-        return;
-      }
-
-      const timeMs = Math.min(
-        Math.max(0, this.context.currentTime * 1000 - this.playbackStartMs),
-        config.accompaniment.durationMs
-      );
-      config.onPlaybackTime?.(timeMs);
-    }, 50);
+    this.startPlaybackTimer();
     this.accompanimentSource.start(startAt);
     this.vocalSource.start(startAt);
+  }
+
+  async pause() {
+    if (!this.running || this.paused || !this.context) {
+      return;
+    }
+
+    this.paused = true;
+    this.clearPlaybackTimer();
+    try {
+      if (this.context.state === "running") {
+        await this.context.suspend();
+      }
+    } catch (error) {
+      this.paused = false;
+      this.startPlaybackTimer();
+      throw error;
+    }
+  }
+
+  async resume() {
+    if (!this.running || !this.paused || !this.context) {
+      return;
+    }
+
+    if (this.context.state === "suspended") {
+      await this.context.resume();
+    }
+    this.paused = false;
+    this.startPlaybackTimer();
   }
 
   async stop() {
     const wasRunning = this.running;
     this.running = false;
+    this.paused = false;
     this.endedCallback = null;
-    if (this.playbackTimer !== null) {
-      window.clearInterval(this.playbackTimer);
-      this.playbackTimer = null;
-    }
+    this.clearPlaybackTimer();
 
     if (wasRunning) {
       try {
@@ -161,6 +185,8 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     this.accompanimentSource = null;
     this.vocalSource = null;
     this.vocalGain = null;
+    this.playbackTimeCallback = null;
+    this.playbackDurationMs = 0;
     this.playbackStartMs = 0;
   }
 
@@ -174,6 +200,10 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     return this.running;
   }
 
+  isPaused() {
+    return this.paused;
+  }
+
   static isSupported() {
     return Boolean(
       typeof window !== "undefined" &&
@@ -181,5 +211,27 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         "AudioWorkletNode" in window &&
         navigator.mediaDevices?.getUserMedia
     );
+  }
+
+  private clearPlaybackTimer() {
+    if (this.playbackTimer !== null) {
+      window.clearInterval(this.playbackTimer);
+      this.playbackTimer = null;
+    }
+  }
+
+  private startPlaybackTimer() {
+    this.clearPlaybackTimer();
+    this.playbackTimer = window.setInterval(() => {
+      if (!this.running || this.paused || !this.context) {
+        return;
+      }
+
+      const timeMs = Math.min(
+        Math.max(0, this.context.currentTime * 1000 - this.playbackStartMs),
+        this.playbackDurationMs
+      );
+      this.playbackTimeCallback?.(timeMs);
+    }, 50);
   }
 }

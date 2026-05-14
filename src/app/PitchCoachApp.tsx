@@ -28,6 +28,7 @@ import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
+import { usePitchCoachTheme } from "./theme";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
 
 export type PitchCoachAppProps = PitchCoachControllerOptions & {
@@ -476,8 +477,6 @@ const statusCopy = {
   complete: "Complete"
 } as const;
 
-type ResolvedTheme = "light" | "dark";
-
 const themeOptions = [
   {
     value: "system",
@@ -499,44 +498,6 @@ const themeOptions = [
   label: string;
   icon: typeof Monitor;
 }[];
-
-function usePitchCoachTheme(themePreference: ThemePreference): ResolvedTheme {
-  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => getSystemTheme());
-  const resolvedTheme = themePreference === "system" ? systemTheme : themePreference;
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const updateSystemTheme = () => setSystemTheme(mediaQuery.matches ? "dark" : "light");
-    updateSystemTheme();
-
-    mediaQuery.addEventListener("change", updateSystemTheme);
-    return () => mediaQuery.removeEventListener("change", updateSystemTheme);
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = resolvedTheme;
-    root.style.colorScheme = resolvedTheme;
-  }, [resolvedTheme]);
-
-  return resolvedTheme;
-}
-
-function getSystemTheme(): ResolvedTheme {
-  if (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  ) {
-    return "dark";
-  }
-
-  return "light";
-}
 
 function ThemePicker({
   value,
