@@ -2,9 +2,12 @@ import type { SongReferenceDetail } from "./types";
 
 export type SongReferenceDetailConfig = {
   label: string;
-  onsetThreshold: number;
   frameThreshold: number;
-  minNoteFrames: number;
+  onsetSplitThreshold: number;
+  minStableFrames: number;
+  minNoteDurationMs: number;
+  maxGapFillMs: number;
+  maxSamePitchMergeGapMs: number;
 };
 
 export const REFERENCE_DETAIL_OPTIONS: Array<{
@@ -19,21 +22,30 @@ export const REFERENCE_DETAIL_OPTIONS: Array<{
 export const REFERENCE_DETAIL_CONFIG: Record<SongReferenceDetail, SongReferenceDetailConfig> = {
   clean: {
     label: "Clean",
-    onsetThreshold: 0.3,
-    frameThreshold: 0.25,
-    minNoteFrames: 6
+    frameThreshold: 0.34,
+    onsetSplitThreshold: 0.95,
+    minStableFrames: 6,
+    minNoteDurationMs: 80,
+    maxGapFillMs: 100,
+    maxSamePitchMergeGapMs: 100
   },
   balanced: {
     label: "Balanced",
-    onsetThreshold: 0.2,
-    frameThreshold: 0.18,
-    minNoteFrames: 4
+    frameThreshold: 0.22,
+    onsetSplitThreshold: 0.9,
+    minStableFrames: 4,
+    minNoteDurationMs: 55,
+    maxGapFillMs: 80,
+    maxSamePitchMergeGapMs: 80
   },
   sensitive: {
     label: "Sensitive",
-    onsetThreshold: 0.12,
-    frameThreshold: 0.1,
-    minNoteFrames: 3
+    frameThreshold: 0.13,
+    onsetSplitThreshold: 0.82,
+    minStableFrames: 4,
+    minNoteDurationMs: 55,
+    maxGapFillMs: 80,
+    maxSamePitchMergeGapMs: 80
   }
 };
 

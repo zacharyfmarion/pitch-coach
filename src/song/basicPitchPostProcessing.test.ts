@@ -20,6 +20,64 @@ describe("Basic Pitch song reference post-processing", () => {
     expect(reference.notes[1].startMs - reference.notes[0].endMs).toBeGreaterThan(80);
   });
 
+  it("segments legato vocal pitch changes from frame activations without onset spikes", () => {
+    const output = createBasicPitchOutput([
+      { startFrame: 2, endFrame: 14, midi: 60, onset: 0 },
+      { startFrame: 14, endFrame: 26, midi: 62, onset: 0 }
+    ]);
+
+    const reference = decodeBasicPitchOutputToReference(output, decodeOptions());
+
+    expect(reference.notes.map((note) => note.midi)).toEqual([60, 62]);
+  });
+
+  it("splits re-articulated same-pitch notes when an onset peak appears", () => {
+    const output = createBasicPitchOutput([
+      { startFrame: 2, endFrame: 14, midi: 60, onset: 0.98 },
+      { startFrame: 14, endFrame: 26, midi: 60, onset: 0.98 }
+    ]);
+
+    const reference = decodeBasicPitchOutputToReference(output, decodeOptions());
+
+    expect(reference.notes).toHaveLength(2);
+    expect(reference.notes.map((note) => note.midi)).toEqual([60, 60]);
+  });
+
+  it("collapses harmonic candidates into one monophonic vocal note", () => {
+    const output = createBasicPitchOutput([
+      { startFrame: 2, endFrame: 22, midi: 60, amplitude: 0.8 },
+      { startFrame: 2, endFrame: 22, midi: 72, amplitude: 0.5 }
+    ]);
+
+    const reference = decodeBasicPitchOutputToReference(output, decodeOptions());
+
+    expect(reference.notes).toHaveLength(1);
+    expect(reference.notes[0].midi).toBe(60);
+  });
+
+  it("smooths isolated octave glitches before note segmentation", () => {
+    const output = createBasicPitchOutput([{ startFrame: 2, endFrame: 22, midi: 60, amplitude: 0.8 }]);
+    output.frames[12][60 - 21] = 0.2;
+    output.frames[12][72 - 21] = 0.95;
+
+    const reference = decodeBasicPitchOutputToReference(output, decodeOptions());
+
+    expect(reference.notes).toHaveLength(1);
+    expect(reference.notes[0].midi).toBe(60);
+  });
+
+  it("does not turn low-confidence sensitive noise into note blocks", () => {
+    const output = createBasicPitchOutput([{ startFrame: 10, endFrame: 24, midi: 61, amplitude: 0.72 }]);
+    for (let frame = 0; frame < output.frames.length; frame += 1) {
+      output.frames[frame][68 - 21] = 0.11;
+    }
+
+    const reference = decodeBasicPitchOutputToReference(output, decodeOptions({ detail: "sensitive" }));
+
+    expect(reference.notes).toHaveLength(1);
+    expect(reference.notes[0].midi).toBe(61);
+  });
+
   it("drops very short note events", () => {
     const reference = createReferenceFromBasicPitchNotes(
       [noteEvent({ startTimeSeconds: 0, durationSeconds: 0.03, pitchMidi: 60 })],
@@ -91,7 +149,13 @@ describe("Basic Pitch song reference post-processing", () => {
 });
 
 function createBasicPitchOutput(
-  notes: Array<{ startFrame: number; endFrame: number; midi: number }>
+  notes: Array<{
+    startFrame: number;
+    endFrame: number;
+    midi: number;
+    amplitude?: number;
+    onset?: number;
+  }>
 ) {
   const frameCount = Math.max(...notes.map((note) => note.endFrame)) + 6;
   const frames = createMatrix(frameCount, 88);
@@ -100,9 +164,9 @@ function createBasicPitchOutput(
 
   notes.forEach((note) => {
     const pitchIndex = note.midi - 21;
-    onsets[note.startFrame][pitchIndex] = 0.9;
+    onsets[note.startFrame][pitchIndex] = note.onset ?? 0.9;
     for (let frame = note.startFrame; frame < note.endFrame; frame += 1) {
-      frames[frame][pitchIndex] = 0.8;
+      frames[frame][pitchIndex] = note.amplitude ?? 0.8;
       contours[frame][pitchIndex * 3] = 1;
     }
   });
