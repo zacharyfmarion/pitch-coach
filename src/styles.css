@@ -917,6 +917,56 @@ output {
   accent-color: #27685f;
 }
 
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d8d0c3;
+  border-radius: 8px;
+  background: #f6f2ea;
+}
+
+.segmented-control button {
+  min-height: 32px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: #4a433c;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.segmented-control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.segmented-control .segmented-active {
+  color: #fffaf2;
+  background: #27685f;
+}
+
+.reference-quality {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.reference-quality span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #33423f;
+  background: #eef5ef;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.reference-quality p {
+  flex: 1 1 100%;
+}
+
 .song-reason-list {
   display: grid;
   gap: 7px;

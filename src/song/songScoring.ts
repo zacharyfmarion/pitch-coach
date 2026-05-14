@@ -1,9 +1,9 @@
 import type { PitchFrame } from "../domain/contracts";
 import { frequencyToMidi } from "../domain/music";
+import { interpolateReferenceMidi } from "./referenceContour";
 import type {
   SongComparisonStatus,
   SongReference,
-  SongReferenceFrame,
   SongScore,
   SongScoreRegion
 } from "./types";
@@ -11,6 +11,7 @@ import type {
 const MAX_ALIGNMENT_GAP_MS = 150;
 const MAX_REGION_GAP_MS = 260;
 const AUDIBLE_RMS = 0.006;
+const COMPARISON_HOP_MS = 80;
 
 type ComparedFrame = {
   timeMs: number;
@@ -23,9 +24,9 @@ export function scoreSongAttempt(
   liveFrames: PitchFrame[],
   toleranceCents: number
 ): SongScore {
-  const comparedFrames = reference.frames
-    .filter(isVoicedReferenceFrame)
-    .map((referenceFrame) => compareReferenceFrame(referenceFrame, liveFrames, toleranceCents));
+  const comparedFrames = createReferenceComparisonPoints(reference).map((referencePoint) =>
+    compareReferencePoint(reference, referencePoint.timeMs, liveFrames, toleranceCents)
+  );
   const regions = buildScoreRegions(comparedFrames);
   const tunedCount = comparedFrames.filter((frame) => frame.status === "inTune").length;
   const comparedFrameCount = comparedFrames.length;
@@ -39,40 +40,64 @@ export function scoreSongAttempt(
   };
 }
 
-function compareReferenceFrame(
-  referenceFrame: SongReferenceFrame & { midi: number },
+function compareReferencePoint(
+  reference: SongReference,
+  timeMs: number,
   liveFrames: PitchFrame[],
   toleranceCents: number
 ): ComparedFrame {
-  const liveFrame = findNearestFrame(liveFrames, referenceFrame.timeMs);
+  const expectedMidi = interpolateReferenceMidi(reference, timeMs);
+  if (expectedMidi === null) {
+    return {
+      timeMs,
+      status: "missed"
+    };
+  }
+
+  const liveFrame = findNearestFrame(liveFrames, timeMs);
   if (!liveFrame) {
     return {
-      timeMs: referenceFrame.timeMs,
+      timeMs,
       status: "missed"
     };
   }
 
   if (liveFrame.frequencyHz === null) {
     return {
-      timeMs: referenceFrame.timeMs,
+      timeMs,
       status: liveFrame.rms >= AUDIBLE_RMS ? "unclear" : "missed"
     };
   }
 
-  const cents = (frequencyToMidi(liveFrame.frequencyHz) - referenceFrame.midi) * 100;
+  const cents = (frequencyToMidi(liveFrame.frequencyHz) - expectedMidi) * 100;
   if (Math.abs(cents) <= toleranceCents) {
     return {
-      timeMs: referenceFrame.timeMs,
+      timeMs,
       status: "inTune",
       cents
     };
   }
 
   return {
-    timeMs: referenceFrame.timeMs,
+    timeMs,
     status: cents < 0 ? "flat" : "sharp",
     cents
   };
+}
+
+function createReferenceComparisonPoints(reference: SongReference): Array<{ timeMs: number }> {
+  return reference.notes.flatMap((note) => {
+    const points: Array<{ timeMs: number }> = [];
+    for (let timeMs = note.startMs; timeMs <= note.endMs; timeMs += COMPARISON_HOP_MS) {
+      points.push({ timeMs });
+    }
+
+    if (points.length === 0 || points.at(-1)!.timeMs < note.endMs) {
+      points.push({ timeMs: note.endMs });
+    }
+
+    return points;
+  });
 }
 
 function buildScoreRegions(frames: ComparedFrame[]): SongScoreRegion[] {
@@ -162,12 +187,6 @@ function formatTime(timeMs: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function isVoicedReferenceFrame(
-  frame: SongReferenceFrame
-): frame is SongReferenceFrame & { midi: number; frequencyHz: number } {
-  return frame.midi !== null && frame.frequencyHz !== null;
 }
 
 function median(values: number[]) {

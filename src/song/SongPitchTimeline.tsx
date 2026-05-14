@@ -94,7 +94,11 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
   const plotHeight = Math.max(options.height - padding.top - padding.bottom, 1);
   const viewport = createTimelineViewport(options.totalDurationMs, options.currentTimeMs, options.isPlaying);
   const visibleMidis = [
-    ...(options.reference?.notes.map((note) => note.medianMidi) ?? []),
+    ...(options.reference?.notes.flatMap((note) => [
+      note.midi,
+      note.medianMidi,
+      ...note.pitchBends.map((bend) => bend.midi)
+    ]) ?? []),
     ...options.liveFrames
       .filter((frame) => frame.frequencyHz !== null)
       .map((frame) => frequencyToMidi(frame.frequencyHz!))
@@ -247,7 +251,7 @@ function drawReferenceNotes(
   }
 
   context.lineWidth = 6;
-  context.strokeStyle = "rgba(27, 148, 127, 0.78)";
+  context.strokeStyle = "rgba(27, 148, 127, 0.82)";
   context.lineJoin = "round";
   context.lineCap = "round";
   reference.notes.forEach((note) => {
@@ -257,10 +261,45 @@ function drawReferenceNotes(
 
     const xStart = xForTime(Math.max(note.startMs, viewport.startMs));
     const xEnd = xForTime(Math.min(note.endMs, viewport.endMs));
-    const y = yForMidi(note.medianMidi);
+    const yTop = yForMidi(note.midi + 0.42);
+    const yBottom = yForMidi(note.midi - 0.42);
+    const height = Math.max(8, yBottom - yTop);
+    context.fillStyle = "rgba(27, 148, 127, 0.18)";
+    context.strokeStyle = "rgba(27, 148, 127, 0.58)";
+    context.lineWidth = 1;
+    context.fillRect(xStart, yTop, Math.max(4, xEnd - xStart), height);
+    context.strokeRect(xStart, yTop, Math.max(4, xEnd - xStart), height);
+
+    const bendPoints =
+      note.pitchBends.length > 0
+        ? note.pitchBends.map((bend) => ({ timeMs: bend.timeMs, midi: bend.midi }))
+        : [
+            { timeMs: note.startMs, midi: note.midi },
+            { timeMs: note.endMs, midi: note.midi }
+          ];
+    context.strokeStyle = "rgba(27, 148, 127, 0.92)";
+    context.lineWidth = 2;
     context.beginPath();
-    context.moveTo(xStart, y);
-    context.lineTo(Math.max(xStart + 4, xEnd), y);
+    let drawing = false;
+    bendPoints.forEach((point) => {
+      if (point.timeMs < viewport.startMs || point.timeMs > viewport.endMs) {
+        drawing = false;
+        return;
+      }
+
+      const x = xForTime(point.timeMs);
+      const y = yForMidi(point.midi);
+      if (!drawing) {
+        context.moveTo(x, y);
+        drawing = true;
+      } else {
+        context.lineTo(x, y);
+      }
+    });
+    if (!drawing && note.startMs < viewport.startMs && note.endMs > viewport.endMs) {
+      context.moveTo(xStart, yForMidi(note.medianMidi));
+      context.lineTo(Math.max(xStart + 4, xEnd), yForMidi(note.medianMidi));
+    }
     context.stroke();
   });
 }

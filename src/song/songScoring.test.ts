@@ -45,9 +45,11 @@ describe("song scoring", () => {
       durationMs: 1600,
       phrases: [],
       notes: [
-        { id: "note-0", startMs: 0, endMs: 200, medianMidi: 60 },
-        { id: "note-1", startMs: 1000, endMs: 1200, medianMidi: 62 }
+        referenceNote("note-0", 0, 200, 60),
+        referenceNote("note-1", 1000, 1200, 62)
       ],
+      contour: [],
+      quality: { noteCount: 2, lowConfidenceCount: 0, suggestion: null },
       frames: [
         referenceFrame(0, 60),
         referenceFrame(100, 60),
@@ -69,13 +71,51 @@ describe("song scoring", () => {
 
     expect(score.regions.map((region) => region.status)).toEqual(["inTune", "flat"]);
   });
+
+  it("scores live singing against pitch bends inside a reference note", () => {
+    const reference: SongReference = {
+      durationMs: 500,
+      phrases: [],
+      notes: [
+        {
+          ...referenceNote("note-0", 0, 400, 60),
+          pitchBends: [
+            { timeMs: 0, midi: 60, offsetSemitones: 0 },
+            { timeMs: 200, midi: 61, offsetSemitones: 1 },
+            { timeMs: 400, midi: 60, offsetSemitones: 0 }
+          ]
+        }
+      ],
+      contour: [],
+      quality: { noteCount: 1, lowConfidenceCount: 0, suggestion: null },
+      frames: [0, 100, 200, 300, 400].map((timeMs) => referenceFrame(timeMs, 60))
+    };
+
+    const score = scoreSongAttempt(
+      reference,
+      [
+        liveFrame(0, 60),
+        liveFrame(80, 60.4),
+        liveFrame(160, 60.8),
+        liveFrame(240, 60.8),
+        liveFrame(320, 60.4),
+        liveFrame(400, 60)
+      ],
+      35
+    );
+
+    expect(score.tunedRatio).toBeGreaterThan(0.8);
+    expect(score.regions[0].status).toBe("inTune");
+  });
 });
 
 function referenceLine(): SongReference {
   return {
     durationMs: 1200,
     phrases: [],
-    notes: [{ id: "note-0", startMs: 0, endMs: 600, medianMidi: 60 }],
+    notes: [referenceNote("note-0", 0, 600, 60)],
+    contour: [],
+    quality: { noteCount: 1, lowConfidenceCount: 0, suggestion: null },
     frames: [0, 100, 200, 300, 400, 500].map((timeMs) => referenceFrame(timeMs, 60))
   };
 }
@@ -96,6 +136,19 @@ function referenceFrame(timeMs: number, midi: number) {
     midi,
     clarity: 0.95,
     rms: 0.08
+  };
+}
+
+function referenceNote(id: string, startMs: number, endMs: number, midi: number) {
+  return {
+    id,
+    startMs,
+    endMs,
+    midi,
+    medianMidi: midi,
+    confidence: 0.9,
+    amplitude: 0.9,
+    pitchBends: []
   };
 }
 

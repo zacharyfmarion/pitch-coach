@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@radix-ui/react-select": "2.2.6",
+    "@spotify/basic-pitch": "1.0.1",
+    "@tensorflow/tfjs": "3.21.0",
     "demucs-web": "1.0.2",
     "lucide-react": "1.14.0",
     "onnxruntime-web": "1.26.0",

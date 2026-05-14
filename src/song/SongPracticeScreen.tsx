@@ -199,11 +199,35 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                     <progress value={song.analysisProgress.separationProgress} max="1" />
                     <span>{Math.round(song.analysisProgress.separationProgress * 100)}%</span>
                   </div>
+                  <div className="analysis-meter">
+                    <span>Notes</span>
+                    <progress value={song.analysisProgress.transcriptionProgress} max="1" />
+                    <span>{Math.round(song.analysisProgress.transcriptionProgress * 100)}%</span>
+                  </div>
+                  <div className="segmented-control" role="group" aria-label="Reference detail">
+                    {song.referenceDetailOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        className={option.value === song.referenceDetail ? "segmented-active" : ""}
+                        type="button"
+                        onClick={() => song.setReferenceDetail(option.value)}
+                        aria-pressed={option.value === song.referenceDetail}
+                        disabled={song.isBusy}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                   <p className="history-empty">{song.analysisProgress.status}</p>
                   {song.reference ? (
-                    <p className="coach-summary">
-                      {song.reference.phrases.length} vocal phrases found in {formatDuration(song.reference.durationMs)}.
-                    </p>
+                    <div className="reference-quality">
+                      <span>{formatCount(song.reference.quality.noteCount, "note")}</span>
+                      <span>{formatCount(song.reference.phrases.length, "phrase")}</span>
+                      <span>{song.reference.quality.lowConfidenceCount} low confidence</span>
+                      {song.reference.quality.suggestion ? (
+                        <p className="history-empty">{song.reference.quality.suggestion}</p>
+                      ) : null}
+                    </div>
                   ) : null}
                 </section>
 
@@ -301,6 +325,10 @@ function formatDuration(durationMs: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatCount(count: number, singular: string) {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
 }
 
 function formatRegionStatus(status: string) {

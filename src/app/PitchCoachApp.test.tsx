@@ -11,7 +11,7 @@ import {
 } from "../domain/exercise";
 import { midiToFrequency, parseNoteName } from "../domain/music";
 import { createStereoBuffer } from "../song/audioData";
-import type { SongModeServices, SongPracticeConfig, SongStereoBuffer } from "../song/types";
+import type { SongModeServices, SongPracticeConfig, SongReference, SongStereoBuffer } from "../song/types";
 import type { AttemptHistoryRecord } from "../domain/contracts";
 import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
 import { installFakeIndexedDB } from "../test/fakeIndexedDB";
@@ -79,13 +79,20 @@ describe("PitchCoachApp", () => {
     });
 
     await screen.findByText(/0:01 selected/);
+    expect(screen.getByRole("button", { name: "Balanced" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Sensitive" }));
     fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
 
-    await screen.findByText(/vocal phrases found/i);
+    await screen.findByText(/1 note/i);
+    expect(screen.getByRole("group", { name: "Reference detail" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
 
     await waitFor(() => expect(screen.getByLabelText("Song feedback").textContent).toMatch(/Strong match/i));
     expect(songServices.separator.separate).toHaveBeenCalled();
+    expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ detail: "sensitive" })
+    );
   });
 
   it("advances a half step after a passing attempt", async () => {
@@ -653,6 +660,7 @@ function mockPreferredColorScheme(initialMatches: boolean) {
 
 function createSongServices(options: { supported: boolean }): SongModeServices & {
   separator: SongModeServices["separator"] & { separate: ReturnType<typeof vi.fn> };
+  transcriber: SongModeServices["transcriber"] & { transcribe: ReturnType<typeof vi.fn> };
 } {
   const audio = createTestSongBuffer();
   const separated = {
@@ -682,6 +690,12 @@ function createSongServices(options: { supported: boolean }): SongModeServices &
     separator: {
       separate: vi.fn(() => Promise.resolve(separated))
     },
+    transcriber: {
+      transcribe: vi.fn((_vocals, transcriptionOptions) => {
+        transcriptionOptions.onProgress?.({ progress: 1 });
+        return Promise.resolve(createTestSongReference());
+      })
+    },
     practiceEngine,
     detector: {
       detectPitch: vi.fn((_samples, _sampleRate, timeMs) => ({
@@ -691,6 +705,37 @@ function createSongServices(options: { supported: boolean }): SongModeServices &
         rms: 0.08
       }))
     }
+  };
+}
+
+function createTestSongReference(): SongReference {
+  return {
+    durationMs: 1200,
+    frames: [0, 100, 200, 300, 400, 500].map((timeMs) => ({
+      timeMs,
+      frequencyHz: midiToFrequency(60),
+      midi: 60,
+      clarity: 0.9,
+      rms: 0.08
+    })),
+    notes: [
+      {
+        id: "note-0",
+        startMs: 0,
+        endMs: 600,
+        midi: 60,
+        medianMidi: 60,
+        confidence: 0.9,
+        amplitude: 0.9,
+        pitchBends: []
+      }
+    ],
+    contour: [
+      { timeMs: 0, midi: 60, confidence: 0.9, noteId: "note-0" },
+      { timeMs: 600, midi: 60, confidence: 0.9, noteId: "note-0" }
+    ],
+    phrases: [{ id: "phrase-0", startMs: 0, endMs: 600, medianMidi: 60 }],
+    quality: { noteCount: 1, lowConfidenceCount: 0, suggestion: null }
   };
 }
 

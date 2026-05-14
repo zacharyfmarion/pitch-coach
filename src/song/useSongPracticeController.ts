@@ -3,13 +3,14 @@ import type { PitchFrame } from "../domain/contracts";
 import { midiToFrequency } from "../domain/music";
 import { loadSettings, normalizeSettings, saveSettings } from "../storage/settingsStorage";
 import { sliceStereoBuffer } from "./audioData";
-import { extractReferencePitch } from "./referencePitch";
 import { createSongModeServices } from "./services";
 import { scoreSongAttempt } from "./songScoring";
 import { pendingSongRuntimeSupport } from "./support";
+import { DEFAULT_REFERENCE_DETAIL, REFERENCE_DETAIL_OPTIONS } from "./transcriptionConfig";
 import type {
   SongModeServices,
   SongReference,
+  SongReferenceDetail,
   SongRuntimeSupport,
   SongScore,
   SongSeparationResult,
@@ -36,6 +37,7 @@ export type SongPracticeStage =
 export type SongAnalysisProgress = {
   modelProgress: number;
   separationProgress: number;
+  transcriptionProgress: number;
   status: string;
 };
 
@@ -56,6 +58,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const [analysisProgress, setAnalysisProgress] = useState<SongAnalysisProgress>({
     modelProgress: 0,
     separationProgress: 0,
+    transcriptionProgress: 0,
     status: "Idle"
   });
   const [separation, setSeparation] = useState<SongSeparationResult | null>(null);
@@ -64,6 +67,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const [score, setScore] = useState<SongScore | null>(null);
   const [vocalGuideGain, setVocalGuideGainState] = useState(0);
   const [currentPlaybackTimeMs, setCurrentPlaybackTimeMs] = useState(0);
+  const [referenceDetail, setReferenceDetailState] =
+    useState<SongReferenceDetail>(DEFAULT_REFERENCE_DETAIL);
 
   const liveFramesRef = useRef<PitchFrame[]>([]);
   const referenceRef = useRef<SongReference | null>(null);
@@ -109,6 +114,17 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     stage !== "practicing";
   const canPractice = Boolean(reference && separation && (stage === "ready" || stage === "complete"));
 
+  const clearAttemptState = useCallback((options: { clearSeparation: boolean }) => {
+    if (options.clearSeparation) {
+      setSeparation(null);
+    }
+    setReference(null);
+    setLiveFrames([]);
+    setScore(null);
+    setCurrentPlaybackTimeMs(0);
+    liveFramesRef.current = [];
+  }, []);
+
   const chooseFile = useCallback(
     async (file: File) => {
       runIdRef.current += 1;
@@ -117,12 +133,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setErrorMessage(null);
       setFileName(file.name);
       setDecodedAudio(null);
-      setSeparation(null);
-      setReference(null);
-      setLiveFrames([]);
-      setScore(null);
-      setCurrentPlaybackTimeMs(0);
-      liveFramesRef.current = [];
+      clearAttemptState({ clearSeparation: true });
 
       try {
         const audio = await services.decodeFile(file);
@@ -136,7 +147,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
         setErrorMessage(createSongErrorMessage(error));
       }
     },
-    [services]
+    [clearAttemptState, services]
   );
 
   const setTrimStartMs = useCallback(
@@ -152,8 +163,10 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setTrimEndMsState((currentEndMs) =>
         clamp(Math.max(currentEndMs, startMs + 1000), startMs + 1000, maxEndMs)
       );
+      clearAttemptState({ clearSeparation: true });
+      setStage("decoded");
     },
-    [decodedAudio]
+    [clearAttemptState, decodedAudio]
   );
 
   const setTrimEndMs = useCallback(
@@ -165,8 +178,10 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setTrimEndMsState(
         clamp(nextEndMs, trimStartMs + 1000, Math.min(decodedAudio.durationMs, trimStartMs + MAX_SECTION_MS))
       );
+      clearAttemptState({ clearSeparation: true });
+      setStage("decoded");
     },
-    [decodedAudio, trimStartMs]
+    [clearAttemptState, decodedAudio, trimStartMs]
   );
 
   const analyzeSong = useCallback(async () => {
@@ -179,47 +194,59 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     await services.practiceEngine.stop();
     setStage("analyzing");
     setErrorMessage(null);
-    setSeparation(null);
-    setReference(null);
-    setScore(null);
-    setLiveFrames([]);
-    setCurrentPlaybackTimeMs(0);
-    liveFramesRef.current = [];
+    clearAttemptState({ clearSeparation: false });
     setAnalysisProgress({
       modelProgress: 0,
       separationProgress: 0,
+      transcriptionProgress: 0,
       status: "Preparing selected section"
     });
 
     try {
-      const selectedAudio = sliceStereoBuffer(decodedAudio, trimStartMs, trimEndMs);
-      const separated = await services.separator.separate(selectedAudio, {
-        onModelDownloadProgress: (progress) =>
-          setAnalysisProgress((current) => ({
-            ...current,
-            modelProgress: Math.max(current.modelProgress, progress.progress),
-            status: "Loading vocal isolation model"
-          })),
-        onSeparationProgress: (progress) =>
-          setAnalysisProgress((current) => ({
-            ...current,
-            separationProgress: progress.progress,
-            status: "Separating vocals"
-          })),
-        onStatus: (status) => setAnalysisProgress((current) => ({ ...current, status }))
-      });
+      let separated = separation;
+      if (!separated) {
+        const selectedAudio = sliceStereoBuffer(decodedAudio, trimStartMs, trimEndMs);
+        separated = await services.separator.separate(selectedAudio, {
+          onModelDownloadProgress: (progress) =>
+            setAnalysisProgress((current) => ({
+              ...current,
+              modelProgress: Math.max(current.modelProgress, progress.progress),
+              status: "Loading vocal isolation model"
+            })),
+          onSeparationProgress: (progress) =>
+            setAnalysisProgress((current) => ({
+              ...current,
+              separationProgress: progress.progress,
+              status: "Separating vocals"
+            })),
+          onStatus: (status) => setAnalysisProgress((current) => ({ ...current, status }))
+        });
+      } else {
+        setAnalysisProgress((current) => ({
+          ...current,
+          modelProgress: 1,
+          separationProgress: 1,
+          status: "Using separated vocals"
+        }));
+      }
 
       if (runId !== runIdRef.current) {
         return;
       }
 
-      const nextReference = extractReferencePitch({
-        vocal: separated.vocals,
-        detector: services.detector,
-        range: settings.range
+      const nextReference = await services.transcriber.transcribe(separated.vocals, {
+        range: settings.range,
+        detail: referenceDetail,
+        onProgress: (progress) =>
+          setAnalysisProgress((current) => ({
+            ...current,
+            transcriptionProgress: progress.progress,
+            status: "Transcribing vocal notes"
+          })),
+        onStatus: (status) => setAnalysisProgress((current) => ({ ...current, status }))
       });
-      if (nextReference.phrases.length === 0) {
-        throw new Error("No clear vocal pitch was found in this section.");
+      if (nextReference.notes.length === 0) {
+        throw new Error("No vocal notes were found. Try Sensitive reference detail or choose a clearer section.");
       }
 
       setSeparation(separated);
@@ -227,6 +254,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setAnalysisProgress({
         modelProgress: 1,
         separationProgress: 1,
+        transcriptionProgress: 1,
         status: "Ready to practice"
       });
       setStage("ready");
@@ -239,10 +267,13 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setErrorMessage(createSongErrorMessage(error));
     }
   }, [
+    clearAttemptState,
     decodedAudio,
-    services.detector,
     services.practiceEngine,
     services.separator,
+    services.transcriber,
+    separation,
+    referenceDetail,
     settings.range,
     support.supported,
     trimEndMs,
@@ -345,6 +376,22 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setTrimEndMsState(DEFAULT_SECTION_MS);
   }, [services.practiceEngine, support.supported]);
 
+  const setReferenceDetail = useCallback(
+    (detail: SongReferenceDetail) => {
+      setReferenceDetailState(detail);
+      if (reference && stage !== "practicing") {
+        clearAttemptState({ clearSeparation: false });
+        setStage("decoded");
+        setAnalysisProgress((current) => ({
+          ...current,
+          transcriptionProgress: 0,
+          status: "Reference detail changed. Analyze again."
+        }));
+      }
+    },
+    [clearAttemptState, reference, stage]
+  );
+
   const setToleranceCents = useCallback(
     (toleranceCents: number) => {
       const nextSettings = normalizeSettings({
@@ -384,6 +431,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     liveFrames,
     score,
     currentPlaybackTimeMs,
+    referenceDetail,
+    referenceDetailOptions: REFERENCE_DETAIL_OPTIONS,
     toleranceCents: settings.toleranceCents,
     vocalGuideGain,
     canAnalyze,
@@ -395,6 +444,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     startPractice,
     stopPractice,
     resetSong,
+    setReferenceDetail,
     setToleranceCents,
     setVocalGuideGain,
     isBusy: stage === "decoding" || stage === "analyzing" || stage === "practicing"

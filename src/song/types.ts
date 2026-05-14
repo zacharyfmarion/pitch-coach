@@ -47,6 +47,8 @@ export type SongReferenceFrame = PitchFrame & {
   midi: number | null;
 };
 
+export type SongReferenceDetail = "clean" | "balanced" | "sensitive";
+
 export type SongPhrase = {
   id: string;
   startMs: number;
@@ -54,19 +56,58 @@ export type SongPhrase = {
   medianMidi: number;
 };
 
+export type SongReferencePitchBend = {
+  timeMs: number;
+  midi: number;
+  offsetSemitones: number;
+};
+
 export type SongReferenceNote = {
   id: string;
   startMs: number;
   endMs: number;
+  midi: number;
   medianMidi: number;
+  confidence: number;
+  amplitude: number;
+  pitchBends: SongReferencePitchBend[];
+};
+
+export type SongReferenceContourPoint = {
+  timeMs: number;
+  midi: number;
+  confidence: number;
+  noteId: string;
+};
+
+export type SongReferenceQuality = {
+  noteCount: number;
+  lowConfidenceCount: number;
+  suggestion: string | null;
 };
 
 export type SongReference = {
   frames: SongReferenceFrame[];
   notes: SongReferenceNote[];
+  contour: SongReferenceContourPoint[];
   phrases: SongPhrase[];
+  quality: SongReferenceQuality;
   durationMs: number;
 };
+
+export type SongTranscriptionCallbacks = {
+  onProgress?: (progress: SongProgressInfo) => void;
+  onStatus?: (message: string) => void;
+};
+
+export type SongTranscriptionOptions = SongTranscriptionCallbacks & {
+  range: VocalRange;
+  detail: SongReferenceDetail;
+};
+
+export interface SongTranscriptionService {
+  transcribe(vocals: SongStereoBuffer, options: SongTranscriptionOptions): Promise<SongReference>;
+}
 
 export type SongComparisonStatus = "inTune" | "flat" | "sharp" | "missed" | "unclear";
 
@@ -107,14 +148,7 @@ export type SongModeServices = {
   detectSupport: () => Promise<SongRuntimeSupport>;
   decodeFile: (file: File) => Promise<SongStereoBuffer>;
   separator: SongVocalSeparator;
+  transcriber: SongTranscriptionService;
   practiceEngine: SongPracticeEngine;
   detector: PitchDetectorAdapter;
-};
-
-export type ExtractReferencePitchOptions = {
-  vocal: SongStereoBuffer;
-  detector: PitchDetectorAdapter;
-  range: VocalRange;
-  frameSize?: number;
-  hopSize?: number;
 };
