@@ -43,6 +43,24 @@ test("keeps the exercise usable on a mobile viewport", async ({ page }) => {
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
 });
 
+test("defaults to system dark mode and persists manual theme choice", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+
+  await expect(page.getByRole("radio", { name: "System theme" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await page.getByRole("radio", { name: "Light theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+  await page.reload();
+  await expect(page.getByRole("radio", { name: "Light theme" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+  await page.getByRole("radio", { name: "System theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
 test("shows and clears local attempt history", async ({ page }) => {
   await page.goto("/");
   await seedAttemptHistory(page);

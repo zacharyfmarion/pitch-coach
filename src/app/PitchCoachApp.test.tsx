@@ -18,6 +18,7 @@ import { PitchCoachApp } from "./PitchCoachApp";
 describe("PitchCoachApp", () => {
   beforeEach(() => {
     installFakeIndexedDB();
+    localStorage.clear();
     window.history.replaceState(null, "", "/");
   });
 
@@ -25,6 +26,9 @@ describe("PitchCoachApp", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    localStorage.clear();
+    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.style.colorScheme = "";
     window.history.replaceState(null, "", "/");
   });
 
@@ -188,6 +192,43 @@ describe("PitchCoachApp", () => {
     expect(checkbox.checked).toBe(false);
     fireEvent.click(checkbox);
     expect(checkbox.checked).toBe(true);
+  });
+
+  it("defaults the system theme to the current color scheme", () => {
+    mockPreferredColorScheme(true);
+
+    render(<PitchCoachApp services={createServices([])} />);
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(screen.getByRole("radio", { name: "System theme" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("persists manual theme preferences in settings", () => {
+    mockPreferredColorScheme(false);
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Dark theme" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(readStoredSettings().themePreference).toBe("dark");
+    expect(screen.getByRole("radio", { name: "Dark theme" }).getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Light theme" }));
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(readStoredSettings().themePreference).toBe("light");
+  });
+
+  it("updates system theme when the preferred color scheme changes", async () => {
+    const media = mockPreferredColorScheme(false);
+
+    render(<PitchCoachApp services={createServices([])} />);
+    expect(document.documentElement.dataset.theme).toBe("light");
+
+    await act(async () => {
+      media.setMatches(true);
+    });
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
   it("opens a selected exercise detail screen from the library", async () => {
@@ -497,6 +538,68 @@ function createServices(frames: PitchFrame[], rejection?: Error): {
     promptPlayer: {
       playPrompt: vi.fn((_targetNotes, _tempoBpm, _promptStyle) => Promise.resolve()),
       cancel: vi.fn()
+    }
+  };
+}
+
+function readStoredSettings() {
+  const rawSettings = localStorage.getItem("pitch-coach-settings-v1");
+  if (!rawSettings) {
+    throw new Error("Expected stored settings");
+  }
+
+  return JSON.parse(rawSettings) as CoachSettings;
+}
+
+function mockPreferredColorScheme(initialMatches: boolean) {
+  let matches = initialMatches;
+  const listeners = new Set<EventListenerOrEventListenerObject>();
+  const mediaQueryList = {
+    get matches() {
+      return matches;
+    },
+    media: "(prefers-color-scheme: dark)",
+    onchange: null,
+    addEventListener: vi.fn((_event: string, listener: EventListenerOrEventListenerObject | null) => {
+      if (listener) {
+        listeners.add(listener);
+      }
+    }),
+    removeEventListener: vi.fn((_event: string, listener: EventListenerOrEventListenerObject | null) => {
+      if (listener) {
+        listeners.delete(listener);
+      }
+    }),
+    addListener: vi.fn((listener: ((this: MediaQueryList, event: MediaQueryListEvent) => void) | null) => {
+      if (listener) {
+        listeners.add(listener as EventListener);
+      }
+    }),
+    removeListener: vi.fn((listener: ((this: MediaQueryList, event: MediaQueryListEvent) => void) | null) => {
+      if (listener) {
+        listeners.delete(listener as EventListener);
+      }
+    }),
+    dispatchEvent: vi.fn()
+  } as unknown as MediaQueryList;
+
+  vi.stubGlobal("matchMedia", vi.fn(() => mediaQueryList));
+
+  return {
+    setMatches(nextMatches: boolean) {
+      matches = nextMatches;
+      const event = {
+        matches: nextMatches,
+        media: mediaQueryList.media
+      } as MediaQueryListEvent;
+      listeners.forEach((listener) => {
+        if (typeof listener === "function") {
+          listener.call(mediaQueryList, event);
+          return;
+        }
+
+        listener.handleEvent(event);
+      });
     }
   };
 }
