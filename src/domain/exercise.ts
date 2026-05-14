@@ -159,7 +159,8 @@ export const DEFAULT_SETTINGS: CoachSettings = {
   toleranceCents: 35,
   exerciseId: "major-triad",
   saveLocalClips: false,
-  timingMode: "pitch-first"
+  timingMode: "pitch-first",
+  themePreference: "system"
 };
 
 export const DEFAULT_SCORING_POLICY: ScoringPolicy = {

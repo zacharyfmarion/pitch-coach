@@ -4,18 +4,26 @@ import {
   Gauge,
   History,
   Mic2,
+  Monitor,
+  Moon,
   Music2,
   Play,
   RotateCcw,
   SlidersHorizontal,
   Square,
+  Sun,
   Trash2,
   Volume2
 } from "lucide-react";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
-import type { ExerciseId, ExerciseProgressSummary, NoteAssessmentStatus } from "../domain/contracts";
+import type {
+  ExerciseId,
+  ExerciseProgressSummary,
+  NoteAssessmentStatus,
+  ThemePreference
+} from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
@@ -30,6 +38,7 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
     ...props,
     initialExerciseId: router.route.screen === "practice" ? router.route.exerciseId : undefined
   });
+  const resolvedTheme = usePitchCoachTheme(coach.settings.themePreference);
 
   useEffect(() => {
     if (
@@ -78,9 +87,20 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
                 <p>Vocal exercise library</p>
               </div>
             </div>
-            <div className="session-readout" aria-live="polite">
-              <span className="readout-label">Selected</span>
-              <strong>{coach.selectedExercise.title}</strong>
+            <div className="top-actions">
+              <ThemePicker
+                value={coach.settings.themePreference}
+                onValueChange={(themePreference) =>
+                  coach.setSettings({
+                    ...coach.settings,
+                    themePreference
+                  })
+                }
+              />
+              <div className="session-readout" aria-live="polite">
+                <span className="readout-label">Selected</span>
+                <strong>{coach.selectedExercise.title}</strong>
+              </div>
             </div>
           </header>
 
@@ -136,9 +156,20 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
               <p>{coach.selectedExercise.title}</p>
             </div>
           </div>
-          <div className="session-readout" aria-live="polite">
-            <span className="readout-label">Current key</span>
-            <strong>{coach.currentKeyLabel}</strong>
+          <div className="top-actions">
+            <ThemePicker
+              value={coach.settings.themePreference}
+              onValueChange={(themePreference) =>
+                coach.setSettings({
+                  ...coach.settings,
+                  themePreference
+                })
+              }
+            />
+            <div className="session-readout" aria-live="polite">
+              <span className="readout-label">Current key</span>
+              <strong>{coach.currentKeyLabel}</strong>
+            </div>
           </div>
         </header>
 
@@ -177,6 +208,7 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
               totalDurationMs={coach.listeningDurationMs}
               toleranceCents={coach.settings.toleranceCents}
               status={coach.lessonState.status}
+              theme={resolvedTheme}
             />
 
             <div className="transport-row">
@@ -411,6 +443,100 @@ const statusCopy = {
   retry: "Retry",
   complete: "Complete"
 } as const;
+
+type ResolvedTheme = "light" | "dark";
+
+const themeOptions = [
+  {
+    value: "system",
+    label: "System",
+    icon: Monitor
+  },
+  {
+    value: "light",
+    label: "Light",
+    icon: Sun
+  },
+  {
+    value: "dark",
+    label: "Dark",
+    icon: Moon
+  }
+] satisfies readonly {
+  value: ThemePreference;
+  label: string;
+  icon: typeof Monitor;
+}[];
+
+function usePitchCoachTheme(themePreference: ThemePreference): ResolvedTheme {
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => getSystemTheme());
+  const resolvedTheme = themePreference === "system" ? systemTheme : themePreference;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateSystemTheme = () => setSystemTheme(mediaQuery.matches ? "dark" : "light");
+    updateSystemTheme();
+
+    mediaQuery.addEventListener("change", updateSystemTheme);
+    return () => mediaQuery.removeEventListener("change", updateSystemTheme);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = resolvedTheme;
+    root.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
+
+  return resolvedTheme;
+}
+
+function getSystemTheme(): ResolvedTheme {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+
+  return "light";
+}
+
+function ThemePicker({
+  value,
+  onValueChange
+}: {
+  value: ThemePreference;
+  onValueChange: (themePreference: ThemePreference) => void;
+}) {
+  return (
+    <div className="theme-picker" role="radiogroup" aria-label="Theme">
+      {themeOptions.map((option) => {
+        const Icon = option.icon;
+        const isSelected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            className={`theme-option${isSelected ? " theme-option-active" : ""}`}
+            type="button"
+            role="radio"
+            aria-checked={isSelected}
+            aria-label={`${option.label} theme`}
+            title={`${option.label} theme`}
+            onClick={() => onValueChange(option.value)}
+          >
+            <Icon size={16} />
+            <span className="visually-hidden">{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function formatClipDuration(durationMs: number) {
   return `${Math.max(0, durationMs / 1000).toFixed(1)}s`;

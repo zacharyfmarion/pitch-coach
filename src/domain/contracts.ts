@@ -50,9 +50,12 @@ export type CoachSettings = {
   exerciseId: ExerciseId;
   saveLocalClips: boolean;
   timingMode: TimingMode;
+  themePreference: ThemePreference;
 };
 
 export type TimingMode = "pitch-first";
+
+export type ThemePreference = "system" | "light" | "dark";
 
 export type ScoringPolicy = {
   timingMode: TimingMode;

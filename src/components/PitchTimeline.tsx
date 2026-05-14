@@ -14,7 +14,10 @@ type PitchTimelineProps = {
   totalDurationMs: number;
   toleranceCents: number;
   status: LessonStatus;
+  theme: TimelineTheme;
 };
+
+export type TimelineTheme = "light" | "dark";
 
 export function PitchTimeline({
   frames,
@@ -22,7 +25,8 @@ export function PitchTimeline({
   attemptScore,
   totalDurationMs,
   toleranceCents,
-  status
+  status,
+  theme
 }: PitchTimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -56,10 +60,11 @@ export function PitchTimeline({
       totalDurationMs,
       toleranceCents,
       status,
+      theme,
       width: size.width,
       height: size.height
     });
-  }, [attemptScore, frames, size, status, targetNotes, toleranceCents, totalDurationMs]);
+  }, [attemptScore, frames, size, status, targetNotes, theme, toleranceCents, totalDurationMs]);
 
   return (
     <div className="timeline-frame">
@@ -78,7 +83,63 @@ type DrawTimelineOptions = PitchTimelineProps & {
   height: number;
 };
 
+type TimelinePalette = {
+  surface: string;
+  targetBand: string;
+  targetLine: string;
+  targetText: string;
+  statusText: string;
+  gridBorder: string;
+  gridLine: string;
+  gridStrongLine: string;
+  gridLabel: string;
+  timeMarker: string;
+  ignoredEvent: string;
+  pitchLine: string;
+  noisyFrame: string;
+  passLine: string;
+  errorLine: string;
+};
+
+const timelinePalettes = {
+  light: {
+    surface: "#fcfbf7",
+    targetBand: "rgba(27, 148, 127, 0.16)",
+    targetLine: "rgba(27, 148, 127, 0.62)",
+    targetText: "#33423f",
+    statusText: "#6b6256",
+    gridBorder: "#e4ded4",
+    gridLine: "#eee8df",
+    gridStrongLine: "#d5cdc0",
+    gridLabel: "#83796d",
+    timeMarker: "#ded6ca",
+    ignoredEvent: "rgba(100, 93, 84, 0.28)",
+    pitchLine: "rgba(125, 76, 194, 0.56)",
+    noisyFrame: "rgba(207, 93, 72, 0.26)",
+    passLine: "#1b947f",
+    errorLine: "#cf5d48"
+  },
+  dark: {
+    surface: "#1f2420",
+    targetBand: "rgba(101, 200, 183, 0.18)",
+    targetLine: "rgba(101, 200, 183, 0.72)",
+    targetText: "#c0d9d0",
+    statusText: "#cfc6b8",
+    gridBorder: "#353d36",
+    gridLine: "#2f3630",
+    gridStrongLine: "#485044",
+    gridLabel: "#b8afa2",
+    timeMarker: "#40493f",
+    ignoredEvent: "rgba(184, 175, 162, 0.28)",
+    pitchLine: "rgba(185, 152, 239, 0.72)",
+    noisyFrame: "rgba(243, 161, 145, 0.28)",
+    passLine: "#65c8b7",
+    errorLine: "#f3a191"
+  }
+} satisfies Record<TimelineTheme, TimelinePalette>;
+
 function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
+  const palette = timelinePalettes[options.theme];
   const pixelRatio = window.devicePixelRatio || 1;
   canvas.width = Math.floor(options.width * pixelRatio);
   canvas.height = Math.floor(options.height * pixelRatio);
@@ -90,7 +151,7 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
 
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, options.width, options.height);
-  context.fillStyle = "#fcfbf7";
+  context.fillStyle = palette.surface;
   context.fillRect(0, 0, options.width, options.height);
 
   const padding = { top: 28, right: 24, bottom: 30, left: 54 };
@@ -124,7 +185,8 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
     xForTime,
     yForMidi,
     minMidi,
-    maxMidi
+    maxMidi,
+    palette
   );
 
   renderedTargetSpans.forEach(({ note, startMs, endMs }) => {
@@ -134,24 +196,24 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
     const yBottom = yForMidi(note.midi - centsAsMidi);
     const yCenter = yForMidi(note.midi);
 
-    context.fillStyle = "rgba(27, 148, 127, 0.16)";
+    context.fillStyle = palette.targetBand;
     context.fillRect(x, yTop, width, yBottom - yTop);
-    context.strokeStyle = "rgba(27, 148, 127, 0.62)";
+    context.strokeStyle = palette.targetLine;
     context.lineWidth = 2;
     context.beginPath();
     context.moveTo(x, yCenter);
     context.lineTo(x + width, yCenter);
     context.stroke();
-    context.fillStyle = "#33423f";
+    context.fillStyle = palette.targetText;
     context.font = "600 12px system-ui, sans-serif";
     context.fillText(note.label, x + 8, yCenter - 8);
   });
 
-  drawPitchLine(context, options.frames, xForTime, yForMidi);
-  drawIgnoredEvents(context, options.attemptScore, xForTime, yForMidi);
-  drawStablePlateaus(context, options.attemptScore, xForTime, yForMidi);
+  drawPitchLine(context, options.frames, xForTime, yForMidi, palette);
+  drawIgnoredEvents(context, options.attemptScore, xForTime, yForMidi, palette);
+  drawStablePlateaus(context, options.attemptScore, xForTime, yForMidi, palette);
 
-  context.fillStyle = "#6b6256";
+  context.fillStyle = palette.statusText;
   context.font = "600 12px system-ui, sans-serif";
   context.fillText(
     getCanvasStatusLabel(options.status),
@@ -346,22 +408,23 @@ function drawGrid(
   xForTime: (timeMs: number) => number,
   yForMidi: (midi: number) => number,
   minMidi: number,
-  maxMidi: number
+  maxMidi: number,
+  palette: TimelinePalette
 ) {
-  context.strokeStyle = "#e4ded4";
+  context.strokeStyle = palette.gridBorder;
   context.lineWidth = 1;
   context.strokeRect(padding.left, padding.top, plotWidth, plotHeight);
 
   for (let midi = Math.ceil(minMidi); midi <= Math.floor(maxMidi); midi += 1) {
     const y = yForMidi(midi);
-    context.strokeStyle = midi % 12 === 0 ? "#d5cdc0" : "#eee8df";
+    context.strokeStyle = midi % 12 === 0 ? palette.gridStrongLine : palette.gridLine;
     context.beginPath();
     context.moveTo(padding.left, y);
     context.lineTo(padding.left + plotWidth, y);
     context.stroke();
 
     if (midi % 2 === 0) {
-      context.fillStyle = "#83796d";
+      context.fillStyle = palette.gridLabel;
       context.font = "11px system-ui, sans-serif";
       context.fillText(midiToNoteName(midi), 10, y + 4);
     }
@@ -369,7 +432,7 @@ function drawGrid(
 
   targetSpans.forEach(({ startMs }) => {
     const x = xForTime(startMs);
-    context.strokeStyle = "#ded6ca";
+    context.strokeStyle = palette.timeMarker;
     context.beginPath();
     context.moveTo(x, padding.top);
     context.lineTo(x, padding.top + plotHeight);
@@ -381,7 +444,8 @@ function drawIgnoredEvents(
   context: CanvasRenderingContext2D,
   attemptScore: AttemptScore | null,
   xForTime: (timeMs: number) => number,
-  yForMidi: (midi: number) => number
+  yForMidi: (midi: number) => number,
+  palette: TimelinePalette
 ) {
   if (!attemptScore) {
     return;
@@ -396,7 +460,7 @@ function drawIgnoredEvents(
     const xStart = xForTime(event.stableStartMs);
     const xEnd = xForTime(event.stableEndMs);
     const y = yForMidi(event.medianMidi);
-    context.strokeStyle = "rgba(100, 93, 84, 0.28)";
+    context.strokeStyle = palette.ignoredEvent;
     context.lineWidth = 4;
     context.lineCap = "round";
     context.beginPath();
@@ -410,10 +474,11 @@ function drawPitchLine(
   context: CanvasRenderingContext2D,
   frames: PitchFrame[],
   xForTime: (timeMs: number) => number,
-  yForMidi: (midi: number) => number
+  yForMidi: (midi: number) => number,
+  palette: TimelinePalette
 ) {
   context.lineWidth = 3;
-  context.strokeStyle = "rgba(125, 76, 194, 0.56)";
+  context.strokeStyle = palette.pitchLine;
   context.lineJoin = "round";
   context.lineCap = "round";
   context.beginPath();
@@ -440,7 +505,7 @@ function drawPitchLine(
   frames
     .filter((frame) => frame.frequencyHz === null && frame.rms > 0.006)
     .forEach((frame) => {
-      context.fillStyle = "rgba(207, 93, 72, 0.26)";
+      context.fillStyle = palette.noisyFrame;
       context.beginPath();
       context.arc(xForTime(frame.timeMs), 20, 3, 0, Math.PI * 2);
       context.fill();
@@ -451,7 +516,8 @@ function drawStablePlateaus(
   context: CanvasRenderingContext2D,
   attemptScore: AttemptScore | null,
   xForTime: (timeMs: number) => number,
-  yForMidi: (midi: number) => number
+  yForMidi: (midi: number) => number,
+  palette: TimelinePalette
 ) {
   if (!attemptScore) {
     return;
@@ -471,8 +537,8 @@ function drawStablePlateaus(
     const y = yForMidi(note.midi + note.score.medianCents / 100);
     context.strokeStyle =
       note.score.status === "pass" || note.score.status === "passWithWarning"
-        ? "#1b947f"
-        : "#cf5d48";
+        ? palette.passLine
+        : palette.errorLine;
     context.lineWidth = 5;
     context.lineCap = "round";
     context.beginPath();
