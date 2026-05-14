@@ -6,7 +6,6 @@ import {
   Music2,
   Pause,
   Play,
-  RotateCcw,
   SlidersHorizontal,
   Square,
   Upload
@@ -73,9 +72,6 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
             >
               <ArrowLeft size={18} />
             </button>
-            <div className="brand-mark song-brand-mark" aria-hidden="true">
-              <Music2 size={22} />
-            </div>
             <div>
               <h1>Song Practice</h1>
               <p>{song.fileName ?? "Upload a local audio section"}</p>
@@ -134,16 +130,6 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                 title="Stop"
               >
                 <Square size={18} />
-              </button>
-              <button
-                className="icon-action"
-                type="button"
-                onClick={() => void song.resetSong()}
-                disabled={song.isBusy}
-                aria-label="Reset song"
-                title="Reset song"
-              >
-                <RotateCcw size={18} />
               </button>
             </div>
 

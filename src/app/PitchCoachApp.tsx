@@ -122,10 +122,6 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
                   })
                 }
               />
-              <div className="session-readout" aria-live="polite">
-                <span className="readout-label">Selected</span>
-                <strong>{coach.selectedExercise.title}</strong>
-              </div>
               <button
                 className="text-action mode-action"
                 type="button"
@@ -181,9 +177,6 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
             >
               <ArrowLeft size={18} />
             </button>
-            <div className="brand-mark" aria-hidden="true">
-              <Mic2 size={22} />
-            </div>
             <div>
               <h1>Pitch Coach</h1>
               <p>{coach.selectedExercise.title}</p>

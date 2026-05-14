@@ -304,11 +304,6 @@ h1 {
   white-space: nowrap;
 }
 
-.song-brand-mark {
-  background: var(--color-level);
-  box-shadow: var(--shadow-brand);
-}
-
 .exercise-library {
   display: grid;
   gap: 14px;
