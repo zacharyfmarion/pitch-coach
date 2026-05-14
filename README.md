@@ -6,7 +6,7 @@ A privacy-first web app for vocal practice. The app plays guided exercises, list
 
 GitHub Actions includes CI and a Cloudflare Pages deployment workflow for `main`. The app publishes here:
 
-https://zac.is-a.dev/pitch-coach/
+https://pitch-coach.pages.dev/
 
 Microphone input requires HTTPS or localhost. Song mode also requires WebGPU and cross-origin isolation headers so vocal isolation can run locally in the browser.
 
