@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Bug,
   Gauge,
   Headphones,
   Music2,
@@ -9,6 +10,8 @@ import {
   Square,
   Upload
 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { createSongDebugInfo, createVocalEnergyTrace } from "./debugDiagnostics";
 import { SongPitchTimeline } from "./SongPitchTimeline";
 import { SONG_SECTION_LIMITS, useSongPracticeController } from "./useSongPracticeController";
 import type { SongModeServices } from "./types";
@@ -20,7 +23,35 @@ export type SongPracticeScreenProps = {
 
 export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeScreenProps) {
   const song = useSongPracticeController({ services });
+  const [debugEnabled, setDebugEnabled] = useState(false);
   const durationMs = song.reference?.durationMs ?? song.selectedDurationMs ?? SONG_SECTION_LIMITS.defaultMs;
+  const debugEnergy = useMemo(
+    () => (debugEnabled ? createVocalEnergyTrace(song.separation?.vocals ?? null) : []),
+    [debugEnabled, song.separation?.vocals]
+  );
+  const debugInfo = useMemo(
+    () =>
+      debugEnabled
+        ? createSongDebugInfo({
+            reference: song.reference,
+            vocals: null,
+            vocalEnergy: debugEnergy,
+            totalDurationMs: Math.max(durationMs, 1000),
+            currentTimeMs: song.currentPlaybackTimeMs,
+            isPlaying: song.stage === "practicing",
+            trimStartMs: song.trimStartMs
+          })
+        : null,
+    [
+      debugEnabled,
+      debugEnergy,
+      durationMs,
+      song.currentPlaybackTimeMs,
+      song.reference,
+      song.stage,
+      song.trimStartMs
+    ]
+  );
 
   return (
     <main className="app-shell">
@@ -59,6 +90,8 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
               totalDurationMs={Math.max(durationMs, 1000)}
               currentTimeMs={song.currentPlaybackTimeMs}
               isPlaying={song.stage === "practicing"}
+              debugEnabled={debugEnabled}
+              debugEnergy={debugEnergy}
             />
 
             <div className="transport-row">
@@ -229,7 +262,62 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                       ) : null}
                     </div>
                   ) : null}
+                  <label className="toggle-row song-debug-toggle">
+                    <input
+                      type="checkbox"
+                      checked={debugEnabled}
+                      onChange={(event) => setDebugEnabled(event.currentTarget.checked)}
+                      disabled={!song.reference}
+                    />
+                    <span>Debug note timing</span>
+                  </label>
                 </section>
+
+                {debugEnabled && song.reference && debugInfo ? (
+                  <section className="control-group song-debug-panel" aria-label="Song debug audit">
+                    <div className="group-heading">
+                      <Bug size={17} />
+                      <h2>Debug Audit</h2>
+                    </div>
+                    <div className="song-debug-readout">
+                      <span>Relative</span>
+                      <strong>
+                        {formatDuration(debugInfo.viewport.startMs)}-{formatDuration(debugInfo.viewport.endMs)}
+                      </strong>
+                      <span>Original</span>
+                      <strong>
+                        {formatDuration(debugInfo.originalViewport.startMs)}-
+                        {formatDuration(debugInfo.originalViewport.endMs)}
+                      </strong>
+                      <span>Visible</span>
+                      <strong>{formatCount(debugInfo.visibleNotes.length, "note")}</strong>
+                      <span>Energy peak</span>
+                      <strong>{formatDecimal(debugInfo.visibleEnergyPeak)}</strong>
+                    </div>
+                    {debugInfo.visibleNotes.length > 0 ? (
+                      <ol className="song-debug-note-list">
+                        {debugInfo.visibleNotes.slice(0, 12).map((note) => (
+                          <li key={note.id}>
+                            <strong>
+                              {formatDuration(note.relativeStartMs)}-{formatDuration(note.relativeEndMs)}
+                            </strong>
+                            <span>
+                              song {formatDuration(note.originalStartMs)}-{formatDuration(note.originalEndMs)}
+                            </span>
+                            <span>
+                              {note.noteName} MIDI {note.midi}
+                            </span>
+                            <span>
+                              conf {formatDecimal(note.confidence)} amp {formatDecimal(note.amplitude)}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="history-empty">No rendered reference notes in this viewport.</p>
+                    )}
+                  </section>
+                ) : null}
 
                 <section className="control-group" aria-label="Practice mix">
                   <div className="group-heading">
@@ -329,6 +417,10 @@ function formatDuration(durationMs: number) {
 
 function formatCount(count: number, singular: string) {
   return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
+
+function formatDecimal(value: number) {
+  return value.toFixed(3);
 }
 
 function formatRegionStatus(status: string) {

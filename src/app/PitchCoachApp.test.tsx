@@ -85,6 +85,9 @@ describe("PitchCoachApp", () => {
 
     await screen.findByText(/1 note/i);
     expect(screen.getByRole("group", { name: "Reference detail" })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Debug note timing"));
+    expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/C4 MIDI 60/);
+    expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/conf 0\.900 amp 0\.900/);
     fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
 
     await waitFor(() => expect(screen.getByLabelText("Song feedback").textContent).toMatch(/Strong match/i));

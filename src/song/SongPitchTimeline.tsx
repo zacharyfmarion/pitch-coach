@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PitchFrame } from "../domain/contracts";
 import { frequencyToMidi, midiToNoteName } from "../domain/music";
+import type { SongDebugEnergyPoint } from "./debugDiagnostics";
+import { createSongTimelineViewport, type SongTimelineViewport } from "./timelineViewport";
 import type { SongReference, SongScore } from "./types";
 
 type SongPitchTimelineProps = {
@@ -10,6 +12,8 @@ type SongPitchTimelineProps = {
   totalDurationMs: number;
   currentTimeMs: number;
   isPlaying: boolean;
+  debugEnabled?: boolean;
+  debugEnergy?: SongDebugEnergyPoint[];
 };
 
 export function SongPitchTimeline({
@@ -18,7 +22,9 @@ export function SongPitchTimeline({
   score,
   totalDurationMs,
   currentTimeMs,
-  isPlaying
+  isPlaying,
+  debugEnabled = false,
+  debugEnergy = []
 }: SongPitchTimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -52,10 +58,23 @@ export function SongPitchTimeline({
       totalDurationMs,
       currentTimeMs,
       isPlaying,
+      debugEnabled,
+      debugEnergy,
       width: size.width,
       height: size.height
     });
-  }, [currentTimeMs, isPlaying, liveFrames, reference, score, size.height, size.width, totalDurationMs]);
+  }, [
+    currentTimeMs,
+    debugEnabled,
+    debugEnergy,
+    isPlaying,
+    liveFrames,
+    reference,
+    score,
+    size.height,
+    size.width,
+    totalDurationMs
+  ]);
 
   return (
     <div className="timeline-frame song-timeline-frame">
@@ -89,10 +108,11 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
   context.fillStyle = "#fcfbf7";
   context.fillRect(0, 0, options.width, options.height);
 
+  const debugStripHeight = options.debugEnabled ? 30 : 0;
   const padding = { top: 28, right: 24, bottom: 30, left: 54 };
   const plotWidth = Math.max(options.width - padding.left - padding.right, 1);
-  const plotHeight = Math.max(options.height - padding.top - padding.bottom, 1);
-  const viewport = createTimelineViewport(options.totalDurationMs, options.currentTimeMs, options.isPlaying);
+  const plotHeight = Math.max(options.height - padding.top - padding.bottom - debugStripHeight, 1);
+  const viewport = createSongTimelineViewport(options.totalDurationMs, options.currentTimeMs, options.isPlaying);
   const visibleMidis = [
     ...(options.reference?.notes.flatMap((note) => [
       note.midi,
@@ -114,10 +134,23 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
   const yForMidi = (midi: number) =>
     padding.top + (1 - (midi - minMidi) / Math.max(maxMidi - minMidi, 1)) * plotHeight;
 
-  drawSongGrid(context, padding, plotWidth, plotHeight, xForTime, yForMidi, minMidi, maxMidi, viewport);
+  const timeLabelY = padding.top + plotHeight + debugStripHeight + 17;
+  drawSongGrid(context, padding, plotWidth, plotHeight, xForTime, yForMidi, minMidi, maxMidi, viewport, timeLabelY);
   drawScoreRegions(context, options.score, padding, plotHeight, xForTime, viewport);
   drawReferenceNotes(context, options.reference, xForTime, yForMidi, viewport);
   drawLiveContour(context, options.liveFrames, xForTime, yForMidi, viewport);
+  if (options.debugEnabled) {
+    drawVocalEnergyStrip(
+      context,
+      options.debugEnergy ?? [],
+      padding.left,
+      padding.top + plotHeight + 5,
+      plotWidth,
+      Math.max(18, debugStripHeight - 8),
+      xForTime,
+      viewport
+    );
+  }
   drawPlayhead(context, options.currentTimeMs, padding, plotHeight, xForTime, viewport);
 
   context.fillStyle = "#6b6256";
@@ -131,37 +164,6 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
   );
 }
 
-type TimelineViewport = {
-  startMs: number;
-  endMs: number;
-};
-
-function createTimelineViewport(
-  totalDurationMs: number,
-  currentTimeMs: number,
-  isPlaying: boolean
-): TimelineViewport {
-  const durationMs = Math.max(totalDurationMs, 1000);
-  const windowMs = durationMs <= 14000 ? durationMs : 12000;
-  if (durationMs <= windowMs) {
-    return {
-      startMs: 0,
-      endMs: durationMs
-    };
-  }
-
-  const playheadBias = isPlaying ? 0.38 : 0.15;
-  const startMs = Math.min(
-    Math.max(0, currentTimeMs - windowMs * playheadBias),
-    Math.max(0, durationMs - windowMs)
-  );
-
-  return {
-    startMs,
-    endMs: startMs + windowMs
-  };
-}
-
 function drawSongGrid(
   context: CanvasRenderingContext2D,
   padding: { top: number; right: number; bottom: number; left: number },
@@ -171,7 +173,8 @@ function drawSongGrid(
   yForMidi: (midi: number) => number,
   minMidi: number,
   maxMidi: number,
-  viewport: TimelineViewport
+  viewport: SongTimelineViewport,
+  timeLabelY: number
 ) {
   context.strokeStyle = "#e4ded4";
   context.lineWidth = 1;
@@ -205,7 +208,7 @@ function drawSongGrid(
 
     context.fillStyle = "#83796d";
     context.font = "10px system-ui, sans-serif";
-    context.fillText(formatTime(timeMs), x - 11, padding.top + plotHeight + 17);
+    context.fillText(formatTime(timeMs), x - 11, timeLabelY);
   }
 }
 
@@ -215,7 +218,7 @@ function drawScoreRegions(
   padding: { top: number; right: number; bottom: number; left: number },
   plotHeight: number,
   xForTime: (timeMs: number) => number,
-  viewport: TimelineViewport
+  viewport: SongTimelineViewport
 ) {
   if (!score) {
     return;
@@ -244,7 +247,7 @@ function drawReferenceNotes(
   reference: SongReference | null,
   xForTime: (timeMs: number) => number,
   yForMidi: (midi: number) => number,
-  viewport: TimelineViewport
+  viewport: SongTimelineViewport
 ) {
   if (!reference) {
     return;
@@ -309,7 +312,7 @@ function drawLiveContour(
   frames: PitchFrame[],
   xForTime: (timeMs: number) => number,
   yForMidi: (midi: number) => number,
-  viewport: TimelineViewport
+  viewport: SongTimelineViewport
 ) {
   context.lineWidth = 3;
   context.strokeStyle = "rgba(125, 76, 194, 0.62)";
@@ -333,7 +336,7 @@ function drawPlayhead(
   padding: { top: number; right: number; bottom: number; left: number },
   plotHeight: number,
   xForTime: (timeMs: number) => number,
-  viewport: TimelineViewport
+  viewport: SongTimelineViewport
 ) {
   if (currentTimeMs < viewport.startMs || currentTimeMs > viewport.endMs) {
     return;
@@ -358,12 +361,45 @@ function drawPlayhead(
   context.fill();
 }
 
+function drawVocalEnergyStrip(
+  context: CanvasRenderingContext2D,
+  energy: SongDebugEnergyPoint[],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  xForTime: (timeMs: number) => number,
+  viewport: SongTimelineViewport
+) {
+  context.fillStyle = "#f5efe6";
+  context.fillRect(x, y, width, height);
+  context.strokeStyle = "#dfd5c7";
+  context.lineWidth = 1;
+  context.strokeRect(x, y, width, height);
+
+  const visibleEnergy = energy.filter(
+    (point) => point.timeMs >= viewport.startMs && point.timeMs <= viewport.endMs
+  );
+  const maxRms = Math.max(0.0001, ...visibleEnergy.map((point) => point.rms));
+
+  context.fillStyle = "rgba(31, 111, 100, 0.46)";
+  visibleEnergy.forEach((point) => {
+    const barHeight = Math.max(1, (point.rms / maxRms) * (height - 4));
+    const barX = xForTime(point.timeMs);
+    context.fillRect(barX, y + height - 2 - barHeight, 2, barHeight);
+  });
+
+  context.fillStyle = "#6b6256";
+  context.font = "9px system-ui, sans-serif";
+  context.fillText("vocal rms", x + 5, y + 10);
+}
+
 function drawMidiLine(
   context: CanvasRenderingContext2D,
   points: Array<{ timeMs: number; midi: number | null }>,
   xForTime: (timeMs: number) => number,
   yForMidi: (midi: number) => number,
-  viewport: TimelineViewport
+  viewport: SongTimelineViewport
 ) {
   context.beginPath();
   let drawing = false;
