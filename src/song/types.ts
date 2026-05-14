@@ -87,6 +87,7 @@ export type SongReferenceQuality = {
 };
 
 export type SongReference = {
+  analysisVersion?: string;
   frames: SongReferenceFrame[];
   notes: SongReferenceNote[];
   contour: SongReferenceContourPoint[];

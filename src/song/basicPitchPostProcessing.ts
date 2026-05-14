@@ -5,6 +5,7 @@ import {
 } from "@spotify/basic-pitch";
 import { midiToFrequency } from "../domain/music";
 import { interpolateNoteMidi } from "./referenceContour";
+import { SONG_REFERENCE_ANALYSIS_VERSION } from "./referenceVersion";
 import { REFERENCE_DETAIL_CONFIG } from "./transcriptionConfig";
 import type {
   SongReference,
@@ -72,6 +73,7 @@ export function createReferenceFromBasicPitchNotes(
   const frames = createReferenceFrames(notes, options.durationMs);
 
   return {
+    analysisVersion: SONG_REFERENCE_ANALYSIS_VERSION,
     frames,
     notes,
     contour,

@@ -5,6 +5,7 @@ import {
   decodeBasicPitchOutputToReference
 } from "./basicPitchPostProcessing";
 import { interpolateReferenceMidi } from "./referenceContour";
+import { SONG_REFERENCE_ANALYSIS_VERSION } from "./referenceVersion";
 
 describe("Basic Pitch song reference post-processing", () => {
   it("maps fake Basic Pitch frames into separated repeated notes", () => {
@@ -15,6 +16,7 @@ describe("Basic Pitch song reference post-processing", () => {
 
     const reference = decodeBasicPitchOutputToReference(output, decodeOptions());
 
+    expect(reference.analysisVersion).toBe(SONG_REFERENCE_ANALYSIS_VERSION);
     expect(reference.notes).toHaveLength(2);
     expect(reference.notes[0].midi).toBe(60);
     expect(reference.notes[1].startMs - reference.notes[0].endMs).toBeGreaterThan(80);

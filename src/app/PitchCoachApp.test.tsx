@@ -11,6 +11,7 @@ import {
 } from "../domain/exercise";
 import { midiToFrequency, parseNoteName } from "../domain/music";
 import { createStereoBuffer } from "../song/audioData";
+import { SONG_REFERENCE_ANALYSIS_VERSION } from "../song/referenceVersion";
 import type { SongModeServices, SongPracticeConfig, SongReference, SongStereoBuffer } from "../song/types";
 import type { AttemptHistoryRecord } from "../domain/contracts";
 import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
@@ -96,6 +97,35 @@ describe("PitchCoachApp", () => {
       expect.anything(),
       expect.objectContaining({ detail: "sensitive" })
     );
+  });
+
+  it("clears stale song references from an older transcription build", async () => {
+    const songServices = createSongServices({
+      supported: true,
+      referenceAnalysisVersion: "older-transcription-build"
+    });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+
+    await screen.findByText(/Transcription engine updated\. Analyze song again\./i);
+    expect(screen.getByLabelText("Debug note timing")).toHaveProperty("disabled", true);
+    expect(songServices.separator.separate).toHaveBeenCalledTimes(1);
   });
 
   it("advances a half step after a passing attempt", async () => {
@@ -661,7 +691,7 @@ function mockPreferredColorScheme(initialMatches: boolean) {
   };
 }
 
-function createSongServices(options: { supported: boolean }): SongModeServices & {
+function createSongServices(options: { supported: boolean; referenceAnalysisVersion?: string }): SongModeServices & {
   separator: SongModeServices["separator"] & { separate: ReturnType<typeof vi.fn> };
   transcriber: SongModeServices["transcriber"] & { transcribe: ReturnType<typeof vi.fn> };
 } {
@@ -696,7 +726,7 @@ function createSongServices(options: { supported: boolean }): SongModeServices &
     transcriber: {
       transcribe: vi.fn((_vocals, transcriptionOptions) => {
         transcriptionOptions.onProgress?.({ progress: 1 });
-        return Promise.resolve(createTestSongReference());
+        return Promise.resolve(createTestSongReference(options.referenceAnalysisVersion));
       })
     },
     practiceEngine,
@@ -711,8 +741,11 @@ function createSongServices(options: { supported: boolean }): SongModeServices &
   };
 }
 
-function createTestSongReference(): SongReference {
+function createTestSongReference(
+  analysisVersion: string | undefined = SONG_REFERENCE_ANALYSIS_VERSION
+): SongReference {
   return {
+    analysisVersion,
     durationMs: 1200,
     frames: [0, 100, 200, 300, 400, 500].map((timeMs) => ({
       timeMs,

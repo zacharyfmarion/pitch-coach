@@ -3,6 +3,7 @@ import type { PitchFrame } from "../domain/contracts";
 import { midiToFrequency } from "../domain/music";
 import { loadSettings, normalizeSettings, saveSettings } from "../storage/settingsStorage";
 import { sliceStereoBuffer } from "./audioData";
+import { isCurrentSongReference } from "./referenceVersion";
 import { createSongModeServices } from "./services";
 import { scoreSongAttempt } from "./songScoring";
 import { pendingSongRuntimeSupport } from "./support";
@@ -415,6 +416,20 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     },
     [services.practiceEngine]
   );
+
+  useEffect(() => {
+    if (!reference || isCurrentSongReference(reference) || stage === "practicing") {
+      return;
+    }
+
+    clearAttemptState({ clearSeparation: false });
+    setStage("decoded");
+    setAnalysisProgress((current) => ({
+      ...current,
+      transcriptionProgress: 0,
+      status: "Transcription engine updated. Analyze song again."
+    }));
+  }, [clearAttemptState, reference, stage]);
 
   return {
     support,
