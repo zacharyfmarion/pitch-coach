@@ -31,6 +31,24 @@ test("opens exercise routes directly", async ({ page }) => {
   await expect(page.getByText("A3 major")).toBeVisible();
 });
 
+test("opens song mode directly without starting model download on unsupported browsers", async ({ page }) => {
+  const requests: string[] = [];
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "gpu", {
+      value: undefined,
+      configurable: true
+    });
+  });
+  page.on("request", (request) => requests.push(request.url()));
+
+  await page.goto("/songs");
+
+  await expect(page.getByRole("heading", { name: "Song Practice" })).toBeVisible();
+  await expect(page.getByLabel("Song pitch timeline")).toBeVisible();
+  await expect(page.getByText(/Song mode needs WebGPU/i)).toBeVisible();
+  expect(requests.some((url) => url.includes("htdemucs_embedded.onnx"))).toBe(false);
+});
+
 test("keeps the exercise usable on a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

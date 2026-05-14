@@ -13,9 +13,21 @@ function normalizeBasePath(path: string) {
   return withLeadingSlash.endsWith("/") ? withLeadingSlash : `${withLeadingSlash}/`;
 }
 
+const crossOriginIsolationHeaders = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "X-Content-Type-Options": "nosniff"
+};
+
 export default defineConfig({
   base: githubPagesBase,
   plugins: [react()],
+  server: {
+    headers: crossOriginIsolationHeaders
+  },
+  preview: {
+    headers: crossOriginIsolationHeaders
+  },
   test: {
     environment: "jsdom",
     globals: true,

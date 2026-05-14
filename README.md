@@ -1,14 +1,14 @@
 # Pitch Coach
 
-A privacy-first web MVP for vocal exercise practice. The app plays a major triad prompt, listens for the sing-back, draws detected pitch against target notes, scores each note, retries missed attempts, and advances by half step after a pass.
+A privacy-first web app for vocal practice. The app plays guided exercises, listens for the sing-back, draws detected pitch against target notes, scores each note, and includes an experimental browser-local song practice mode for trimmed audio sections.
 
 ## Deployment
 
-GitHub Actions includes CI and a GitHub Pages deployment workflow for `main`. The app publishes here:
+GitHub Actions includes CI and a Cloudflare Pages deployment workflow for `main`. The app publishes here:
 
 https://zac.is-a.dev/pitch-coach/
 
-Microphone input requires HTTPS or localhost.
+Microphone input requires HTTPS or localhost. Song mode also requires WebGPU and cross-origin isolation headers so vocal isolation can run locally in the browser.
 
 ## Run
 
@@ -39,6 +39,7 @@ pnpm exec playwright install chromium
 - `src/app`: React controller and app composition.
 - `src/components`: reusable visual feedback components.
 - `src/storage`: settings-only local persistence.
-- `.github/workflows`: CI and GitHub Pages deployment.
+- `src/song`: browser-local upload, vocal isolation, reference pitch extraction, and song scoring.
+- `.github/workflows`: CI and Cloudflare Pages deployment.
 
-No microphone audio is saved or uploaded. The app stores only local settings such as range, tempo, and tolerance.
+No microphone audio or uploaded song audio is uploaded. The app stores local settings such as range, tempo, and tolerance; microphone clips are saved only locally when that setting is enabled.

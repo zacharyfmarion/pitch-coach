@@ -9,7 +9,9 @@ import {
   getExerciseById,
   MAJOR_TRIAD_EXERCISE
 } from "../domain/exercise";
-import { parseNoteName } from "../domain/music";
+import { midiToFrequency, parseNoteName } from "../domain/music";
+import { createStereoBuffer } from "../song/audioData";
+import type { SongModeServices, SongPracticeConfig, SongStereoBuffer } from "../song/types";
 import type { AttemptHistoryRecord } from "../domain/contracts";
 import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
 import { installFakeIndexedDB } from "../test/fakeIndexedDB";
@@ -37,8 +39,53 @@ describe("PitchCoachApp", () => {
 
     expect(screen.getByRole("heading", { name: "Pitch Coach" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Song mode" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Single Note Match/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
+  });
+
+  it("opens song mode and shows runtime requirements when unsupported", async () => {
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={createSongServices({ supported: false })}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/songs"));
+    expect(screen.getByRole("heading", { name: "Song Practice" })).toBeTruthy();
+    expect(screen.getByLabelText("Song mode unavailable").textContent).toMatch(/WebGPU/i);
+  });
+
+  it("uploads, analyzes, and scores a song practice attempt with fake local services", async () => {
+    const songServices = createSongServices({ supported: true });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+
+    await screen.findByText(/vocal phrases found/i);
+    fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Song feedback").textContent).toMatch(/Strong match/i));
+    expect(songServices.separator.separate).toHaveBeenCalled();
   });
 
   it("advances a half step after a passing attempt", async () => {
@@ -604,6 +651,55 @@ function mockPreferredColorScheme(initialMatches: boolean) {
   };
 }
 
+function createSongServices(options: { supported: boolean }): SongModeServices & {
+  separator: SongModeServices["separator"] & { separate: ReturnType<typeof vi.fn> };
+} {
+  const audio = createTestSongBuffer();
+  const separated = {
+    vocals: audio,
+    accompaniment: audio,
+    stems: {
+      drums: audio,
+      bass: audio,
+      other: audio,
+      vocals: audio
+    }
+  };
+  const practiceEngine = new MockSongPracticeEngine();
+  return {
+    detectSupport: vi.fn(() =>
+      Promise.resolve(
+        options.supported
+          ? { supported: true, checking: false, reasons: [] }
+          : {
+              supported: false,
+              checking: false,
+              reasons: ["Song mode requires WebGPU."]
+            }
+      )
+    ),
+    decodeFile: vi.fn(() => Promise.resolve(audio)),
+    separator: {
+      separate: vi.fn(() => Promise.resolve(separated))
+    },
+    practiceEngine,
+    detector: {
+      detectPitch: vi.fn((_samples, _sampleRate, timeMs) => ({
+        timeMs,
+        frequencyHz: midiToFrequency(60),
+        clarity: 0.96,
+        rms: 0.08
+      }))
+    }
+  };
+}
+
+function createTestSongBuffer(): SongStereoBuffer {
+  const sampleRate = 44100;
+  const samples = new Float32Array(Math.round(sampleRate * 1.2));
+  return createStereoBuffer(samples, samples, sampleRate);
+}
+
 class MockAudioEngine implements AudioInputEngine {
   constructor(
     private readonly frames: PitchFrame[],
@@ -622,6 +718,34 @@ class MockAudioEngine implements AudioInputEngine {
 
   isRunning() {
     return false;
+  }
+}
+
+class MockSongPracticeEngine {
+  private running = false;
+
+  async start(config: SongPracticeConfig) {
+    this.running = true;
+    Array.from({ length: 12 }, (_, index) => index * 100).forEach((timeMs) =>
+      config.onPitchFrame({
+        timeMs,
+        frequencyHz: midiToFrequency(60),
+        clarity: 0.96,
+        rms: 0.08
+      })
+    );
+    this.running = false;
+    config.onEnded();
+  }
+
+  async stop() {
+    this.running = false;
+  }
+
+  setVocalGuideGain() {}
+
+  isRunning() {
+    return this.running;
   }
 }
 
