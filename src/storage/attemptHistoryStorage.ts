@@ -1,4 +1,4 @@
-import type { AttemptHistoryRecord, ExerciseId, NoteAssessmentStatus } from "../domain/contracts";
+import type { AttemptHistoryRecord, NoteAssessmentStatus } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import {
   ATTEMPT_HISTORY_LIMIT_PER_EXERCISE,
