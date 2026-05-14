@@ -57,6 +57,8 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
               liveFrames={song.liveFrames}
               score={song.score}
               totalDurationMs={Math.max(durationMs, 1000)}
+              currentTimeMs={song.currentPlaybackTimeMs}
+              isPlaying={song.stage === "practicing"}
             />
 
             <div className="transport-row">

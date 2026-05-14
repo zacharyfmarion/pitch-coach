@@ -44,6 +44,10 @@ describe("song scoring", () => {
     const reference: SongReference = {
       durationMs: 1600,
       phrases: [],
+      notes: [
+        { id: "note-0", startMs: 0, endMs: 200, medianMidi: 60 },
+        { id: "note-1", startMs: 1000, endMs: 1200, medianMidi: 62 }
+      ],
       frames: [
         referenceFrame(0, 60),
         referenceFrame(100, 60),
@@ -71,6 +75,7 @@ function referenceLine(): SongReference {
   return {
     durationMs: 1200,
     phrases: [],
+    notes: [{ id: "note-0", startMs: 0, endMs: 600, medianMidi: 60 }],
     frames: [0, 100, 200, 300, 400, 500].map((timeMs) => referenceFrame(timeMs, 60))
   };
 }

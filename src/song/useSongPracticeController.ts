@@ -63,6 +63,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const [liveFrames, setLiveFrames] = useState<PitchFrame[]>([]);
   const [score, setScore] = useState<SongScore | null>(null);
   const [vocalGuideGain, setVocalGuideGainState] = useState(0);
+  const [currentPlaybackTimeMs, setCurrentPlaybackTimeMs] = useState(0);
 
   const liveFramesRef = useRef<PitchFrame[]>([]);
   const referenceRef = useRef<SongReference | null>(null);
@@ -120,15 +121,16 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setReference(null);
       setLiveFrames([]);
       setScore(null);
+      setCurrentPlaybackTimeMs(0);
       liveFramesRef.current = [];
 
       try {
-      const audio = await services.decodeFile(file);
-      setDecodedAudio(audio);
-      const defaultEndMs = Math.min(audio.durationMs, DEFAULT_SECTION_MS);
-      setTrimStartMsState(0);
-      setTrimEndMsState(Math.max(defaultEndMs, Math.min(audio.durationMs, MIN_SECTION_MS)));
-      setStage("decoded");
+        const audio = await services.decodeFile(file);
+        setDecodedAudio(audio);
+        const defaultEndMs = Math.min(audio.durationMs, DEFAULT_SECTION_MS);
+        setTrimStartMsState(0);
+        setTrimEndMsState(Math.max(defaultEndMs, Math.min(audio.durationMs, MIN_SECTION_MS)));
+        setStage("decoded");
       } catch (error) {
         setStage("error");
         setErrorMessage(createSongErrorMessage(error));
@@ -181,6 +183,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setReference(null);
     setScore(null);
     setLiveFrames([]);
+    setCurrentPlaybackTimeMs(0);
     liveFramesRef.current = [];
     setAnalysisProgress({
       modelProgress: 0,
@@ -257,6 +260,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setErrorMessage(null);
     setLiveFrames([]);
     setScore(null);
+    setCurrentPlaybackTimeMs(0);
     liveFramesRef.current = [];
 
     try {
@@ -277,6 +281,13 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
           liveFramesRef.current = [...liveFramesRef.current, frame].slice(-MAX_RENDERED_FRAMES);
           setLiveFrames(liveFramesRef.current);
           setScore(scoreSongAttempt(reference, liveFramesRef.current, settings.toleranceCents));
+        },
+        onPlaybackTime: (timeMs) => {
+          if (runId !== runIdRef.current) {
+            return;
+          }
+
+          setCurrentPlaybackTimeMs(timeMs);
         },
         onEnded: () => {
           if (runId !== runIdRef.current) {
@@ -328,6 +339,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setReference(null);
     setScore(null);
     setLiveFrames([]);
+    setCurrentPlaybackTimeMs(0);
     liveFramesRef.current = [];
     setTrimStartMsState(0);
     setTrimEndMsState(DEFAULT_SECTION_MS);
@@ -371,6 +383,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     separation,
     liveFrames,
     score,
+    currentPlaybackTimeMs,
     toleranceCents: settings.toleranceCents,
     vocalGuideGain,
     canAnalyze,

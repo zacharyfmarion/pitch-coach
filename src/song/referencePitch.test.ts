@@ -3,7 +3,12 @@ import type { PitchDetectorAdapter } from "../audio/types";
 import { PitchyPitchDetectorAdapter } from "../audio/pitchyDetector";
 import { midiToFrequency } from "../domain/music";
 import { createStereoBuffer } from "./audioData";
-import { extractReferencePitch, extractSongPhrases, smoothReferenceFrames } from "./referencePitch";
+import {
+  extractReferenceNotes,
+  extractReferencePitch,
+  extractSongPhrases,
+  smoothReferenceFrames
+} from "./referencePitch";
 import type { SongReferenceFrame } from "./types";
 
 describe("song reference pitch extraction", () => {
@@ -19,6 +24,7 @@ describe("song reference pitch extraction", () => {
 
     const voiced = reference.frames.filter((frame) => frame.midi !== null);
     expect(voiced.length).toBeGreaterThan(20);
+    expect(reference.notes).toHaveLength(1);
     expect(reference.phrases).toHaveLength(1);
     expect(reference.phrases[0].medianMidi).toBeCloseTo(60, 0);
   });
@@ -59,6 +65,28 @@ describe("song reference pitch extraction", () => {
     expect(smoothed[2].midi).toBeCloseTo(60.05, 1);
     expect(extractSongPhrases(smoothed)).toHaveLength(1);
   });
+
+  it("groups a sung contour into stable note segments instead of raw pitch spikes", () => {
+    const frames: SongReferenceFrame[] = [
+      referenceFrame(0, 60),
+      referenceFrame(50, 60.08),
+      referenceFrame(100, 59.95),
+      silenceFrame(150),
+      referenceFrame(200, 60.02),
+      referenceFrame(250, 60.1),
+      referenceFrame(300, 62),
+      referenceFrame(350, 62.1),
+      referenceFrame(400, 61.95)
+    ];
+
+    const smoothed = smoothReferenceFrames(frames);
+    const notes = extractReferenceNotes(smoothed);
+
+    expect(notes).toHaveLength(2);
+    expect(notes[0].medianMidi).toBeCloseTo(60, 0);
+    expect(notes[0].endMs - notes[0].startMs).toBeGreaterThan(200);
+    expect(notes[1].medianMidi).toBeCloseTo(62, 0);
+  });
 });
 
 function referenceFrame(timeMs: number, midi: number): SongReferenceFrame {
@@ -68,6 +96,16 @@ function referenceFrame(timeMs: number, midi: number): SongReferenceFrame {
     midi,
     clarity: 0.95,
     rms: 0.08
+  };
+}
+
+function silenceFrame(timeMs: number): SongReferenceFrame {
+  return {
+    timeMs,
+    frequencyHz: null,
+    midi: null,
+    clarity: 0.1,
+    rms: 0.001
   };
 }
 

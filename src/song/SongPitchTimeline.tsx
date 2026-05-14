@@ -8,13 +8,17 @@ type SongPitchTimelineProps = {
   liveFrames: PitchFrame[];
   score: SongScore | null;
   totalDurationMs: number;
+  currentTimeMs: number;
+  isPlaying: boolean;
 };
 
 export function SongPitchTimeline({
   reference,
   liveFrames,
   score,
-  totalDurationMs
+  totalDurationMs,
+  currentTimeMs,
+  isPlaying
 }: SongPitchTimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -46,10 +50,12 @@ export function SongPitchTimeline({
       liveFrames,
       score,
       totalDurationMs,
+      currentTimeMs,
+      isPlaying,
       width: size.width,
       height: size.height
     });
-  }, [liveFrames, reference, score, size.height, size.width, totalDurationMs]);
+  }, [currentTimeMs, isPlaying, liveFrames, reference, score, size.height, size.width, totalDurationMs]);
 
   return (
     <div className="timeline-frame song-timeline-frame">
@@ -86,10 +92,9 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
   const padding = { top: 28, right: 24, bottom: 30, left: 54 };
   const plotWidth = Math.max(options.width - padding.left - padding.right, 1);
   const plotHeight = Math.max(options.height - padding.top - padding.bottom, 1);
+  const viewport = createTimelineViewport(options.totalDurationMs, options.currentTimeMs, options.isPlaying);
   const visibleMidis = [
-    ...(options.reference?.frames
-      .filter((frame) => frame.midi !== null)
-      .map((frame) => frame.midi!) ?? []),
+    ...(options.reference?.notes.map((note) => note.medianMidi) ?? []),
     ...options.liveFrames
       .filter((frame) => frame.frequencyHz !== null)
       .map((frame) => frequencyToMidi(frame.frequencyHz!))
@@ -99,19 +104,58 @@ function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOp
 
   const xForTime = (timeMs: number) =>
     padding.left +
-    (Math.min(Math.max(timeMs, 0), options.totalDurationMs) / Math.max(options.totalDurationMs, 1)) *
+    ((Math.min(Math.max(timeMs, viewport.startMs), viewport.endMs) - viewport.startMs) /
+      Math.max(viewport.endMs - viewport.startMs, 1)) *
       plotWidth;
   const yForMidi = (midi: number) =>
     padding.top + (1 - (midi - minMidi) / Math.max(maxMidi - minMidi, 1)) * plotHeight;
 
-  drawSongGrid(context, padding, plotWidth, plotHeight, xForTime, yForMidi, minMidi, maxMidi, options.totalDurationMs);
-  drawScoreRegions(context, options.score, padding, plotHeight, xForTime);
-  drawReferenceContour(context, options.reference, xForTime, yForMidi);
-  drawLiveContour(context, options.liveFrames, xForTime, yForMidi);
+  drawSongGrid(context, padding, plotWidth, plotHeight, xForTime, yForMidi, minMidi, maxMidi, viewport);
+  drawScoreRegions(context, options.score, padding, plotHeight, xForTime, viewport);
+  drawReferenceNotes(context, options.reference, xForTime, yForMidi, viewport);
+  drawLiveContour(context, options.liveFrames, xForTime, yForMidi, viewport);
+  drawPlayhead(context, options.currentTimeMs, padding, plotHeight, xForTime, viewport);
 
   context.fillStyle = "#6b6256";
   context.font = "600 12px system-ui, sans-serif";
-  context.fillText(options.reference ? "Reference and live vocal" : "Analyze a song section", padding.left, 18);
+  context.fillText(
+    options.reference
+      ? `Reference and live vocal · ${formatTime(viewport.startMs)}-${formatTime(viewport.endMs)}`
+      : "Analyze a song section",
+    padding.left,
+    18
+  );
+}
+
+type TimelineViewport = {
+  startMs: number;
+  endMs: number;
+};
+
+function createTimelineViewport(
+  totalDurationMs: number,
+  currentTimeMs: number,
+  isPlaying: boolean
+): TimelineViewport {
+  const durationMs = Math.max(totalDurationMs, 1000);
+  const windowMs = durationMs <= 14000 ? durationMs : 12000;
+  if (durationMs <= windowMs) {
+    return {
+      startMs: 0,
+      endMs: durationMs
+    };
+  }
+
+  const playheadBias = isPlaying ? 0.38 : 0.15;
+  const startMs = Math.min(
+    Math.max(0, currentTimeMs - windowMs * playheadBias),
+    Math.max(0, durationMs - windowMs)
+  );
+
+  return {
+    startMs,
+    endMs: startMs + windowMs
+  };
 }
 
 function drawSongGrid(
@@ -123,7 +167,7 @@ function drawSongGrid(
   yForMidi: (midi: number) => number,
   minMidi: number,
   maxMidi: number,
-  totalDurationMs: number
+  viewport: TimelineViewport
 ) {
   context.strokeStyle = "#e4ded4";
   context.lineWidth = 1;
@@ -144,14 +188,20 @@ function drawSongGrid(
     }
   }
 
-  const tickMs = totalDurationMs <= 45000 ? 5000 : 10000;
-  for (let timeMs = 0; timeMs <= totalDurationMs; timeMs += tickMs) {
+  const visibleDurationMs = viewport.endMs - viewport.startMs;
+  const tickMs = visibleDurationMs <= 6000 ? 1000 : 2000;
+  const firstTickMs = Math.ceil(viewport.startMs / tickMs) * tickMs;
+  for (let timeMs = firstTickMs; timeMs <= viewport.endMs; timeMs += tickMs) {
     const x = xForTime(timeMs);
     context.strokeStyle = "#ded6ca";
     context.beginPath();
     context.moveTo(x, padding.top);
     context.lineTo(x, padding.top + plotHeight);
     context.stroke();
+
+    context.fillStyle = "#83796d";
+    context.font = "10px system-ui, sans-serif";
+    context.fillText(formatTime(timeMs), x - 11, padding.top + plotHeight + 17);
   }
 }
 
@@ -160,7 +210,8 @@ function drawScoreRegions(
   score: SongScore | null,
   padding: { top: number; right: number; bottom: number; left: number },
   plotHeight: number,
-  xForTime: (timeMs: number) => number
+  xForTime: (timeMs: number) => number,
+  viewport: TimelineViewport
 ) {
   if (!score) {
     return;
@@ -170,9 +221,12 @@ function drawScoreRegions(
     if (region.status === "inTune") {
       return;
     }
+    if (region.endMs < viewport.startMs || region.startMs > viewport.endMs) {
+      return;
+    }
 
-    const x = xForTime(region.startMs);
-    const width = Math.max(4, xForTime(region.endMs) - x);
+    const x = xForTime(Math.max(region.startMs, viewport.startMs));
+    const width = Math.max(4, xForTime(Math.min(region.endMs, viewport.endMs)) - x);
     context.fillStyle =
       region.status === "missed" || region.status === "unclear"
         ? "rgba(207, 93, 72, 0.14)"
@@ -181,36 +235,42 @@ function drawScoreRegions(
   });
 }
 
-function drawReferenceContour(
+function drawReferenceNotes(
   context: CanvasRenderingContext2D,
   reference: SongReference | null,
   xForTime: (timeMs: number) => number,
-  yForMidi: (midi: number) => number
+  yForMidi: (midi: number) => number,
+  viewport: TimelineViewport
 ) {
   if (!reference) {
     return;
   }
 
-  context.lineWidth = 4;
-  context.strokeStyle = "rgba(27, 148, 127, 0.68)";
+  context.lineWidth = 6;
+  context.strokeStyle = "rgba(27, 148, 127, 0.78)";
   context.lineJoin = "round";
   context.lineCap = "round";
-  drawMidiLine(
-    context,
-    reference.frames.map((frame) => ({
-      timeMs: frame.timeMs,
-      midi: frame.midi
-    })),
-    xForTime,
-    yForMidi
-  );
+  reference.notes.forEach((note) => {
+    if (note.endMs < viewport.startMs || note.startMs > viewport.endMs) {
+      return;
+    }
+
+    const xStart = xForTime(Math.max(note.startMs, viewport.startMs));
+    const xEnd = xForTime(Math.min(note.endMs, viewport.endMs));
+    const y = yForMidi(note.medianMidi);
+    context.beginPath();
+    context.moveTo(xStart, y);
+    context.lineTo(Math.max(xStart + 4, xEnd), y);
+    context.stroke();
+  });
 }
 
 function drawLiveContour(
   context: CanvasRenderingContext2D,
   frames: PitchFrame[],
   xForTime: (timeMs: number) => number,
-  yForMidi: (midi: number) => number
+  yForMidi: (midi: number) => number,
+  viewport: TimelineViewport
 ) {
   context.lineWidth = 3;
   context.strokeStyle = "rgba(125, 76, 194, 0.62)";
@@ -223,19 +283,57 @@ function drawLiveContour(
       midi: frame.frequencyHz === null ? null : frequencyToMidi(frame.frequencyHz)
     })),
     xForTime,
-    yForMidi
+    yForMidi,
+    viewport
   );
+}
+
+function drawPlayhead(
+  context: CanvasRenderingContext2D,
+  currentTimeMs: number,
+  padding: { top: number; right: number; bottom: number; left: number },
+  plotHeight: number,
+  xForTime: (timeMs: number) => number,
+  viewport: TimelineViewport
+) {
+  if (currentTimeMs < viewport.startMs || currentTimeMs > viewport.endMs) {
+    return;
+  }
+
+  const x = xForTime(currentTimeMs);
+  context.strokeStyle = "#1f6f64";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(x, padding.top);
+  context.lineTo(x, padding.top + plotHeight);
+  context.stroke();
+
+  context.fillStyle = "#1f6f64";
+  context.beginPath();
+  context.moveTo(x, padding.top - 1);
+  context.lineTo(x - 5, padding.top - 9);
+  context.lineTo(x + 5, padding.top - 9);
+  if (typeof context.closePath === "function") {
+    context.closePath();
+  }
+  context.fill();
 }
 
 function drawMidiLine(
   context: CanvasRenderingContext2D,
   points: Array<{ timeMs: number; midi: number | null }>,
   xForTime: (timeMs: number) => number,
-  yForMidi: (midi: number) => number
+  yForMidi: (midi: number) => number,
+  viewport: TimelineViewport
 ) {
   context.beginPath();
   let drawing = false;
   points.forEach((point) => {
+    if (point.timeMs < viewport.startMs || point.timeMs > viewport.endMs) {
+      drawing = false;
+      return;
+    }
+
     if (point.midi === null) {
       drawing = false;
       return;
@@ -251,4 +349,11 @@ function drawMidiLine(
     }
   });
   context.stroke();
+}
+
+function formatTime(timeMs: number) {
+  const totalSeconds = Math.max(0, Math.round(timeMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }

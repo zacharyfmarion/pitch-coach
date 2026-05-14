@@ -54,8 +54,16 @@ export type SongPhrase = {
   medianMidi: number;
 };
 
+export type SongReferenceNote = {
+  id: string;
+  startMs: number;
+  endMs: number;
+  medianMidi: number;
+};
+
 export type SongReference = {
   frames: SongReferenceFrame[];
+  notes: SongReferenceNote[];
   phrases: SongPhrase[];
   durationMs: number;
 };
@@ -84,6 +92,7 @@ export type SongPracticeConfig = {
   bounds: PitchDetectionBounds;
   vocalGuideGain: number;
   onPitchFrame: (frame: PitchFrame) => void;
+  onPlaybackTime?: (timeMs: number) => void;
   onEnded: () => void;
 };
 

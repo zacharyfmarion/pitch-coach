@@ -20,6 +20,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
   private accompanimentSource: AudioBufferSourceNode | null = null;
   private vocalSource: AudioBufferSourceNode | null = null;
   private vocalGain: GainNode | null = null;
+  private playbackTimer: number | null = null;
   private running = false;
   private playbackStartMs = 0;
   private endedCallback: (() => void) | null = null;
@@ -94,12 +95,25 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         return;
       }
 
+      config.onPlaybackTime?.(config.accompaniment.durationMs);
       const onEnded = this.endedCallback;
       void this.stop().then(() => onEnded?.());
     };
 
     this.running = true;
     const startAt = this.playbackStartMs / 1000;
+    config.onPlaybackTime?.(0);
+    this.playbackTimer = window.setInterval(() => {
+      if (!this.running || !this.context) {
+        return;
+      }
+
+      const timeMs = Math.min(
+        Math.max(0, this.context.currentTime * 1000 - this.playbackStartMs),
+        config.accompaniment.durationMs
+      );
+      config.onPlaybackTime?.(timeMs);
+    }, 50);
     this.accompanimentSource.start(startAt);
     this.vocalSource.start(startAt);
   }
@@ -108,6 +122,10 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     const wasRunning = this.running;
     this.running = false;
     this.endedCallback = null;
+    if (this.playbackTimer !== null) {
+      window.clearInterval(this.playbackTimer);
+      this.playbackTimer = null;
+    }
 
     if (wasRunning) {
       try {
