@@ -30,4 +30,4 @@ Add first-party theme support with light, dark, and system preferences, persiste
 - [x] Convert CSS and canvas colors to theme-aware tokens
 - [x] Add unit and browser coverage
 - [x] Run baseline and browser validation
-- [ ] Commit, push, and open a draft PR
+- [x] Commit, push, and open a draft PR
