@@ -26,16 +26,41 @@ import type {
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
+import { SongPracticeScreen } from "../song/SongPracticeScreen";
+import type { SongModeServices } from "../song/types";
+import { usePitchCoachTheme } from "./theme";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
 
-export type PitchCoachAppProps = PitchCoachControllerOptions;
+export type PitchCoachAppProps = PitchCoachControllerOptions & {
+  songServices?: SongModeServices;
+};
 
 const APP_BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 
 export function PitchCoachApp(props: PitchCoachAppProps) {
   const router = usePitchCoachRouter();
+
+  if (router.route.screen === "songs") {
+    return (
+      <SongPracticeScreen
+        services={props.songServices}
+        onBackToLibrary={() => router.goBackToLibraryFallback()}
+      />
+    );
+  }
+
+  const { songServices: _songServices, ...coachOptions } = props;
+  return <ExercisePracticeApp router={router} coachOptions={coachOptions} />;
+}
+
+type ExercisePracticeAppProps = {
+  router: ReturnType<typeof usePitchCoachRouter>;
+  coachOptions: PitchCoachControllerOptions;
+};
+
+function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps) {
   const coach = usePitchCoachController({
-    ...props,
+    ...coachOptions,
     initialExerciseId: router.route.screen === "practice" ? router.route.exerciseId : undefined
   });
   const resolvedTheme = usePitchCoachTheme(coach.settings.themePreference);
@@ -97,10 +122,14 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
                   })
                 }
               />
-              <div className="session-readout" aria-live="polite">
-                <span className="readout-label">Selected</span>
-                <strong>{coach.selectedExercise.title}</strong>
-              </div>
+              <button
+                className="text-action mode-action"
+                type="button"
+                onClick={() => router.navigateToSongs()}
+              >
+                <Music2 size={16} />
+                <span>Song mode</span>
+              </button>
             </div>
           </header>
 
@@ -148,9 +177,6 @@ export function PitchCoachApp(props: PitchCoachAppProps) {
             >
               <ArrowLeft size={18} />
             </button>
-            <div className="brand-mark" aria-hidden="true">
-              <Mic2 size={22} />
-            </div>
             <div>
               <h1>Pitch Coach</h1>
               <p>{coach.selectedExercise.title}</p>
@@ -444,8 +470,6 @@ const statusCopy = {
   complete: "Complete"
 } as const;
 
-type ResolvedTheme = "light" | "dark";
-
 const themeOptions = [
   {
     value: "system",
@@ -467,44 +491,6 @@ const themeOptions = [
   label: string;
   icon: typeof Monitor;
 }[];
-
-function usePitchCoachTheme(themePreference: ThemePreference): ResolvedTheme {
-  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => getSystemTheme());
-  const resolvedTheme = themePreference === "system" ? systemTheme : themePreference;
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const updateSystemTheme = () => setSystemTheme(mediaQuery.matches ? "dark" : "light");
-    updateSystemTheme();
-
-    mediaQuery.addEventListener("change", updateSystemTheme);
-    return () => mediaQuery.removeEventListener("change", updateSystemTheme);
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = resolvedTheme;
-    root.style.colorScheme = resolvedTheme;
-  }, [resolvedTheme]);
-
-  return resolvedTheme;
-}
-
-function getSystemTheme(): ResolvedTheme {
-  if (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  ) {
-    return "dark";
-  }
-
-  return "light";
-}
 
 function ThemePicker({
   value,
@@ -551,6 +537,10 @@ type AppRoute =
       screen: "practice";
       exerciseId: ExerciseId;
       fromAppNavigation: boolean;
+    }
+  | {
+      screen: "songs";
+      fromAppNavigation: boolean;
     };
 
 type RouteLocation =
@@ -560,6 +550,9 @@ type RouteLocation =
   | {
       screen: "practice";
       exerciseId: ExerciseId;
+    }
+  | {
+      screen: "songs";
     };
 
 type ParsedRoute = {
@@ -637,8 +630,22 @@ function usePitchCoachRouter() {
     []
   );
 
+  const navigateToSongs = useCallback((options: { replace?: boolean } = {}) => {
+    const nextRoute = {
+      screen: "songs" as const,
+      fromAppNavigation: true
+    };
+    const state = createHistoryState(true);
+    if (options.replace) {
+      window.history.replaceState(state, "", routePath({ screen: "songs" }));
+    } else {
+      window.history.pushState(state, "", routePath({ screen: "songs" }));
+    }
+    setRoute(nextRoute);
+  }, []);
+
   const goBackToLibraryFallback = useCallback(() => {
-    if (route.screen === "practice" && route.fromAppNavigation) {
+    if ((route.screen === "practice" || route.screen === "songs") && route.fromAppNavigation) {
       window.history.back();
       return;
     }
@@ -650,6 +657,7 @@ function usePitchCoachRouter() {
     route,
     navigateToLibrary,
     navigateToExercise,
+    navigateToSongs,
     goBackToLibraryFallback
   };
 }
@@ -677,6 +685,13 @@ function parsePathname(pathname: string): ParsedRoute {
   if (appPathname === "/" || appPathname === "") {
     return {
       route: { screen: "library" },
+      invalid: false
+    };
+  }
+
+  if (appPathname === "/songs" || appPathname === "/songs/") {
+    return {
+      route: { screen: "songs" },
       invalid: false
     };
   }
@@ -716,7 +731,8 @@ function parsePathname(pathname: string): ParsedRoute {
 }
 
 function routePath(route: RouteLocation) {
-  const pathname = route.screen === "library" ? "/" : `/exercises/${route.exerciseId}`;
+  const pathname =
+    route.screen === "library" ? "/" : route.screen === "songs" ? "/songs" : `/exercises/${route.exerciseId}`;
   return withAppBase(pathname);
 }
 

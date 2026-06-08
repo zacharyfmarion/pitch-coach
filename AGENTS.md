@@ -16,6 +16,7 @@ src/
   audio/        # Browser audio capture, AudioWorklet frames, Pitchy detection, prompts
   components/   # Reusable feedback and visualization components
   domain/       # Pure music math, exercise generation, scoring, lesson state
+  song/         # Browser-local song upload, separation, reference pitch, and scoring
   storage/      # Local settings and optional local clip persistence
   test/         # Shared Vitest setup
 tests/browser/  # Playwright browser coverage
@@ -26,8 +27,8 @@ tests/browser/  # Playwright browser coverage
 - Domain logic belongs in `src/domain` and should stay browser-independent. Prefer pure functions with focused Vitest coverage for scoring, music math, and lesson transitions.
 - Browser APIs belong behind adapters in `src/audio` or `src/storage`. Keep microphone capture, AudioWorklets, Tone.js playback, and persistence out of pure domain modules.
 - The React controller in `src/app/usePitchCoachController.ts` coordinates lesson state and services. Components should receive already-shaped data rather than reimplementing scoring or audio decisions.
-- No microphone audio is uploaded. Do not add network transport for audio or pitch frames unless the product explicitly changes its privacy model.
-- URL routes are intentionally lightweight and live in `src/app/PitchCoachApp.tsx`. Keep route helpers aware of Vite's `import.meta.env.BASE_URL` so GitHub Pages project paths keep working.
+- No microphone audio or uploaded song audio is uploaded. Do not add network transport for user audio or pitch frames unless the product explicitly changes its privacy model.
+- URL routes are intentionally lightweight and live in `src/app/PitchCoachApp.tsx`. Keep route helpers aware of Vite's `import.meta.env.BASE_URL` so non-root preview or legacy deploy paths keep working.
 
 ## Product And Design Context
 
@@ -67,9 +68,10 @@ pnpm exec playwright install chromium
 GitHub Actions workflows live under `.github/workflows/`.
 
 - `ci.yml` runs dependency install, unit tests, production build, and Playwright browser coverage.
-- `deploy-pages.yml` builds on pushes to `main` and deploys `dist/` to GitHub Pages when Pages is enabled for the repository. Private repositories must set `ENABLE_PRIVATE_PAGES_DEPLOY=true` after Pages support is available.
-- The deployment workflow sets `GITHUB_PAGES=true` and `GITHUB_PAGES_BASE_PATH=/pitch-coach/`; `vite.config.ts` uses that to build assets under the public Pages path.
-- The workflow copies `dist/index.html` to `dist/404.html` so direct exercise URLs can fall back to the single-page app on GitHub Pages.
+- `deploy-web.yml` builds on pushes to `main` and deploys `dist/` to Cloudflare Pages with `wrangler pages deploy`.
+- `deploy-pr-preview.yml` deploys Cloudflare Pages previews for non-fork pull requests.
+- Cloudflare Pages must serve `public/_headers` so song mode can use cross-origin isolation for WebGPU/ONNX runtime support.
+- The Demucs model should be hosted outside Pages, for example in Cloudflare R2 behind a CORS-enabled custom domain, and provided as `VITE_DEMUCS_MODEL_URL` when needed.
 
 ## `/create` Workflow
 

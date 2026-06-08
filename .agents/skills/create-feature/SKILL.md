@@ -121,9 +121,9 @@ If `gh` auth or GitHub access is unavailable, stop after local validation and re
 
 ## Deployment Handoff
 
-Pushes to `main` deploy to GitHub Pages through `.github/workflows/deploy-pages.yml`.
+Pushes to `main` deploy to Cloudflare Pages through `.github/workflows/deploy-web.yml`.
 
-After opening or merging a PR, use GitHub Actions status or the deployment environment to confirm the published site URL. Do not claim a deployment is live until GitHub reports a successful Pages deployment.
+After opening or merging a PR, use GitHub Actions status or the deployment environment to confirm the published site URL. Do not claim a deployment is live until Cloudflare Pages reports a successful deployment.
 
 ## Guardrails
 

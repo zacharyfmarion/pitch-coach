@@ -9,7 +9,10 @@ import {
   getExerciseById,
   MAJOR_TRIAD_EXERCISE
 } from "../domain/exercise";
-import { parseNoteName } from "../domain/music";
+import { midiToFrequency, parseNoteName } from "../domain/music";
+import { createStereoBuffer } from "../song/audioData";
+import { SONG_REFERENCE_ANALYSIS_VERSION } from "../song/referenceVersion";
+import type { SongModeServices, SongPracticeConfig, SongReference, SongStereoBuffer } from "../song/types";
 import type { AttemptHistoryRecord } from "../domain/contracts";
 import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
 import { installFakeIndexedDB } from "../test/fakeIndexedDB";
@@ -37,8 +40,186 @@ describe("PitchCoachApp", () => {
 
     expect(screen.getByRole("heading", { name: "Pitch Coach" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Song mode" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Single Note Match/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
+  });
+
+  it("opens song mode and shows runtime requirements when unsupported", async () => {
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={createSongServices({ supported: false })}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/songs"));
+    expect(screen.getByRole("heading", { name: "Song Practice" })).toBeTruthy();
+    expect(screen.getByLabelText("Song mode unavailable").textContent).toMatch(/WebGPU/i);
+  });
+
+  it("applies the resolved theme on direct song mode navigation", async () => {
+    mockPreferredColorScheme(true);
+    window.history.replaceState(null, "", "/songs");
+
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={createSongServices({ supported: true })}
+      />
+    );
+
+    await screen.findByRole("heading", { name: "Song Practice" });
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+  });
+
+  it("uploads, analyzes, and scores a song practice attempt with fake local services", async () => {
+    const songServices = createSongServices({ supported: true });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    expect(screen.getByRole("button", { name: "Balanced" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Sensitive" }));
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+
+    await screen.findByText(/1 note/i);
+    expect(screen.getByRole("group", { name: "Reference detail" })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Debug note timing"));
+    expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/C4 MIDI 60/);
+    expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/conf 0\.900 amp 0\.900/);
+    fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Song feedback").textContent).toMatch(/Strong match/i));
+    expect(songServices.separator.separate).toHaveBeenCalled();
+    expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ detail: "sensitive" })
+    );
+  });
+
+  it("pauses and resumes an active song practice attempt", async () => {
+    const songServices = createSongServices({ supported: true, autoEndPractice: false });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+    await screen.findByText(/1 note/i);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
+    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    await waitFor(() => expect(screen.getByText("Paused")).toBeTruthy());
+    expect(songServices.practiceEngine.pause).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+    expect(songServices.practiceEngine.resume).toHaveBeenCalled();
+  });
+
+  it("clears stale song references from an older transcription build", async () => {
+    const songServices = createSongServices({
+      supported: true,
+      referenceAnalysisVersion: "older-transcription-build"
+    });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+
+    await screen.findByText(/Transcription engine updated\. Analyze song again\./i);
+    expect(screen.getByLabelText("Debug note timing")).toHaveProperty("disabled", true);
+    expect(songServices.separator.separate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not filter song transcription to a narrow exercise range", async () => {
+    const songServices = createSongServices({ supported: true, referenceMidis: [61, 64] });
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={songServices}
+        initialSettings={{
+          ...DEFAULT_SETTINGS,
+          range: {
+            lowestMidi: parseNoteName("C3"),
+            highestMidi: parseNoteName("D4")
+          }
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
+      }
+    });
+
+    await screen.findByText(/0:01 selected/);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+
+    await screen.findByText(/range C3-C5/i);
+    expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        range: {
+          lowestMidi: parseNoteName("C3"),
+          highestMidi: parseNoteName("C5")
+        }
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
+    await waitFor(() => expect(songServices.practiceEngine.lastConfig).not.toBeNull());
+    expect(songServices.practiceEngine.lastConfig?.bounds.maxFrequencyHz).toBeGreaterThan(
+      midiToFrequency(parseNoteName("D#4"))
+    );
   });
 
   it("advances a half step after a passing attempt", async () => {
@@ -604,6 +785,103 @@ function mockPreferredColorScheme(initialMatches: boolean) {
   };
 }
 
+function createSongServices(options: {
+  supported: boolean;
+  referenceAnalysisVersion?: string;
+  referenceMidis?: number[];
+  autoEndPractice?: boolean;
+}): SongModeServices & {
+  separator: SongModeServices["separator"] & { separate: ReturnType<typeof vi.fn> };
+  transcriber: SongModeServices["transcriber"] & { transcribe: ReturnType<typeof vi.fn> };
+  practiceEngine: MockSongPracticeEngine;
+} {
+  const audio = createTestSongBuffer();
+  const separated = {
+    vocals: audio,
+    accompaniment: audio,
+    stems: {
+      drums: audio,
+      bass: audio,
+      other: audio,
+      vocals: audio
+    }
+  };
+  const practiceEngine = new MockSongPracticeEngine(options.autoEndPractice ?? true);
+  return {
+    detectSupport: vi.fn(() =>
+      Promise.resolve(
+        options.supported
+          ? { supported: true, checking: false, reasons: [] }
+          : {
+              supported: false,
+              checking: false,
+              reasons: ["Song mode requires WebGPU."]
+            }
+      )
+    ),
+    decodeFile: vi.fn(() => Promise.resolve(audio)),
+    separator: {
+      separate: vi.fn(() => Promise.resolve(separated))
+    },
+    transcriber: {
+      transcribe: vi.fn((_vocals, transcriptionOptions) => {
+        transcriptionOptions.onProgress?.({ progress: 1 });
+        return Promise.resolve(createTestSongReference(options.referenceAnalysisVersion, options.referenceMidis));
+      })
+    },
+    practiceEngine,
+    detector: {
+      detectPitch: vi.fn((_samples, _sampleRate, timeMs) => ({
+        timeMs,
+        frequencyHz: midiToFrequency(60),
+        clarity: 0.96,
+        rms: 0.08
+      }))
+    }
+  };
+}
+
+function createTestSongReference(
+  analysisVersion: string | undefined = SONG_REFERENCE_ANALYSIS_VERSION,
+  midis: number[] = [60]
+): SongReference {
+  const firstMidi = midis[0] ?? 60;
+  return {
+    analysisVersion,
+    analysisRange: DEFAULT_SETTINGS.range,
+    durationMs: 1200,
+    frames: [0, 100, 200, 300, 400, 500].map((timeMs) => ({
+      timeMs,
+      frequencyHz: midiToFrequency(firstMidi),
+      midi: firstMidi,
+      clarity: 0.9,
+      rms: 0.08
+    })),
+    notes: midis.map((midi, index) => ({
+      id: `note-${index}`,
+      startMs: index * 300,
+      endMs: index * 300 + 240,
+      midi,
+      medianMidi: midi,
+      confidence: 0.9,
+      amplitude: 0.9,
+      pitchBends: []
+    })),
+    contour: midis.flatMap((midi, index) => [
+      { timeMs: index * 300, midi, confidence: 0.9, noteId: `note-${index}` },
+      { timeMs: index * 300 + 240, midi, confidence: 0.9, noteId: `note-${index}` }
+    ]),
+    phrases: [{ id: "phrase-0", startMs: 0, endMs: Math.max(240, midis.length * 300), medianMidi: firstMidi }],
+    quality: { noteCount: midis.length, lowConfidenceCount: 0, suggestion: null }
+  };
+}
+
+function createTestSongBuffer(): SongStereoBuffer {
+  const sampleRate = 44100;
+  const samples = new Float32Array(Math.round(sampleRate * 1.2));
+  return createStereoBuffer(samples, samples, sampleRate);
+}
+
 class MockAudioEngine implements AudioInputEngine {
   constructor(
     private readonly frames: PitchFrame[],
@@ -622,6 +900,55 @@ class MockAudioEngine implements AudioInputEngine {
 
   isRunning() {
     return false;
+  }
+}
+
+class MockSongPracticeEngine {
+  private running = false;
+  private paused = false;
+  lastConfig: SongPracticeConfig | null = null;
+
+  constructor(private readonly autoEndPractice: boolean) {}
+
+  async start(config: SongPracticeConfig) {
+    this.running = true;
+    this.paused = false;
+    this.lastConfig = config;
+    Array.from({ length: 12 }, (_, index) => index * 100).forEach((timeMs) =>
+      config.onPitchFrame({
+        timeMs,
+        frequencyHz: midiToFrequency(60),
+        clarity: 0.96,
+        rms: 0.08
+      })
+    );
+    if (this.autoEndPractice) {
+      this.running = false;
+      config.onEnded();
+    }
+  }
+
+  pause = vi.fn(async () => {
+    this.paused = true;
+  });
+
+  resume = vi.fn(async () => {
+    this.paused = false;
+  });
+
+  async stop() {
+    this.running = false;
+    this.paused = false;
+  }
+
+  setVocalGuideGain() {}
+
+  isRunning() {
+    return this.running;
+  }
+
+  isPaused() {
+    return this.paused;
   }
 }
 
