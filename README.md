@@ -10,6 +10,8 @@ https://pitch-coach.pages.dev/
 
 Microphone input requires HTTPS or localhost. Song mode also requires WebGPU and cross-origin isolation headers so vocal isolation can run locally in the browser.
 
+Production song mode expects `VITE_DEMUCS_MODEL_URL` to point to a CORS-enabled Demucs ONNX model, preferably hosted from Cloudflare R2. The build serves ONNX Runtime Web's browser runtime from `/ort/`, and Cloudflare Pages must deploy `public/_headers` so those assets keep the cross-origin isolation headers.
+
 ## Run
 
 ```bash

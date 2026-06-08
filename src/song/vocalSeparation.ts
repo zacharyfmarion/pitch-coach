@@ -12,6 +12,9 @@ type OnnxRuntimeWebGpu = typeof import("onnxruntime-web/webgpu");
 type DemucsWebModule = typeof import("demucs-web");
 
 const DEFAULT_MODEL_URL = "https://huggingface.co/timcsy/demucs-web-onnx/resolve/main/htdemucs_embedded.onnx";
+const ORT_RUNTIME_BASE_URL = `${import.meta.env.BASE_URL}ort/`;
+const ORT_RUNTIME_MJS = "ort-wasm-simd-threaded.asyncify.mjs";
+const ORT_RUNTIME_WASM = "ort-wasm-simd-threaded.asyncify.wasm";
 
 export class DemucsWebVocalSeparator implements SongVocalSeparator {
   constructor(private readonly modelUrl = getConfiguredModelUrl()) {}
@@ -69,7 +72,16 @@ export function getConfiguredModelUrl() {
 }
 
 function configureOnnxRuntime(ort: OnnxRuntimeWebGpu) {
+  ort.env.wasm.proxy = false;
+  ort.env.wasm.wasmPaths = getOnnxRuntimeWasmPaths();
   ort.env.wasm.numThreads = Math.max(1, Math.min(navigator.hardwareConcurrency || 4, 8));
+}
+
+export function getOnnxRuntimeWasmPaths() {
+  return {
+    mjs: `${ORT_RUNTIME_BASE_URL}${ORT_RUNTIME_MJS}`,
+    wasm: `${ORT_RUNTIME_BASE_URL}${ORT_RUNTIME_WASM}`
+  };
 }
 
 function toSongBuffer(
