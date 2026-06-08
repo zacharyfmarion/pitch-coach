@@ -14,10 +14,8 @@ type PitchTimelineProps = {
   totalDurationMs: number;
   toleranceCents: number;
   status: LessonStatus;
-  theme: TimelineTheme;
+  themeName: string;
 };
-
-export type TimelineTheme = "light" | "dark";
 
 export function PitchTimeline({
   frames,
@@ -26,7 +24,7 @@ export function PitchTimeline({
   totalDurationMs,
   toleranceCents,
   status,
-  theme
+  themeName
 }: PitchTimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -60,11 +58,11 @@ export function PitchTimeline({
       totalDurationMs,
       toleranceCents,
       status,
-      theme,
+      themeName,
       width: size.width,
       height: size.height
     });
-  }, [attemptScore, frames, size, status, targetNotes, theme, toleranceCents, totalDurationMs]);
+  }, [attemptScore, frames, size, status, targetNotes, themeName, toleranceCents, totalDurationMs]);
 
   return (
     <div className="timeline-frame">
@@ -101,45 +99,55 @@ type TimelinePalette = {
   errorLine: string;
 };
 
-const timelinePalettes = {
-  light: {
-    surface: "#fcfbf7",
-    targetBand: "rgba(27, 148, 127, 0.16)",
-    targetLine: "rgba(27, 148, 127, 0.62)",
-    targetText: "#33423f",
-    statusText: "#6b6256",
-    gridBorder: "#e4ded4",
-    gridLine: "#eee8df",
-    gridStrongLine: "#d5cdc0",
-    gridLabel: "#83796d",
-    timeMarker: "#ded6ca",
-    ignoredEvent: "rgba(100, 93, 84, 0.28)",
-    pitchLine: "rgba(125, 76, 194, 0.56)",
-    noisyFrame: "rgba(207, 93, 72, 0.26)",
-    passLine: "#1b947f",
-    errorLine: "#cf5d48"
-  },
-  dark: {
-    surface: "#1f2420",
-    targetBand: "rgba(101, 200, 183, 0.18)",
-    targetLine: "rgba(101, 200, 183, 0.72)",
-    targetText: "#c0d9d0",
-    statusText: "#cfc6b8",
-    gridBorder: "#353d36",
-    gridLine: "#2f3630",
-    gridStrongLine: "#485044",
-    gridLabel: "#b8afa2",
-    timeMarker: "#40493f",
-    ignoredEvent: "rgba(184, 175, 162, 0.28)",
-    pitchLine: "rgba(185, 152, 239, 0.72)",
-    noisyFrame: "rgba(243, 161, 145, 0.28)",
-    passLine: "#65c8b7",
-    errorLine: "#f3a191"
-  }
-} satisfies Record<TimelineTheme, TimelinePalette>;
+const fallbackTimelinePalette = {
+  surface: "#1b1f27",
+  targetBand: "rgba(97, 175, 239, 0.18)",
+  targetLine: "rgba(97, 175, 239, 0.78)",
+  targetText: "#abb2bf",
+  statusText: "#828997",
+  gridBorder: "#3e4452",
+  gridLine: "rgba(171, 178, 191, 0.08)",
+  gridStrongLine: "rgba(171, 178, 191, 0.16)",
+  gridLabel: "#828997",
+  timeMarker: "rgba(62, 68, 82, 0.88)",
+  ignoredEvent: "rgba(130, 137, 151, 0.28)",
+  pitchLine: "rgba(198, 120, 221, 0.78)",
+  noisyFrame: "rgba(224, 108, 117, 0.28)",
+  passLine: "#98c379",
+  errorLine: "#e06c75"
+} satisfies TimelinePalette;
+
+const timelinePaletteVariables = {
+  surface: "--timeline-surface",
+  targetBand: "--timeline-target-band",
+  targetLine: "--timeline-target-line",
+  targetText: "--timeline-target-text",
+  statusText: "--timeline-status-text",
+  gridBorder: "--timeline-grid-border",
+  gridLine: "--timeline-grid-line",
+  gridStrongLine: "--timeline-grid-strong-line",
+  gridLabel: "--timeline-grid-label",
+  timeMarker: "--timeline-time-marker",
+  ignoredEvent: "--timeline-ignored-event",
+  pitchLine: "--timeline-pitch-line",
+  noisyFrame: "--timeline-noisy-frame",
+  passLine: "--timeline-pass-line",
+  errorLine: "--timeline-error-line"
+} satisfies Record<keyof TimelinePalette, string>;
+
+function readTimelinePalette(canvas: HTMLCanvasElement): TimelinePalette {
+  const computedStyle = getComputedStyle(canvas);
+  return Object.fromEntries(
+    Object.entries(timelinePaletteVariables).map(([key, variableName]) => [
+      key,
+      computedStyle.getPropertyValue(variableName).trim() ||
+        fallbackTimelinePalette[key as keyof TimelinePalette]
+    ])
+  ) as TimelinePalette;
+}
 
 function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
-  const palette = timelinePalettes[options.theme];
+  const palette = readTimelinePalette(canvas);
   const pixelRatio = window.devicePixelRatio || 1;
   canvas.width = Math.floor(options.width * pixelRatio);
   canvas.height = Math.floor(options.height * pixelRatio);

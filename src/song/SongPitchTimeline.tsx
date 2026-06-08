@@ -12,12 +12,10 @@ type SongPitchTimelineProps = {
   totalDurationMs: number;
   currentTimeMs: number;
   isPlaying: boolean;
-  theme: SongTimelineTheme;
+  themeName: string;
   debugEnabled?: boolean;
   debugEnergy?: SongDebugEnergyPoint[];
 };
-
-export type SongTimelineTheme = "light" | "dark";
 
 export function SongPitchTimeline({
   reference,
@@ -26,7 +24,7 @@ export function SongPitchTimeline({
   totalDurationMs,
   currentTimeMs,
   isPlaying,
-  theme,
+  themeName,
   debugEnabled = false,
   debugEnergy = []
 }: SongPitchTimelineProps) {
@@ -62,7 +60,7 @@ export function SongPitchTimeline({
       totalDurationMs,
       currentTimeMs,
       isPlaying,
-      theme,
+      themeName,
       debugEnabled,
       debugEnergy,
       width: size.width,
@@ -78,7 +76,7 @@ export function SongPitchTimeline({
     score,
     size.height,
     size.width,
-    theme,
+    themeName,
     totalDurationMs
   ]);
 
@@ -119,49 +117,59 @@ type SongTimelinePalette = {
   debugBar: string;
 };
 
-const songTimelinePalettes = {
-  light: {
-    surface: "#fcfbf7",
-    statusText: "#6b6256",
-    gridBorder: "#e4ded4",
-    gridLine: "#eee8df",
-    gridStrongLine: "#d5cdc0",
-    gridLabel: "#83796d",
-    timeMarker: "#ded6ca",
-    missedRegion: "rgba(207, 93, 72, 0.14)",
-    offPitchRegion: "rgba(125, 76, 194, 0.13)",
-    referenceBand: "rgba(27, 148, 127, 0.18)",
-    referenceBorder: "rgba(27, 148, 127, 0.58)",
-    referenceLine: "rgba(27, 148, 127, 0.92)",
-    liveLine: "rgba(125, 76, 194, 0.62)",
-    playhead: "#1f6f64",
-    debugSurface: "#f5efe6",
-    debugBorder: "#dfd5c7",
-    debugBar: "rgba(31, 111, 100, 0.46)"
-  },
-  dark: {
-    surface: "#1f2420",
-    statusText: "#cfc6b8",
-    gridBorder: "#353d36",
-    gridLine: "#2f3630",
-    gridStrongLine: "#485044",
-    gridLabel: "#b8afa2",
-    timeMarker: "#40493f",
-    missedRegion: "rgba(243, 161, 145, 0.18)",
-    offPitchRegion: "rgba(185, 152, 239, 0.16)",
-    referenceBand: "rgba(101, 200, 183, 0.18)",
-    referenceBorder: "rgba(101, 200, 183, 0.62)",
-    referenceLine: "rgba(101, 200, 183, 0.92)",
-    liveLine: "rgba(185, 152, 239, 0.72)",
-    playhead: "#65c8b7",
-    debugSurface: "#252b26",
-    debugBorder: "#485044",
-    debugBar: "rgba(101, 200, 183, 0.54)"
-  }
-} satisfies Record<SongTimelineTheme, SongTimelinePalette>;
+const fallbackSongTimelinePalette = {
+  surface: "#1b1f27",
+  statusText: "#828997",
+  gridBorder: "#3e4452",
+  gridLine: "rgba(171, 178, 191, 0.08)",
+  gridStrongLine: "rgba(171, 178, 191, 0.16)",
+  gridLabel: "#828997",
+  timeMarker: "rgba(62, 68, 82, 0.88)",
+  missedRegion: "rgba(224, 108, 117, 0.2)",
+  offPitchRegion: "rgba(198, 120, 221, 0.18)",
+  referenceBand: "rgba(86, 182, 194, 0.18)",
+  referenceBorder: "rgba(86, 182, 194, 0.62)",
+  referenceLine: "rgba(86, 182, 194, 0.92)",
+  liveLine: "rgba(198, 120, 221, 0.78)",
+  playhead: "#61afef",
+  debugSurface: "#21252b",
+  debugBorder: "#3e4452",
+  debugBar: "rgba(97, 175, 239, 0.54)"
+} satisfies SongTimelinePalette;
+
+const songTimelinePaletteVariables = {
+  surface: "--timeline-surface",
+  statusText: "--timeline-status-text",
+  gridBorder: "--timeline-grid-border",
+  gridLine: "--timeline-grid-line",
+  gridStrongLine: "--timeline-grid-strong-line",
+  gridLabel: "--timeline-grid-label",
+  timeMarker: "--timeline-time-marker",
+  missedRegion: "--song-timeline-missed-region",
+  offPitchRegion: "--song-timeline-off-pitch-region",
+  referenceBand: "--song-timeline-reference-band",
+  referenceBorder: "--song-timeline-reference-border",
+  referenceLine: "--song-timeline-reference-line",
+  liveLine: "--song-timeline-live-line",
+  playhead: "--song-timeline-playhead",
+  debugSurface: "--song-timeline-debug-surface",
+  debugBorder: "--song-timeline-debug-border",
+  debugBar: "--song-timeline-debug-bar"
+} satisfies Record<keyof SongTimelinePalette, string>;
+
+function readSongTimelinePalette(canvas: HTMLCanvasElement): SongTimelinePalette {
+  const computedStyle = getComputedStyle(canvas);
+  return Object.fromEntries(
+    Object.entries(songTimelinePaletteVariables).map(([key, variableName]) => [
+      key,
+      computedStyle.getPropertyValue(variableName).trim() ||
+        fallbackSongTimelinePalette[key as keyof SongTimelinePalette]
+    ])
+  ) as SongTimelinePalette;
+}
 
 function drawSongTimeline(canvas: HTMLCanvasElement, options: DrawSongTimelineOptions) {
-  const palette = songTimelinePalettes[options.theme];
+  const palette = readSongTimelinePalette(canvas);
   const pixelRatio = window.devicePixelRatio || 1;
   canvas.width = Math.floor(options.width * pixelRatio);
   canvas.height = Math.floor(options.height * pixelRatio);

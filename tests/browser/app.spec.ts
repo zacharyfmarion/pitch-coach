@@ -67,16 +67,20 @@ test("defaults to system dark mode and persists manual theme choice", async ({ p
 
   await expect(page.getByRole("radio", { name: "System theme" })).toHaveAttribute("aria-checked", "true");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "One Dark");
 
-  await page.getByRole("radio", { name: "Light theme" }).click();
+  await page.getByRole("radio", { name: "Atom One Light theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "Atom One Light");
 
   await page.reload();
-  await expect(page.getByRole("radio", { name: "Light theme" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "Atom One Light theme" })).toHaveAttribute("aria-checked", "true");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "Atom One Light");
 
   await page.getByRole("radio", { name: "System theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "One Dark");
 });
 
 test("shows and clears local attempt history", async ({ page }) => {

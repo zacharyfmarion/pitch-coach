@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import type { ThemePreference } from "../domain/contracts";
+import {
+  applyTheme,
+  getThemeByName,
+  resolveSystemDefaultTheme,
+  type PitchCoachTheme
+} from "../themes";
 
-export type ResolvedTheme = "light" | "dark";
+type SystemTheme = "light" | "dark";
 
-export function usePitchCoachTheme(themePreference: ThemePreference): ResolvedTheme {
-  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => getSystemTheme());
-  const resolvedTheme = themePreference === "system" ? systemTheme : themePreference;
+export function usePitchCoachTheme(themePreference: ThemePreference): PitchCoachTheme {
+  const [systemTheme, setSystemTheme] = useState<SystemTheme>(() => getSystemTheme());
+  const resolvedTheme = resolveThemePreference(themePreference, systemTheme);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -21,15 +27,21 @@ export function usePitchCoachTheme(themePreference: ThemePreference): ResolvedTh
   }, []);
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = resolvedTheme;
-    root.style.colorScheme = resolvedTheme;
+    applyTheme(resolvedTheme);
   }, [resolvedTheme]);
 
   return resolvedTheme;
 }
 
-function getSystemTheme(): ResolvedTheme {
+function resolveThemePreference(themePreference: ThemePreference, systemTheme: SystemTheme) {
+  if (themePreference.mode === "system") {
+    return resolveSystemDefaultTheme(systemTheme);
+  }
+
+  return getThemeByName(themePreference.themeName) ?? resolveSystemDefaultTheme(systemTheme);
+}
+
+function getSystemTheme(): SystemTheme {
   if (
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&

@@ -1,5 +1,6 @@
 import type { CoachSettings, ThemePreference } from "../domain/contracts";
 import { DEFAULT_SETTINGS, isExerciseId, normalizeRange } from "../domain/exercise";
+import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, getThemeByName } from "../themes";
 
 const STORAGE_KEY = "pitch-coach-settings-v1";
 
@@ -54,7 +55,56 @@ export function normalizeSettings(settings: Partial<CoachSettings>): CoachSettin
 }
 
 function normalizeThemePreference(value: unknown): ThemePreference {
-  return value === "light" || value === "dark" || value === "system" ? value : DEFAULT_SETTINGS.themePreference;
+  if (value === "system") {
+    return {
+      mode: "system"
+    };
+  }
+
+  if (value === "dark") {
+    return {
+      mode: "theme",
+      themeName: DEFAULT_DARK_THEME.name
+    };
+  }
+
+  if (value === "light") {
+    return {
+      mode: "theme",
+      themeName: DEFAULT_LIGHT_THEME.name
+    };
+  }
+
+  if (isThemePreference(value)) {
+    if (value.mode === "system") {
+      return {
+        mode: "system"
+      };
+    }
+
+    const theme = getThemeByName(value.themeName);
+    if (theme) {
+      return {
+        mode: "theme",
+        themeName: theme.name
+      };
+    }
+  }
+
+  return DEFAULT_SETTINGS.themePreference;
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  if (typeof value !== "object" || value === null || !("mode" in value)) {
+    return false;
+  }
+
+  const mode = (value as { mode?: unknown }).mode;
+  if (mode === "system") {
+    return true;
+  }
+
+  return mode === "theme" && typeof (value as { themeName?: unknown }).themeName === "string";
 }
 
 function clampNumber(value: number, min: number, max: number, fallback: number) {

@@ -55,7 +55,14 @@ export type CoachSettings = {
 
 export type TimingMode = "pitch-first";
 
-export type ThemePreference = "system" | "light" | "dark";
+export type ThemePreference =
+  | {
+      mode: "system";
+    }
+  | {
+      mode: "theme";
+      themeName: string;
+    };
 
 export type ScoringPolicy = {
   timingMode: TimingMode;
