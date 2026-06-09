@@ -16,6 +16,7 @@ import type { SongModeServices, SongPracticeConfig, SongReference, SongStereoBuf
 import type { AttemptHistoryRecord } from "../domain/contracts";
 import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
 import { installFakeIndexedDB } from "../test/fakeIndexedDB";
+import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME } from "../themes";
 import { PitchCoachApp } from "./PitchCoachApp";
 
 describe("PitchCoachApp", () => {
@@ -31,6 +32,8 @@ describe("PitchCoachApp", () => {
     vi.unstubAllGlobals();
     localStorage.clear();
     document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute("data-theme-name");
+    document.documentElement.removeAttribute("data-theme-type");
     document.documentElement.style.colorScheme = "";
     window.history.replaceState(null, "", "/");
   });
@@ -369,10 +372,10 @@ describe("PitchCoachApp", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
     openMajorTriad();
-    const checkbox = screen.getByLabelText("Local clips") as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
-    fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(true);
+    const switchControl = screen.getByRole("switch", { name: "Local clips" });
+    expect(switchControl.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(switchControl);
+    expect(switchControl.getAttribute("aria-checked")).toBe("true");
   });
 
   it("defaults the system theme to the current color scheme", () => {
@@ -381,6 +384,7 @@ describe("PitchCoachApp", () => {
     render(<PitchCoachApp services={createServices([])} />);
 
     expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
     expect(screen.getByRole("radio", { name: "System theme" }).getAttribute("aria-checked")).toBe("true");
   });
 
@@ -389,14 +393,24 @@ describe("PitchCoachApp", () => {
 
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Dark theme" }));
+    fireEvent.click(screen.getByRole("radio", { name: `${DEFAULT_DARK_THEME.name} theme` }));
     expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(readStoredSettings().themePreference).toBe("dark");
-    expect(screen.getByRole("radio", { name: "Dark theme" }).getAttribute("aria-checked")).toBe("true");
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
+    expect(readStoredSettings().themePreference).toEqual({
+      mode: "theme",
+      themeName: DEFAULT_DARK_THEME.name
+    });
+    expect(
+      screen.getByRole("radio", { name: `${DEFAULT_DARK_THEME.name} theme` }).getAttribute("aria-checked")
+    ).toBe("true");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Light theme" }));
+    fireEvent.click(screen.getByRole("radio", { name: `${DEFAULT_LIGHT_THEME.name} theme` }));
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(readStoredSettings().themePreference).toBe("light");
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_LIGHT_THEME.name);
+    expect(readStoredSettings().themePreference).toEqual({
+      mode: "theme",
+      themeName: DEFAULT_LIGHT_THEME.name
+    });
   });
 
   it("updates system theme when the preferred color scheme changes", async () => {
@@ -404,12 +418,14 @@ describe("PitchCoachApp", () => {
 
     render(<PitchCoachApp services={createServices([])} />);
     expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_LIGHT_THEME.name);
 
     await act(async () => {
       media.setMatches(true);
     });
 
     expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
   });
 
   it("opens a selected exercise detail screen from the library", async () => {

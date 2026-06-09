@@ -18,6 +18,9 @@ import {
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
+import { Button } from "../components/ui/Button";
+import { IconButton } from "../components/ui/IconButton";
+import { Toggle } from "../components/ui/Toggle";
 import type {
   ExerciseId,
   ExerciseProgressSummary,
@@ -28,6 +31,7 @@ import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
+import { PRESET_THEMES, type PitchCoachTheme } from "../themes";
 import { usePitchCoachTheme } from "./theme";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
 
@@ -63,7 +67,7 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
     ...coachOptions,
     initialExerciseId: router.route.screen === "practice" ? router.route.exerciseId : undefined
   });
-  const resolvedTheme = usePitchCoachTheme(coach.settings.themePreference);
+  const activeTheme = usePitchCoachTheme(coach.settings.themePreference);
 
   useEffect(() => {
     if (
@@ -107,7 +111,7 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
               <div className="brand-mark" aria-hidden="true">
                 <Mic2 size={22} />
               </div>
-              <div>
+              <div className="brand-copy">
                 <h1>Pitch Coach</h1>
                 <p>Vocal exercise library</p>
               </div>
@@ -122,14 +126,15 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
                   })
                 }
               />
-              <button
-                className="text-action mode-action"
-                type="button"
+              <Button
+                className="mode-action"
+                variant="secondary"
+                size="md"
                 onClick={() => router.navigateToSongs()}
               >
                 <Music2 size={16} />
                 <span>Song mode</span>
-              </button>
+              </Button>
             </div>
           </header>
 
@@ -168,16 +173,19 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
       <section className="coach-workspace" aria-label="Pitch coach exercise">
         <header className="top-bar">
           <div className="brand-lockup">
-            <button
-              className="icon-action back-action"
-              type="button"
+            <IconButton
+              className="back-action"
+              size="sm"
               onClick={() => void backToLibrary()}
               aria-label="Back to exercises"
               title="Back to exercises"
             >
               <ArrowLeft size={18} />
-            </button>
-            <div>
+            </IconButton>
+            <div className="brand-mark" aria-hidden="true">
+              <Mic2 size={22} />
+            </div>
+            <div className="brand-copy">
               <h1>Pitch Coach</h1>
               <p>{coach.selectedExercise.title}</p>
             </div>
@@ -234,13 +242,14 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
               totalDurationMs={coach.listeningDurationMs}
               toleranceCents={coach.settings.toleranceCents}
               status={coach.lessonState.status}
-              theme={resolvedTheme}
+              themeName={activeTheme.name}
             />
 
             <div className="transport-row">
-              <button
+              <Button
                 className="primary-action"
-                type="button"
+                variant="primary"
+                size="lg"
                 onClick={() => void primaryAction()}
                 disabled={coach.isBusy || coach.lessonState.status === "passed"}
                 aria-label={primaryLabel}
@@ -248,27 +257,27 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
               >
                 {coach.lessonState.status === "complete" ? <RotateCcw size={18} /> : <Play size={18} />}
                 <span>{primaryLabel}</span>
-              </button>
-              <button
-                className="icon-action"
-                type="button"
+              </Button>
+              <IconButton
+                size="lg"
+                variant="toolbar"
                 onClick={() => void coach.stopAttempt()}
                 disabled={!coach.isBusy && coach.lessonState.status !== "passed"}
                 aria-label="Stop"
                 title="Stop"
               >
                 <Square size={18} />
-              </button>
-              <button
-                className="icon-action"
-                type="button"
+              </IconButton>
+              <IconButton
+                size="lg"
+                variant="toolbar"
                 onClick={() => void coach.resetLesson()}
                 disabled={coach.isBusy}
                 aria-label="Reset"
                 title="Reset"
               >
                 <RotateCcw size={18} />
-              </button>
+              </IconButton>
             </div>
 
             {coach.errorMessage ? (
@@ -359,13 +368,13 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
               </label>
               <label className="toggle-row">
                 <span>Local clips</span>
-                <input
-                  type="checkbox"
+                <Toggle
+                  aria-label="Local clips"
                   checked={coach.settings.saveLocalClips}
-                  onChange={(event) =>
+                  onChange={(saveLocalClips) =>
                     coach.setSettings({
                       ...coach.settings,
-                      saveLocalClips: event.target.checked
+                      saveLocalClips
                     })
                   }
                 />
@@ -383,14 +392,15 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
                     <audio className="clip-player" controls src={coach.localClip.url} />
                     <div className="clip-actions">
                       <span>{formatClipDuration(coach.localClip.durationMs)}</span>
-                      <button
+                      <Button
                         className="text-action"
-                        type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => void coach.deleteLocalClip()}
                       >
                         <Trash2 size={16} />
                         <span>Delete</span>
-                      </button>
+                      </Button>
                     </div>
                   </>
                 ) : null}
@@ -438,9 +448,10 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
               ) : (
                 <p className="history-empty">No attempts yet for this exercise.</p>
               )}
-              <button
+              <Button
                 className="text-action"
-                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   if (window.confirm("Clear all local attempt history?")) {
                     void coach.clearLocalAttemptHistory();
@@ -450,7 +461,7 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
               >
                 <Trash2 size={16} />
                 <span>Clear history</span>
-              </button>
+              </Button>
             </section>
           </aside>
         </section>
@@ -470,27 +481,36 @@ const statusCopy = {
   complete: "Complete"
 } as const;
 
-const themeOptions = [
+type ThemePickerOption = {
+  key: string;
+  label: string;
+  preference: ThemePreference;
+  icon: typeof Monitor;
+  theme?: PitchCoachTheme;
+};
+
+const themeOptions: ThemePickerOption[] = [
   {
-    value: "system",
+    key: "system",
     label: "System",
+    preference: {
+      mode: "system"
+    },
     icon: Monitor
   },
-  {
-    value: "light",
-    label: "Light",
-    icon: Sun
-  },
-  {
-    value: "dark",
-    label: "Dark",
-    icon: Moon
-  }
-] satisfies readonly {
-  value: ThemePreference;
-  label: string;
-  icon: typeof Monitor;
-}[];
+  ...PRESET_THEMES.map(
+    (theme): ThemePickerOption => ({
+      key: `theme:${theme.name}`,
+      label: theme.name,
+      preference: {
+        mode: "theme",
+        themeName: theme.name
+      },
+      icon: theme.type === "light" ? Sun : Moon,
+      theme
+    })
+  )
+];
 
 function ThemePicker({
   value,
@@ -499,29 +519,43 @@ function ThemePicker({
   value: ThemePreference;
   onValueChange: (themePreference: ThemePreference) => void;
 }) {
+  const selectedKey = themePreferenceKey(value);
+
   return (
     <div className="theme-picker" role="radiogroup" aria-label="Theme">
       {themeOptions.map((option) => {
         const Icon = option.icon;
-        const isSelected = value === option.value;
+        const isSelected = selectedKey === option.key;
         return (
           <button
-            key={option.value}
+            key={option.key}
             className={`theme-option${isSelected ? " theme-option-active" : ""}`}
             type="button"
             role="radio"
             aria-checked={isSelected}
             aria-label={`${option.label} theme`}
             title={`${option.label} theme`}
-            onClick={() => onValueChange(option.value)}
+            onClick={() => onValueChange(option.preference)}
           >
-            <Icon size={16} />
-            <span className="visually-hidden">{option.label}</span>
+            {option.theme ? (
+              <span className="theme-option__swatches" aria-hidden="true">
+                <span style={{ background: option.theme.colors["bg.primary"] }} />
+                <span style={{ background: option.theme.colors["bg.secondary"] }} />
+                <span style={{ background: option.theme.colors["accent.primary"] }} />
+              </span>
+            ) : (
+              <Icon size={14} />
+            )}
+            <span className="theme-option__label">{option.label}</span>
           </button>
         );
       })}
     </div>
   );
+}
+
+function themePreferenceKey(themePreference: ThemePreference) {
+  return themePreference.mode === "system" ? "system" : `theme:${themePreference.themeName}`;
 }
 
 function formatClipDuration(durationMs: number) {

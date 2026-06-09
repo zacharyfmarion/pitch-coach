@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { usePitchCoachTheme } from "../app/theme";
+import { Button } from "../components/ui/Button";
+import { IconButton } from "../components/ui/IconButton";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { Toggle } from "../components/ui/Toggle";
 import { createSongDebugInfo, createVocalEnergyTrace } from "./debugDiagnostics";
 import { formatSongReferenceRange } from "./referenceRange";
 import { SongPitchTimeline } from "./SongPitchTimeline";
@@ -63,16 +67,19 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
       <section className="coach-workspace" aria-label="Song practice">
         <header className="top-bar">
           <div className="brand-lockup">
-            <button
-              className="icon-action back-action"
-              type="button"
+            <IconButton
+              className="back-action"
+              size="sm"
               onClick={() => void onBackToLibrary()}
               aria-label="Back to exercises"
               title="Back to exercises"
             >
               <ArrowLeft size={18} />
-            </button>
-            <div>
+            </IconButton>
+            <div className="brand-mark" aria-hidden="true">
+              <Music2 size={22} />
+            </div>
+            <div className="brand-copy">
               <h1>Song Practice</h1>
               <p>{song.fileName ?? "Upload a local audio section"}</p>
             </div>
@@ -92,15 +99,16 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
               totalDurationMs={Math.max(durationMs, 1000)}
               currentTimeMs={song.currentPlaybackTimeMs}
               isPlaying={song.stage === "practicing"}
-              theme={theme}
+              themeName={theme.name}
               debugEnabled={debugEnabled}
               debugEnergy={debugEnergy}
             />
 
             <div className="transport-row">
-              <button
+              <Button
                 className="primary-action"
-                type="button"
+                variant="primary"
+                size="lg"
                 onClick={() => void song.startPractice()}
                 disabled={!song.canPractice || song.stage === "practicing"}
                 aria-label="Start song practice"
@@ -108,10 +116,10 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
               >
                 <Play size={18} />
                 <span>Start practice</span>
-              </button>
-              <button
-                className="icon-action"
-                type="button"
+              </Button>
+              <IconButton
+                size="lg"
+                variant="toolbar"
                 onClick={() =>
                   song.stage === "paused" ? void song.resumePractice() : void song.pausePractice()
                 }
@@ -120,17 +128,17 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                 title={pauseResumeLabel}
               >
                 {song.stage === "paused" ? <Play size={18} /> : <Pause size={18} />}
-              </button>
-              <button
-                className="icon-action"
-                type="button"
+              </IconButton>
+              <IconButton
+                size="lg"
+                variant="toolbar"
                 onClick={() => void song.stopPractice()}
                 disabled={!isActivePractice}
                 aria-label="Stop"
                 title="Stop"
               >
                 <Square size={18} />
-              </button>
+              </IconButton>
             </div>
 
             {song.errorMessage ? (
@@ -209,15 +217,16 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                         <span>{formatDuration(song.selectedDurationMs)} selected</span>
                         <span>V1 target: 0:30-1:30</span>
                       </div>
-                      <button
-                        className="text-action song-full-action"
-                        type="button"
+                      <Button
+                        className="song-full-action"
+                        variant="secondary"
+                        size="md"
                         onClick={() => void song.analyzeSong()}
                         disabled={!song.canAnalyze}
                       >
                         <Music2 size={16} />
                         <span>Analyze song</span>
-                      </button>
+                      </Button>
                     </>
                   ) : null}
                 </section>
@@ -242,20 +251,13 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                     <progress value={song.analysisProgress.transcriptionProgress} max="1" />
                     <span>{Math.round(song.analysisProgress.transcriptionProgress * 100)}%</span>
                   </div>
-                  <div className="segmented-control" role="group" aria-label="Reference detail">
-                    {song.referenceDetailOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        className={option.value === song.referenceDetail ? "segmented-active" : ""}
-                        type="button"
-                        onClick={() => song.setReferenceDetail(option.value)}
-                        aria-pressed={option.value === song.referenceDetail}
-                        disabled={song.isBusy}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
+                  <SegmentedControl
+                    aria-label="Reference detail"
+                    options={song.referenceDetailOptions}
+                    value={song.referenceDetail}
+                    onChange={song.setReferenceDetail}
+                    disabled={song.isBusy}
+                  />
                   <p className="history-empty">{song.analysisProgress.status}</p>
                   {song.reference ? (
                     <div className="reference-quality">
@@ -269,13 +271,13 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                     </div>
                   ) : null}
                   <label className="toggle-row song-debug-toggle">
-                    <input
-                      type="checkbox"
+                    <span>Debug note timing</span>
+                    <Toggle
+                      aria-label="Debug note timing"
                       checked={debugEnabled}
-                      onChange={(event) => setDebugEnabled(event.currentTarget.checked)}
+                      onChange={setDebugEnabled}
                       disabled={!song.reference}
                     />
-                    <span>Debug note timing</span>
                   </label>
                 </section>
 
