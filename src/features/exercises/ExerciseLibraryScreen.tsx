@@ -23,7 +23,7 @@ export function ExerciseLibraryScreen({
 }: ExerciseLibraryScreenProps) {
   return (
     <main className="app-shell">
-      <section className="coach-workspace" aria-label="Pitch coach exercises">
+      <section className="coach-workspace coach-workspace--library" aria-label="Pitch coach exercises">
         <header className="top-bar">
           <div className="brand-lockup">
             <div className="brand-mark" aria-hidden="true">

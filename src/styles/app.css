@@ -12,6 +12,12 @@
   margin: 0 auto;
 }
 
+.coach-workspace--library {
+  display: block;
+  height: auto;
+  min-height: 100vh;
+}
+
 .top-bar {
   position: relative;
   display: grid;
@@ -121,7 +127,9 @@
 }
 
 .exercise-library-organized {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  min-height: auto;
+  overflow: visible;
 }
 
 .library-heading {
@@ -238,9 +246,9 @@
   display: grid;
   align-content: start;
   gap: var(--space-3);
-  min-height: 0;
+  min-height: auto;
   padding: var(--space-3);
-  overflow: auto;
+  overflow: visible;
 }
 
 .exercise-group {
