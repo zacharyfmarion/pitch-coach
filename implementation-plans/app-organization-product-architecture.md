@@ -37,9 +37,9 @@ Controls and information should be disclosed according to that journey. Setup an
 - [x] Move exercise practice into an `ExercisePracticeScreen` with separate setup, live, and review panels.
 - [ ] Keep the primary transport visible across desktop and mobile practice layouts.
 - [ ] Replace the always-on exercise side rail with state-aware panels for setup, feedback, and history.
-- [ ] Redesign the exercise library around recommended next practice, grouped drills, recent activity, and progress signals.
-- [ ] Use existing exercise metadata from `src/domain/exercise.ts` for grouping and difficulty presentation.
-- [ ] Use existing progress summaries from `src/domain/progress.ts` to drive recommendation and history states.
+- [x] Redesign the exercise library around recommended next practice, grouped drills, recent activity, and progress signals.
+- [x] Use existing exercise metadata from `src/domain/exercise.ts` for grouping and difficulty presentation.
+- [x] Use existing progress summaries from `src/domain/progress.ts` to drive recommendation and history states.
 - [ ] Reframe song mode around upload, trim, analyze, practice, and review states.
 - [ ] Make song upload and analysis own the empty state before a reference exists.
 - [ ] Keep song debug controls hidden from the primary workflow unless explicitly enabled.

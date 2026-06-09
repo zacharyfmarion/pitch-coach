@@ -1,11 +1,14 @@
 import { Mic2, Music2 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import type {
+  ExerciseCategory,
+  ExerciseDefinition,
   ExerciseProgressSummary,
   NoteAssessmentStatus
 } from "../../domain/contracts";
 import { ThemePicker } from "../../app/ThemePicker";
 import type { PitchCoachController } from "../../app/usePitchCoachController";
+import { PracticeProgressSummary } from "../progress/PracticeProgressSummary";
 
 type ExerciseLibraryScreenProps = {
   coach: PitchCoachController;
@@ -80,8 +83,11 @@ function ExerciseLibrary({
   onSelectExercise,
   disabled
 }: ExerciseLibraryProps) {
+  const recommendedExercise = getRecommendedExercise(exercises, exerciseProgress, selectedExerciseId);
+  const exerciseGroups = groupExercisesByCategory(exercises);
+
   return (
-    <section className="exercise-library" aria-label="Exercise library">
+    <section className="exercise-library exercise-library-organized" aria-label="Exercise library">
       <div className="library-heading">
         <div>
           <span className="readout-label">Exercises</span>
@@ -89,41 +95,133 @@ function ExerciseLibrary({
         </div>
         <span>{exercises.length} drills</span>
       </div>
-      <div className="exercise-list">
-        {exercises.map((exercise) => {
-          const isSelected = exercise.id === selectedExerciseId;
-          return (
-            <button
-              key={exercise.id}
-              className={`exercise-option ${isSelected ? "exercise-option-active" : ""}`}
-              type="button"
-              onClick={() => onSelectExercise(exercise.id)}
-              aria-pressed={isSelected}
+
+      <div className="library-overview">
+        <section className="library-recommendation" aria-label="Recommended practice">
+          <span className="readout-label">Recommended next</span>
+          <h3>{recommendedExercise.title}</h3>
+          <p>{recommendedExercise.description}</p>
+          <div className="library-recommendation__footer">
+            <span>{formatProgressSummary(exerciseProgress[recommendedExercise.id])}</span>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => onSelectExercise(recommendedExercise.id)}
               disabled={disabled}
             >
-              <span className="difficulty-meter" aria-label={`Difficulty ${exercise.difficulty} of 5`}>
-                {Array.from({ length: 5 }, (_, index) => (
-                  <span key={index} className={index < exercise.difficulty ? "difficulty-on" : ""} />
-                ))}
-              </span>
-              <span className="exercise-copy">
-                <strong>{exercise.title}</strong>
-                <span>{exercise.description}</span>
-                <span className="exercise-progress">
-                  {formatProgressSummary(exerciseProgress[exercise.id])}
-                </span>
-              </span>
-              <span className="exercise-meta">
-                <span>{exercise.focus}</span>
-                <span>{formatExercisePatternText(exercise.patternDegrees)}</span>
-              </span>
-              <span className="exercise-start">Start</span>
-            </button>
-          );
-        })}
+              <span>Start</span>
+            </Button>
+          </div>
+        </section>
+
+        <PracticeProgressSummary progress={exerciseProgress} />
+      </div>
+
+      <div className="exercise-groups">
+        {exerciseGroups.map((group) => (
+          <section className="exercise-group" key={group.category} aria-label={categoryLabel[group.category]}>
+            <div className="exercise-group-heading">
+              <div>
+                <span className="readout-label">{categoryLabel[group.category]}</span>
+                <h3>{categoryFocus[group.category]}</h3>
+              </div>
+              <span>{group.exercises.length} drills</span>
+            </div>
+            <div className="exercise-list">
+              {group.exercises.map((exercise) => {
+                const isSelected = exercise.id === selectedExerciseId;
+                return (
+                  <button
+                    key={exercise.id}
+                    className={`exercise-option ${isSelected ? "exercise-option-active" : ""}`}
+                    type="button"
+                    onClick={() => onSelectExercise(exercise.id)}
+                    aria-pressed={isSelected}
+                    disabled={disabled}
+                  >
+                    <span className="difficulty-meter" aria-label={`Difficulty ${exercise.difficulty} of 5`}>
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <span key={index} className={index < exercise.difficulty ? "difficulty-on" : ""} />
+                      ))}
+                    </span>
+                    <span className="exercise-copy">
+                      <strong>{exercise.title}</strong>
+                      <span>{exercise.description}</span>
+                      <span className="exercise-progress">
+                        {formatProgressSummary(exerciseProgress[exercise.id])}
+                      </span>
+                    </span>
+                    <span className="exercise-meta">
+                      <span>{exercise.focus}</span>
+                      <span>{formatExercisePatternText(exercise.patternDegrees)}</span>
+                    </span>
+                    <span className="exercise-start">Start</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     </section>
   );
+}
+
+const categoryOrder: readonly ExerciseCategory[] = ["pitch", "interval", "arpeggio", "scale"];
+
+const categoryLabel: Record<ExerciseCategory, string> = {
+  pitch: "Pitch",
+  interval: "Intervals",
+  arpeggio: "Arpeggios",
+  scale: "Scales"
+};
+
+const categoryFocus: Record<ExerciseCategory, string> = {
+  pitch: "Center and sustain",
+  interval: "Move between notes",
+  arpeggio: "Tune chord tones",
+  scale: "Connect the line"
+};
+
+function getRecommendedExercise(
+  exercises: readonly ExerciseDefinition[],
+  exerciseProgress: Record<PitchCoachController["selectedExercise"]["id"], ExerciseProgressSummary>,
+  selectedExerciseId: PitchCoachController["selectedExercise"]["id"]
+) {
+  const untried = exercises
+    .filter((exercise) => exerciseProgress[exercise.id].attemptCount === 0)
+    .sort(compareExercisesForRecommendation)[0];
+  if (untried) {
+    return untried;
+  }
+
+  const weakestRecent = [...exercises]
+    .filter((exercise) => exerciseProgress[exercise.id].recentPassRate !== undefined)
+    .sort((a, b) => {
+      const passRateDifference =
+        (exerciseProgress[a.id].recentPassRate ?? 100) - (exerciseProgress[b.id].recentPassRate ?? 100);
+      return passRateDifference !== 0 ? passRateDifference : compareExercisesForRecommendation(a, b);
+    })[0];
+
+  return weakestRecent ?? exercises.find((exercise) => exercise.id === selectedExerciseId) ?? exercises[0];
+}
+
+function compareExercisesForRecommendation(a: ExerciseDefinition, b: ExerciseDefinition) {
+  const difficultyDifference = a.difficulty - b.difficulty;
+  if (difficultyDifference !== 0) {
+    return difficultyDifference;
+  }
+
+  return categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
+}
+
+function groupExercisesByCategory(exercises: readonly ExerciseDefinition[]) {
+  return categoryOrder
+    .map((category) => ({
+      category,
+      exercises: exercises.filter((exercise) => exercise.category === category)
+    }))
+    .filter((group) => group.exercises.length > 0);
 }
 
 function formatExercisePatternText(patternDegrees: readonly number[]) {
