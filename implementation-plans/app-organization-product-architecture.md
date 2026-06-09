@@ -31,10 +31,10 @@ Controls and information should be disclosed according to that journey. Setup an
 
 ## Checklist
 
-- [ ] Extract app shell and route helpers from `src/app/PitchCoachApp.tsx`.
-- [ ] Create feature folders for exercises, songs, and progress-oriented UI.
-- [ ] Move the exercise library into an `ExerciseLibraryScreen` module.
-- [ ] Move exercise practice into an `ExercisePracticeScreen` with separate setup, live, and review panels.
+- [x] Extract app shell and route helpers from `src/app/PitchCoachApp.tsx`.
+- [x] Create feature folders for exercises, songs, and progress-oriented UI.
+- [x] Move the exercise library into an `ExerciseLibraryScreen` module.
+- [x] Move exercise practice into an `ExercisePracticeScreen` with separate setup, live, and review panels.
 - [ ] Keep the primary transport visible across desktop and mobile practice layouts.
 - [ ] Replace the always-on exercise side rail with state-aware panels for setup, feedback, and history.
 - [ ] Redesign the exercise library around recommended next practice, grouped drills, recent activity, and progress signals.

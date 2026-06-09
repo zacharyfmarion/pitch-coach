@@ -56,6 +56,8 @@ export type PitchCoachControllerOptions = {
   initialExerciseId?: ExerciseId;
 };
 
+export type PitchCoachController = ReturnType<typeof usePitchCoachController>;
+
 export type LocalClipView = {
   url: string;
   createdAt: string;
