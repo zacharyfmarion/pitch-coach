@@ -45,5 +45,5 @@ Controls and information should be disclosed according to that journey. Setup an
 - [x] Keep song debug controls hidden from the primary workflow unless explicitly enabled.
 - [x] Split broad controller return values into smaller view models where it improves screen clarity.
 - [x] Preserve browser-local privacy boundaries for microphone audio, uploaded song audio, pitch frames, clips, and model processing.
-- [ ] Update component and browser tests for the reorganized routes and workflows.
-- [ ] Run `pnpm test`, `pnpm build`, and relevant Playwright coverage after implementation.
+- [x] Update component and browser tests for the reorganized routes and workflows.
+- [x] Run `pnpm test`, `pnpm build`, and relevant Playwright coverage after implementation.
