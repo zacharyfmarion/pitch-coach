@@ -51,6 +51,7 @@ export function ExercisePracticeScreen({
     value: note.midi,
     label: note.label
   })) satisfies DropdownOption<number>[];
+  const practiceMode = getPracticeMode(coach);
 
   return (
     <main className="app-shell">
@@ -171,186 +172,274 @@ export function ExercisePracticeScreen({
             ) : null}
           </div>
 
-          <aside className="side-panel" aria-label="Lesson controls and feedback">
-            <section className="control-group" aria-label="Range">
-              <div className="group-heading">
-                <SlidersHorizontal size={17} />
-                <h2>Range</h2>
-              </div>
-              <label>
-                <span>Low</span>
-                <Dropdown
-                  ariaLabel="Low"
-                  value={coach.settings.range.lowestMidi}
-                  options={noteOptions}
-                  onValueChange={(lowestMidi) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      range: {
-                        ...coach.settings.range,
-                        lowestMidi
-                      }
-                    })
-                  }
-                />
-              </label>
-              <label>
-                <span>High</span>
-                <Dropdown
-                  ariaLabel="High"
-                  value={coach.settings.range.highestMidi}
-                  options={noteOptions}
-                  onValueChange={(highestMidi) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      range: {
-                        ...coach.settings.range,
-                        highestMidi
-                      }
-                    })
-                  }
-                />
-              </label>
-            </section>
+          <aside className={`side-panel practice-side-panel practice-side-panel--${practiceMode}`} aria-label="Lesson controls and feedback">
+            {practiceMode === "review" ? (
+              <FeedbackPanel coach={coach} />
+            ) : (
+              <PracticeFocusPanel coach={coach} />
+            )}
 
-            <section className="control-group" aria-label="Scoring">
-              <div className="group-heading">
-                <Gauge size={17} />
-                <h2>Scoring</h2>
-              </div>
-              <label>
-                <span>Guide tempo</span>
-                <input
-                  type="range"
-                  min="50"
-                  max="140"
-                  value={coach.settings.tempoBpm}
-                  onChange={(event) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      tempoBpm: Number(event.target.value)
-                    })
-                  }
-                />
-                <output>{coach.settings.tempoBpm} BPM</output>
-              </label>
-              <label>
-                <span>Tolerance</span>
-                <input
-                  type="range"
-                  min="15"
-                  max="60"
-                  value={coach.settings.toleranceCents}
-                  onChange={(event) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      toleranceCents: Number(event.target.value)
-                    })
-                  }
-                />
-                <output>{coach.settings.toleranceCents} cents</output>
-              </label>
-              <label className="toggle-row">
-                <span>Local clips</span>
-                <Toggle
-                  aria-label="Local clips"
-                  checked={coach.settings.saveLocalClips}
-                  onChange={(saveLocalClips) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      saveLocalClips
-                    })
-                  }
-                />
-              </label>
-            </section>
-
-            {coach.localClip || coach.clipErrorMessage ? (
-              <section className="control-group" aria-label="Latest local clip">
-                <div className="group-heading">
-                  <Volume2 size={17} />
-                  <h2>Latest Clip</h2>
-                </div>
-                {coach.localClip ? (
-                  <>
-                    <audio className="clip-player" controls src={coach.localClip.url} />
-                    <div className="clip-actions">
-                      <span>{formatClipDuration(coach.localClip.durationMs)}</span>
-                      <Button
-                        className="text-action"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void coach.deleteLocalClip()}
-                      >
-                        <Trash2 size={16} />
-                        <span>Delete</span>
-                      </Button>
-                    </div>
-                  </>
-                ) : null}
-                {coach.clipErrorMessage ? (
-                  <p className="clip-error" role="alert">
-                    {coach.clipErrorMessage}
-                  </p>
-                ) : null}
-              </section>
+            {practiceMode !== "active" ? (
+              <PracticeSetupPanels coach={coach} noteOptions={noteOptions} />
             ) : null}
 
-            <section className="feedback-panel" aria-label="Attempt feedback">
-              <div className="group-heading">
-                <Music2 size={17} />
-                <h2>Feedback</h2>
-              </div>
-              <p className="coach-summary">
-                {coach.attemptScore?.summary ??
-                  `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`}
-              </p>
-              <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
-            </section>
+            <LocalClipPanel coach={coach} />
 
-            <section className="control-group history-panel" aria-label="Attempt history">
-              <div className="group-heading">
-                <History size={17} />
-                <h2>History</h2>
-              </div>
-              {coach.selectedExerciseHistory.length > 0 ? (
-                <ol className="history-list">
-                  {coach.selectedExerciseHistory.map((attempt) => (
-                    <li key={attempt.id}>
-                      <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
-                        {attempt.passed ? "Pass" : "Retry"}
-                      </span>
-                      <span className="history-copy">
-                        <strong>
-                          {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
-                        </strong>
-                        <span>{attempt.summary}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="history-empty">No attempts yet for this exercise.</p>
-              )}
-              <Button
-                className="text-action"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (window.confirm("Clear all local attempt history?")) {
-                    void coach.clearLocalAttemptHistory();
-                  }
-                }}
-                disabled={coach.attemptHistoryCount === 0}
-              >
-                <Trash2 size={16} />
-                <span>Clear history</span>
-              </Button>
-            </section>
+            {practiceMode !== "review" ? <FeedbackPanel coach={coach} /> : null}
+
+            <HistoryPanel coach={coach} />
           </aside>
         </section>
       </section>
     </main>
+  );
+}
+
+type PracticeMode = "setup" | "active" | "review";
+
+function getPracticeMode(coach: PitchCoachController): PracticeMode {
+  if (coach.attemptScore || coach.lessonState.status === "retry" || coach.lessonState.status === "complete") {
+    return "review";
+  }
+
+  if (coach.isBusy || coach.lessonState.status === "passed") {
+    return "active";
+  }
+
+  return "setup";
+}
+
+function PracticeFocusPanel({ coach }: { coach: PitchCoachController }) {
+  return (
+    <section className="control-group practice-focus-panel" aria-label="Current practice focus">
+      <div className="group-heading">
+        <Music2 size={17} />
+        <h2>Current Take</h2>
+      </div>
+      <p className="coach-summary">
+        {coach.lessonState.status === "idle"
+          ? `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`
+          : coach.lessonState.status === "promptPlaying"
+            ? "Listen to the guide."
+            : coach.lessonState.status === "awaitingVoice"
+              ? "Start singing when ready."
+              : coach.lessonState.status === "listening"
+                ? "Keep the line steady."
+                : "Scoring the attempt."}
+      </p>
+      <div className="practice-focus-readout">
+        <span>
+          <span className="readout-label">Root</span>
+          <strong>{midiToNoteName(coach.currentRootMidi)}</strong>
+        </span>
+        <span>
+          <span className="readout-label">Pattern</span>
+          <strong>{coach.exerciseLabel}</strong>
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function PracticeSetupPanels({
+  coach,
+  noteOptions
+}: {
+  coach: PitchCoachController;
+  noteOptions: DropdownOption<number>[];
+}) {
+  return (
+    <>
+      <section className="control-group" aria-label="Range">
+        <div className="group-heading">
+          <SlidersHorizontal size={17} />
+          <h2>Range</h2>
+        </div>
+        <label>
+          <span>Low</span>
+          <Dropdown
+            ariaLabel="Low"
+            value={coach.settings.range.lowestMidi}
+            options={noteOptions}
+            onValueChange={(lowestMidi) =>
+              coach.setSettings({
+                ...coach.settings,
+                range: {
+                  ...coach.settings.range,
+                  lowestMidi
+                }
+              })
+            }
+          />
+        </label>
+        <label>
+          <span>High</span>
+          <Dropdown
+            ariaLabel="High"
+            value={coach.settings.range.highestMidi}
+            options={noteOptions}
+            onValueChange={(highestMidi) =>
+              coach.setSettings({
+                ...coach.settings,
+                range: {
+                  ...coach.settings.range,
+                  highestMidi
+                }
+              })
+            }
+          />
+        </label>
+      </section>
+
+      <section className="control-group" aria-label="Scoring">
+        <div className="group-heading">
+          <Gauge size={17} />
+          <h2>Scoring</h2>
+        </div>
+        <label>
+          <span>Guide tempo</span>
+          <input
+            type="range"
+            min="50"
+            max="140"
+            value={coach.settings.tempoBpm}
+            onChange={(event) =>
+              coach.setSettings({
+                ...coach.settings,
+                tempoBpm: Number(event.target.value)
+              })
+            }
+          />
+          <output>{coach.settings.tempoBpm} BPM</output>
+        </label>
+        <label>
+          <span>Tolerance</span>
+          <input
+            type="range"
+            min="15"
+            max="60"
+            value={coach.settings.toleranceCents}
+            onChange={(event) =>
+              coach.setSettings({
+                ...coach.settings,
+                toleranceCents: Number(event.target.value)
+              })
+            }
+          />
+          <output>{coach.settings.toleranceCents} cents</output>
+        </label>
+        <label className="toggle-row">
+          <span>Local clips</span>
+          <Toggle
+            aria-label="Local clips"
+            checked={coach.settings.saveLocalClips}
+            onChange={(saveLocalClips) =>
+              coach.setSettings({
+                ...coach.settings,
+                saveLocalClips
+              })
+            }
+          />
+        </label>
+      </section>
+    </>
+  );
+}
+
+function LocalClipPanel({ coach }: { coach: PitchCoachController }) {
+  if (!coach.localClip && !coach.clipErrorMessage) {
+    return null;
+  }
+
+  return (
+    <section className="control-group" aria-label="Latest local clip">
+      <div className="group-heading">
+        <Volume2 size={17} />
+        <h2>Latest Clip</h2>
+      </div>
+      {coach.localClip ? (
+        <>
+          <audio className="clip-player" controls src={coach.localClip.url} />
+          <div className="clip-actions">
+            <span>{formatClipDuration(coach.localClip.durationMs)}</span>
+            <Button
+              className="text-action"
+              variant="ghost"
+              size="sm"
+              onClick={() => void coach.deleteLocalClip()}
+            >
+              <Trash2 size={16} />
+              <span>Delete</span>
+            </Button>
+          </div>
+        </>
+      ) : null}
+      {coach.clipErrorMessage ? (
+        <p className="clip-error" role="alert">
+          {coach.clipErrorMessage}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function FeedbackPanel({ coach }: { coach: PitchCoachController }) {
+  return (
+    <section className="feedback-panel" aria-label="Attempt feedback">
+      <div className="group-heading">
+        <Music2 size={17} />
+        <h2>Feedback</h2>
+      </div>
+      <p className="coach-summary">
+        {coach.attemptScore?.summary ??
+          `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`}
+      </p>
+      <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
+    </section>
+  );
+}
+
+function HistoryPanel({ coach }: { coach: PitchCoachController }) {
+  return (
+    <section className="control-group history-panel" aria-label="Attempt history">
+      <div className="group-heading">
+        <History size={17} />
+        <h2>History</h2>
+      </div>
+      {coach.selectedExerciseHistory.length > 0 ? (
+        <ol className="history-list">
+          {coach.selectedExerciseHistory.map((attempt) => (
+            <li key={attempt.id}>
+              <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
+                {attempt.passed ? "Pass" : "Retry"}
+              </span>
+              <span className="history-copy">
+                <strong>
+                  {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
+                </strong>
+                <span>{attempt.summary}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="history-empty">No attempts yet for this exercise.</p>
+      )}
+      <Button
+        className="text-action"
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          if (window.confirm("Clear all local attempt history?")) {
+            void coach.clearLocalAttemptHistory();
+          }
+        }}
+        disabled={coach.attemptHistoryCount === 0}
+      >
+        <Trash2 size={16} />
+        <span>Clear history</span>
+      </Button>
+    </section>
   );
 }
 

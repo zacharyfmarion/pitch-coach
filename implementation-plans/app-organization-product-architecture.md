@@ -35,8 +35,8 @@ Controls and information should be disclosed according to that journey. Setup an
 - [x] Create feature folders for exercises, songs, and progress-oriented UI.
 - [x] Move the exercise library into an `ExerciseLibraryScreen` module.
 - [x] Move exercise practice into an `ExercisePracticeScreen` with separate setup, live, and review panels.
-- [ ] Keep the primary transport visible across desktop and mobile practice layouts.
-- [ ] Replace the always-on exercise side rail with state-aware panels for setup, feedback, and history.
+- [x] Keep the primary transport visible across desktop and mobile practice layouts.
+- [x] Replace the always-on exercise side rail with state-aware panels for setup, feedback, and history.
 - [x] Redesign the exercise library around recommended next practice, grouped drills, recent activity, and progress signals.
 - [x] Use existing exercise metadata from `src/domain/exercise.ts` for grouping and difficulty presentation.
 - [x] Use existing progress summaries from `src/domain/progress.ts` to drive recommendation and history states.

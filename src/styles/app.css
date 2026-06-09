@@ -7,6 +7,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: min(1440px, 100%);
+  height: 100vh;
   min-height: 100vh;
   margin: 0 auto;
 }
@@ -393,6 +394,7 @@
   grid-template-columns: minmax(0, 1fr) 342px;
   gap: var(--space-3);
   min-height: 0;
+  overflow: hidden;
   padding: var(--space-3);
 }
 
@@ -417,6 +419,10 @@
   gap: var(--space-2);
   overflow: auto;
   padding: var(--space-2);
+}
+
+.practice-side-panel--active {
+  align-content: start;
 }
 
 .exercise-strip {
@@ -602,6 +608,35 @@
   font-size: 0.78rem;
   font-weight: 620;
   line-height: 1.45;
+}
+
+.practice-focus-panel {
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, var(--border-subtle));
+}
+
+.practice-focus-readout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.practice-focus-readout > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.practice-focus-readout strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feedback-list {
@@ -892,6 +927,7 @@
 
 @media (max-width: 980px) {
   .coach-workspace {
+    height: auto;
     min-height: auto;
   }
 
