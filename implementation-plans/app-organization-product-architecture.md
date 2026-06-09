@@ -40,10 +40,10 @@ Controls and information should be disclosed according to that journey. Setup an
 - [x] Redesign the exercise library around recommended next practice, grouped drills, recent activity, and progress signals.
 - [x] Use existing exercise metadata from `src/domain/exercise.ts` for grouping and difficulty presentation.
 - [x] Use existing progress summaries from `src/domain/progress.ts` to drive recommendation and history states.
-- [ ] Reframe song mode around upload, trim, analyze, practice, and review states.
-- [ ] Make song upload and analysis own the empty state before a reference exists.
-- [ ] Keep song debug controls hidden from the primary workflow unless explicitly enabled.
-- [ ] Split broad controller return values into smaller view models where it improves screen clarity.
-- [ ] Preserve browser-local privacy boundaries for microphone audio, uploaded song audio, pitch frames, clips, and model processing.
+- [x] Reframe song mode around upload, trim, analyze, practice, and review states.
+- [x] Make song upload and analysis own the empty state before a reference exists.
+- [x] Keep song debug controls hidden from the primary workflow unless explicitly enabled.
+- [x] Split broad controller return values into smaller view models where it improves screen clarity.
+- [x] Preserve browser-local privacy boundaries for microphone audio, uploaded song audio, pitch frames, clips, and model processing.
 - [ ] Update component and browser tests for the reorganized routes and workflows.
 - [ ] Run `pnpm test`, `pnpm build`, and relevant Playwright coverage after implementation.

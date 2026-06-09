@@ -506,8 +506,22 @@
   grid-template-rows: minmax(0, 1fr) auto auto;
 }
 
+.song-workbench--prepare {
+  grid-template-rows: auto minmax(180px, 1fr) auto auto;
+}
+
 .song-timeline-frame {
   min-height: 420px;
+}
+
+.song-prep-timeline-preview {
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.song-prep-timeline-preview .song-timeline-frame {
+  min-height: 180px;
 }
 
 .pitch-timeline {
@@ -804,6 +818,62 @@
   font-weight: 740;
 }
 
+.song-prepare-workbench {
+  display: grid;
+  gap: var(--space-3);
+  min-height: 230px;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+}
+
+.song-prepare-workbench__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.song-prepare-workbench__header h2 {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  font-weight: 780;
+  line-height: 1.15;
+}
+
+.song-upload-target,
+.song-section-controls {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.song-upload-target {
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.song-section-controls label {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.song-section-controls output {
+  grid-column: 2;
+}
+
 .song-full-action {
   width: 100%;
 }
@@ -855,6 +925,18 @@
 
 .song-debug-toggle {
   padding-top: 4px;
+}
+
+.song-debug-disclosure {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.song-debug-disclosure summary {
+  cursor: pointer;
 }
 
 .song-debug-panel {
@@ -1040,6 +1122,21 @@
 
   .song-timeline-frame {
     min-height: 300px;
+  }
+
+  .song-workbench--prepare {
+    grid-template-rows: auto minmax(160px, 1fr) auto auto;
+  }
+
+  .song-prepare-workbench {
+    min-height: auto;
+  }
+
+  .song-upload-target,
+  .song-section-controls label,
+  .song-section-controls output {
+    grid-template-columns: 1fr;
+    grid-column: auto;
   }
 
   .transport-row {

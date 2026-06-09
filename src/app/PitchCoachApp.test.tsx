@@ -176,7 +176,7 @@ describe("PitchCoachApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
 
     await screen.findByText(/Transcription engine updated\. Analyze song again\./i);
-    expect(screen.getByLabelText("Debug note timing")).toHaveProperty("disabled", true);
+    expect(screen.queryByLabelText("Debug note timing")).toBeNull();
     expect(songServices.separator.separate).toHaveBeenCalledTimes(1);
   });
 

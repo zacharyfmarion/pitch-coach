@@ -47,6 +47,8 @@ export type SongPracticeControllerOptions = {
   services?: SongModeServices;
 };
 
+export type SongPracticeController = ReturnType<typeof useSongPracticeController>;
+
 export function useSongPracticeController(options: SongPracticeControllerOptions = {}) {
   const services = useMemo(() => options.services ?? createSongModeServices(), [options.services]);
   const [support, setSupport] = useState<SongRuntimeSupport>(() => pendingSongRuntimeSupport());

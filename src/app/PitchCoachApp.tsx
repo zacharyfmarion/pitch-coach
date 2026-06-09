@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { ExerciseLibraryScreen } from "../features/exercises/ExerciseLibraryScreen";
 import { ExercisePracticeScreen } from "../features/exercises/ExercisePracticeScreen";
-import { SongPracticeScreen } from "../song/SongPracticeScreen";
+import { SongPracticeScreen } from "../features/songs/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
 import { usePitchCoachTheme } from "./theme";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
