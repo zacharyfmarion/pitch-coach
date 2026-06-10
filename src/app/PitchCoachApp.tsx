@@ -1,27 +1,28 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
+  ArrowUpRight,
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Flame,
   Gauge,
   History,
   Home,
   Layers3,
+  LineChart,
   Mic2,
-  Monitor,
-  Moon,
   Music2,
   Play,
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
   Square,
-  Sun,
   Target,
   Trash2,
   TrendingUp,
+  Upload,
   Volume2
 } from "lucide-react";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
@@ -33,11 +34,9 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle
 } from "../components/ui/Card";
-import { Chip } from "../components/ui/Chip";
 import { CoachBubble } from "../components/ui/CoachBubble";
 import { IconButton } from "../components/ui/IconButton";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -54,13 +53,11 @@ import type {
   LessonStatus,
   NoteAssessmentStatus,
   TargetNote,
-  ThemePreference
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
-import { PRESET_THEMES, type PitchCoachTheme } from "../themes";
 import { usePitchCoachTheme } from "./theme";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
 
@@ -135,13 +132,6 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
     return (
       <MainShell
         activeScreen={router.route.screen}
-        settingsThemePreference={coach.settings.themePreference}
-        onThemeChange={(themePreference) =>
-          coach.setSettings({
-            ...coach.settings,
-            themePreference
-          })
-        }
         onNavigate={(screen) => {
           if (screen === "home") {
             router.navigateToHome();
@@ -238,15 +228,6 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
             </div>
           </div>
           <div className="top-actions">
-            <ThemePicker
-              value={coach.settings.themePreference}
-              onValueChange={(themePreference) =>
-                coach.setSettings({
-                  ...coach.settings,
-                  themePreference
-                })
-              }
-            />
             <div className="session-readout" aria-live="polite">
               <span className="readout-label">Current key</span>
               <strong>{coach.currentKeyLabel}</strong>
@@ -755,14 +736,10 @@ const navigationItems = [
 
 function MainShell({
   activeScreen,
-  settingsThemePreference,
-  onThemeChange,
   onNavigate,
   children
 }: {
   activeScreen: TopLevelScreen;
-  settingsThemePreference: ThemePreference;
-  onThemeChange: (themePreference: ThemePreference) => void;
   onNavigate: (screen: TopLevelScreen) => void;
   children: ReactNode;
 }) {
@@ -778,33 +755,17 @@ function MainShell({
           footer={<LocalSaveFooter />}
         />
       }
-      header={
-        <div className="shell-topbar">
-          <div className="shell-topbar__copy">
-            <span className="readout-label">Pitch Coach</span>
-            <strong>{screenTitle[activeScreen]}</strong>
-          </div>
-          <ThemePicker value={settingsThemePreference} onValueChange={onThemeChange} />
-        </div>
-      }
     >
       {children}
     </AppShell>
   );
 }
 
-const screenTitle = {
-  home: "Home",
-  library: "Practice Library",
-  songs: "Sing",
-  progress: "Progress"
-} as const;
-
 function PitchCoachBrand() {
   return (
     <div className="shell-brand">
       <span className="shell-brand__mark" aria-hidden="true">
-        <Target size={19} />
+        <Target size={24} />
       </span>
       <span className="shell-brand__name">Pitch Coach</span>
     </div>
@@ -813,15 +774,36 @@ function PitchCoachBrand() {
 
 function LocalSaveFooter() {
   return (
-    <div className="shell-local-save">
-      <span className="shell-local-save__mark" aria-hidden="true">
-        <Mic2 size={17} />
-      </span>
-      <span>
-        <strong>Local practice</strong>
-        <span>Saved on this device</span>
-      </span>
+    <div className="shell-local-footer">
+      <div className="shell-streak-card">
+        <Flame size={22} aria-hidden="true" />
+        <span>
+          <strong>12 days</strong>
+          <span>practice streak</span>
+        </span>
+      </div>
+      <div className="shell-user-card">
+        <span className="shell-user-avatar" aria-hidden="true">
+          R
+        </span>
+        <span className="shell-user-copy">
+          <strong>Robin</strong>
+          <span>Saved on this device</span>
+        </span>
+        <span className="shell-user-sun" aria-hidden="true">
+          <SunGlyph />
+        </span>
+      </div>
     </div>
+  );
+}
+
+function SunGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" />
+    </svg>
   );
 }
 
@@ -841,147 +823,189 @@ type HomeScreenProps = LibraryScreenProps & {
 };
 
 function HomeScreen({
-  exercises,
-  selectedExerciseId,
-  exerciseProgress,
-  practiceSummary,
-  recommendedExercise,
   onSelectExercise,
   onNavigateToPractice,
   onNavigateToSongs,
   disabled
 }: HomeScreenProps) {
-  const recommendedProgress = exerciseProgress[recommendedExercise.exercise.id];
-
   return (
-    <main className="shell-page shell-page--home" aria-label="Pitch coach home">
-      <PageHeader
-        icon={<Target size={24} />}
-        title="Pitch Coach"
-        description="Choose a guided drill, sing after the prompt, and keep every practice stat local to this browser."
-        actions={
-          <>
-            <Button variant="primary" size="md" onClick={onNavigateToPractice}>
-              <Target size={16} />
-              <span>Practice Library</span>
-            </Button>
-            <Button className="mode-action" variant="song" size="md" onClick={onNavigateToSongs}>
-              <Music2 size={16} />
-              <span>Song mode</span>
-            </Button>
-          </>
-        }
-      />
-      <section className="home-summary-grid" aria-label="Practice summary">
-        <StatCard
-          tone="accent"
-          icon={<CalendarDays size={16} />}
-          label="Day streak"
-          value={practiceSummary.streakDays}
-          detail={
-            practiceSummary.lastPracticedAt
-              ? formatLastPracticed(practiceSummary.lastPracticedAt)
-              : "No local attempts yet"
-          }
-        />
-        <StatCard
-          tone="success"
-          icon={<Activity size={16} />}
-          label="Recent pass"
-          value={practiceSummary.recentPassRate ?? 0}
-          unit="%"
-          detail={formatAttemptRatio(practiceSummary.passedAttemptCount, practiceSummary.attemptCount)}
-        />
-        <StatCard
-          icon={<CheckCircle2 size={16} />}
-          label="Notes in tune"
-          value={practiceSummary.noteAccuracy ?? 0}
-          unit="%"
-          detail={formatNoteRatio(practiceSummary.notesInTune, practiceSummary.noteCount)}
-        />
-        <StatCard
-          tone="song"
-          icon={<Clock3 size={16} />}
-          label="Practice time"
-          value={practiceSummary.practiceMinutes}
-          unit="min"
-          detail={formatWeekAttemptCount(practiceSummary.weekActivity)}
-        />
+    <main className="mock-home" aria-label="Pitch coach home">
+      <section className="mock-home__header">
+        <div>
+          <h1>Good evening, Robin</h1>
+          <p>You’re on a 12-day roll — a few minutes keeps it alive.</p>
+        </div>
+        <WeeklyStreakMock />
       </section>
-      <section className="home-spotlight-grid" aria-label="Practice shortcuts">
-        <Card className="home-recommendation-card" tone="accent" padding="lg">
-          <CardHeader>
-            <div className="home-card-kicker">
-              <Chip tone="accent" size="sm">
-                <Sparkles size={13} />
-                Recommended
-              </Chip>
-              <Chip tone="neutral" size="sm">
-                {formatCategoryLabel(recommendedExercise.exercise.category)}
-              </Chip>
-            </div>
-            <CardTitle>{recommendedExercise.exercise.title}</CardTitle>
-            <CardDescription>{recommendedExercise.reason}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="home-recommendation-meta">
-              <span>{recommendedExercise.exercise.focus}</span>
-              <span>{recommendedExercise.exercise.defaultTempoBpm} bpm</span>
-              <span>{formatProgressSummary(recommendedProgress)}</span>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => onSelectExercise(recommendedExercise.exercise.id)}
+
+      <section className="mock-resume-card" aria-label="Pick up where you left off">
+        <div className="mock-resume-card__copy">
+          <div className="mock-kicker">
+            <Sparkles size={18} aria-hidden="true" />
+            <span>Pick up where you left off</span>
+          </div>
+          <div className="mock-resume-card__title-row">
+            <h2>Major Third</h2>
+            <span>Intervals · A major</span>
+          </div>
+          <p>Your thirds slipped flat last session — let’s lock them in.</p>
+          <div className="mock-resume-card__actions">
+            <button
+              className="mock-primary-action"
+              type="button"
+              onClick={() => onSelectExercise("third-up-back")}
               disabled={disabled}
             >
-              <Play size={16} />
-              <span>Start recommended drill</span>
-            </Button>
-          </CardFooter>
-        </Card>
-        <Card className="home-week-card" variant="subtle" padding="lg">
-          <CardHeader>
-            <CardTitle>Last 7 Days</CardTitle>
-            <CardDescription>Attempt volume from local practice history.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <WeekActivityStrip buckets={practiceSummary.weekActivity} />
-          </CardContent>
-        </Card>
+              <Play size={17} fill="currentColor" aria-hidden="true" />
+              <span>Resume practice</span>
+            </button>
+            <span>
+              <strong>78%</strong>
+              best so far
+            </span>
+          </div>
+        </div>
+        <MockPitchPreview />
       </section>
-      <div className="home-mode-grid">
-        <Card variant="interactive" tone="accent" onClick={onNavigateToPractice}>
-          <CardHeader>
-            <Chip tone="accent" size="sm">
-              <Target size={13} />
-              Practice
-            </Chip>
-            <CardTitle>Interval training</CardTitle>
-            <CardDescription>Guided pitch drills for ear and voice.</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card variant="interactive" tone="song" onClick={onNavigateToSongs}>
-          <CardHeader>
-            <Chip tone="song" size="sm">
-              <Music2 size={13} />
-              Sing
-            </Chip>
-            <CardTitle>Sing a song</CardTitle>
-            <CardDescription>Upload a local track and practice against the real vocal contour.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-      <ExerciseLibrary
-        exercises={exercises}
-        selectedExerciseId={selectedExerciseId}
-        exerciseProgress={exerciseProgress}
-        onSelectExercise={onSelectExercise}
-        disabled={disabled}
-      />
+
+      <section className="mock-mode-grid" aria-label="Practice modes">
+        <button className="mock-mode-card mock-mode-card--practice" type="button" onClick={onNavigateToPractice}>
+          <div className="mock-mode-card__header">
+            <span className="mock-mode-icon mock-mode-icon--practice">
+              <Target size={26} aria-hidden="true" />
+            </span>
+            <span className="mock-mode-copy">
+              <strong>Interval Training</strong>
+              <span>12 guided drills · ear & voice</span>
+            </span>
+            <ArrowUpRight size={27} aria-hidden="true" />
+          </div>
+          <div className="mock-chip-row" aria-hidden="true">
+            <span>Warm-ups</span>
+            <span>Intervals</span>
+            <span>Triads</span>
+            <span>Scales</span>
+          </div>
+          <div className="mock-practice-progress">
+            <span />
+            <strong>23 <span>/ 48 done</span></strong>
+          </div>
+        </button>
+
+        <button className="mock-mode-card mock-mode-card--song" type="button" onClick={onNavigateToSongs}>
+          <div className="mock-mode-card__header">
+            <span className="mock-mode-icon mock-mode-icon--song">
+              <Mic2 size={27} aria-hidden="true" />
+            </span>
+            <span className="mock-mode-copy">
+              <strong>Sing a Song</strong>
+              <span>Upload a track · sing the real vocal</span>
+            </span>
+            <ArrowUpRight size={27} aria-hidden="true" />
+          </div>
+          <div className="mock-song-dropzone">
+            <span className="mock-upload-icon">
+              <Upload size={28} aria-hidden="true" />
+            </span>
+            <strong>Drop a song to begin</strong>
+            <span>We split the vocal & map it to pitch targets — locally, in under a minute.</span>
+          </div>
+        </button>
+      </section>
+
+      <section className="mock-stat-grid" aria-label="Practice stats">
+        <div className="mock-stat-card">
+          <span className="mock-stat-label">
+            <Flame size={19} aria-hidden="true" />
+            Day streak
+          </span>
+          <strong className="mock-stat-card__value mock-stat-card__value--accent">12</strong>
+        </div>
+        <div className="mock-stat-card">
+          <span className="mock-stat-label">
+            <LineChart size={19} aria-hidden="true" />
+            Accuracy
+          </span>
+          <div className="mock-stat-card__split">
+            <strong className="mock-stat-card__value">87<span>%</span></strong>
+            <MockAccuracySparkline />
+          </div>
+        </div>
+        <div className="mock-stat-card">
+          <span className="mock-stat-label">
+            <CheckCircle2 size={18} aria-hidden="true" />
+            Notes in tune
+          </span>
+          <strong className="mock-stat-card__value mock-stat-card__value--green">1,284</strong>
+        </div>
+        <div className="mock-stat-card">
+          <span className="mock-stat-label">
+            <Clock3 size={18} aria-hidden="true" />
+            Practiced
+          </span>
+          <strong className="mock-stat-card__value">142<span>min</span></strong>
+        </div>
+      </section>
     </main>
+  );
+}
+
+function WeeklyStreakMock() {
+  const days = [
+    { label: "M", done: true },
+    { label: "T", done: true },
+    { label: "W", done: true },
+    { label: "T", done: false },
+    { label: "F", done: true },
+    { label: "S", done: true },
+    { label: "S", done: true }
+  ];
+
+  return (
+    <div className="mock-week-streak" aria-label="Weekly streak">
+      {days.map((day, index) => (
+        <span key={`${day.label}-${index}`} className="mock-week-streak__day">
+          <span className={day.done ? "mock-week-streak__box is-done" : "mock-week-streak__box"}>
+            {day.done ? <CheckIcon /> : null}
+          </span>
+          <span>{day.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
+      <path d="m7 12 3 3 7-7" />
+    </svg>
+  );
+}
+
+function MockPitchPreview() {
+  return (
+    <div className="mock-pitch-preview" aria-hidden="true">
+      <svg viewBox="0 0 420 230" preserveAspectRatio="none">
+        <path className="mock-pitch-preview__grid" d="M20 34H400M20 81H400M20 128H400M20 175H400" />
+        <path className="mock-pitch-preview__guide" d="M50 150H140M150 104H245M255 58H318" />
+        <path
+          className="mock-pitch-preview__line"
+          d="M30 170 C40 148 38 132 58 132 C92 132 100 132 113 132 C140 132 143 105 169 101 C197 98 210 101 239 100 C260 100 260 84 280 66 C301 47 305 22 311 32 C318 48 322 58 350 57 C368 57 383 58 400 57"
+        />
+        <circle className="mock-pitch-preview__dot" cx="47" cy="132" r="5" />
+        <circle className="mock-pitch-preview__dot" cx="168" cy="101" r="5" />
+        <circle className="mock-pitch-preview__dot" cx="311" cy="57" r="5" />
+      </svg>
+    </div>
+  );
+}
+
+function MockAccuracySparkline() {
+  return (
+    <svg className="mock-accuracy-sparkline" viewBox="0 0 150 48" aria-hidden="true">
+      <path d="M5 35 C18 28 22 22 33 29 C43 37 47 20 60 18 C76 15 75 6 92 8 C104 10 104 1 119 4 C132 7 134 0 145 0" />
+    </svg>
   );
 }
 
@@ -1139,83 +1163,6 @@ function ProgressScreen({
       )}
     </main>
   );
-}
-
-type ThemePickerOption = {
-  key: string;
-  label: string;
-  preference: ThemePreference;
-  icon: typeof Monitor;
-  theme?: PitchCoachTheme;
-};
-
-const themeOptions: ThemePickerOption[] = [
-  {
-    key: "system",
-    label: "System",
-    preference: {
-      mode: "system"
-    },
-    icon: Monitor
-  },
-  ...PRESET_THEMES.map(
-    (theme): ThemePickerOption => ({
-      key: `theme:${theme.name}`,
-      label: theme.name,
-      preference: {
-        mode: "theme",
-        themeName: theme.name
-      },
-      icon: theme.type === "light" ? Sun : Moon,
-      theme
-    })
-  )
-];
-
-function ThemePicker({
-  value,
-  onValueChange
-}: {
-  value: ThemePreference;
-  onValueChange: (themePreference: ThemePreference) => void;
-}) {
-  const selectedKey = themePreferenceKey(value);
-
-  return (
-    <div className="theme-picker" role="radiogroup" aria-label="Theme">
-      {themeOptions.map((option) => {
-        const Icon = option.icon;
-        const isSelected = selectedKey === option.key;
-        return (
-          <button
-            key={option.key}
-            className={`theme-option${isSelected ? " theme-option-active" : ""}`}
-            type="button"
-            role="radio"
-            aria-checked={isSelected}
-            aria-label={`${option.label} theme`}
-            title={`${option.label} theme`}
-            onClick={() => onValueChange(option.preference)}
-          >
-            {option.theme ? (
-              <span className="theme-option__swatches" aria-hidden="true">
-                <span style={{ background: option.theme.colors["bg.primary"] }} />
-                <span style={{ background: option.theme.colors["bg.secondary"] }} />
-                <span style={{ background: option.theme.colors["accent.primary"] }} />
-              </span>
-            ) : (
-              <Icon size={14} />
-            )}
-            <span className="theme-option__label">{option.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function themePreferenceKey(themePreference: ThemePreference) {
-  return themePreference.mode === "system" ? "system" : `theme:${themePreference.themeName}`;
 }
 
 function formatClipDuration(durationMs: number) {

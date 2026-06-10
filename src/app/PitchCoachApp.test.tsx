@@ -16,7 +16,7 @@ import type { SongModeServices, SongPracticeConfig, SongReference, SongStereoBuf
 import type { AttemptHistoryRecord } from "../domain/contracts";
 import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
 import { installFakeIndexedDB } from "../test/fakeIndexedDB";
-import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME } from "../themes";
+import { DEFAULT_THEME } from "../themes";
 import { PitchCoachApp } from "./PitchCoachApp";
 
 describe("PitchCoachApp", () => {
@@ -41,10 +41,13 @@ describe("PitchCoachApp", () => {
   it("renders the initial exercise screen", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    expect(screen.getByRole("heading", { name: "Pitch Coach" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Song mode" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Single Note Match/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Good evening, Robin" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Resume practice/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Interval Training/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Sing a Song/i })).toBeTruthy();
+    expect(screen.getByText("12 days")).toBeTruthy();
+    expect(screen.getByText("1,284")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Practice Library" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 
@@ -98,18 +101,13 @@ describe("PitchCoachApp", () => {
     expect(screen.getAllByText(/Five-Note Major Scale/).length).toBeGreaterThan(0);
   });
 
-  it("shows local history stats and a recommendation on the home screen", async () => {
-    await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
-    await saveAttemptHistoryRecord(historyRecord("major-triad", 1, false));
-
+  it("opens the mock resume card into the matching exercise route", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Recent attempts are trending flat.")).toBeTruthy();
-    });
-    expect(screen.getByText("0 of 2 attempts passed")).toBeTruthy();
-    expect(screen.getByText("0 of 2 notes in tune")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Start recommended drill" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Resume practice/i }));
+
+    expect(window.location.pathname).toBe("/exercises/third-up-back");
+    expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
   });
 
   it("filters the practice library by exercise category", async () => {
@@ -137,14 +135,14 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/songs"));
     expect(screen.getByRole("heading", { name: "Song Practice" })).toBeTruthy();
     expect(screen.getByLabelText("Song mode unavailable").textContent).toMatch(/WebGPU/i);
   });
 
-  it("applies the resolved theme on direct song mode navigation", async () => {
+  it("applies the locked mock theme on direct song mode navigation", async () => {
     mockPreferredColorScheme(true);
     window.history.replaceState(null, "", "/songs");
 
@@ -156,7 +154,8 @@ describe("PitchCoachApp", () => {
     );
 
     await screen.findByRole("heading", { name: "Song Practice" });
-    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_THEME.name);
   });
 
   it("uploads, analyzes, and scores a song practice attempt with fake local services", async () => {
@@ -169,7 +168,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
     expect(await screen.findByRole("heading", { name: "Upload a local song" })).toBeTruthy();
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
@@ -211,7 +210,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -248,7 +247,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -280,7 +279,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -462,54 +461,14 @@ describe("PitchCoachApp", () => {
     expect(switchControl.getAttribute("aria-checked")).toBe("true");
   });
 
-  it("defaults the system theme to the current color scheme", () => {
+  it("locks the app to the mock theme and hides theme controls", () => {
     mockPreferredColorScheme(true);
 
     render(<PitchCoachApp services={createServices([])} />);
 
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
-    expect(screen.getByRole("radio", { name: "System theme" }).getAttribute("aria-checked")).toBe("true");
-  });
-
-  it("persists manual theme preferences in settings", () => {
-    mockPreferredColorScheme(false);
-
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
-
-    fireEvent.click(screen.getByRole("radio", { name: `${DEFAULT_DARK_THEME.name} theme` }));
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
-    expect(readStoredSettings().themePreference).toEqual({
-      mode: "theme",
-      themeName: DEFAULT_DARK_THEME.name
-    });
-    expect(
-      screen.getByRole("radio", { name: `${DEFAULT_DARK_THEME.name} theme` }).getAttribute("aria-checked")
-    ).toBe("true");
-
-    fireEvent.click(screen.getByRole("radio", { name: `${DEFAULT_LIGHT_THEME.name} theme` }));
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_LIGHT_THEME.name);
-    expect(readStoredSettings().themePreference).toEqual({
-      mode: "theme",
-      themeName: DEFAULT_LIGHT_THEME.name
-    });
-  });
-
-  it("updates system theme when the preferred color scheme changes", async () => {
-    const media = mockPreferredColorScheme(false);
-
-    render(<PitchCoachApp services={createServices([])} />);
-    expect(document.documentElement.dataset.theme).toBe("light");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_LIGHT_THEME.name);
-
-    await act(async () => {
-      media.setMatches(true);
-    });
-
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_THEME.name);
+    expect(screen.queryByRole("radiogroup", { name: "Theme" })).toBeNull();
   });
 
   it("opens a selected exercise detail screen from the library", async () => {
@@ -523,7 +482,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+    openSingleNoteMatch();
     expect(screen.getByText("72 BPM")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
     expect(window.location.pathname).toBe("/exercises/single-note-match");
@@ -567,7 +526,7 @@ describe("PitchCoachApp", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Back to exercises" }));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy());
     expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("100% recent pass");
   });
 
@@ -614,8 +573,8 @@ describe("PitchCoachApp", () => {
     });
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe("/");
-      expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+      expect(window.location.pathname).toBe("/practice");
+      expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
     });
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
@@ -633,7 +592,7 @@ describe("PitchCoachApp", () => {
   it("changes lessons from the exercise dropdown", async () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+    openSingleNoteMatch();
     expect(window.location.pathname).toBe("/exercises/single-note-match");
 
     const exerciseDropdown = screen.getByRole("combobox", { name: "Exercise" });
@@ -649,7 +608,7 @@ describe("PitchCoachApp", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    await waitFor(() => expect(window.location.pathname).toBe("/practice"));
   });
 
   it("uses shared dropdown controls instead of native selects", () => {
@@ -663,13 +622,13 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("combobox", { name: "High" }).tagName).toBe("BUTTON");
   });
 
-  it("replaces invalid exercise routes with the library route", async () => {
+  it("replaces invalid exercise routes with the home route", async () => {
     window.history.replaceState(null, "", "/exercises/not-real");
 
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
-    expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Good evening, Robin" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 
@@ -696,7 +655,7 @@ describe("PitchCoachApp", () => {
     const services = createServices(stableFramesForTargets(targets, 0));
     render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Five-Note Major Scale/i }));
+    openFiveNoteScale();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
 
@@ -839,15 +798,6 @@ function createServices(frames: PitchFrame[], rejection?: Error): {
       cancel: vi.fn()
     }
   };
-}
-
-function readStoredSettings() {
-  const rawSettings = localStorage.getItem("pitch-coach-settings-v1");
-  if (!rawSettings) {
-    throw new Error("Expected stored settings");
-  }
-
-  return JSON.parse(rawSettings) as CoachSettings;
 }
 
 function mockPreferredColorScheme(initialMatches: boolean) {
@@ -1074,7 +1024,29 @@ const _settingsCheck: CoachSettings = DEFAULT_SETTINGS;
 void _settingsCheck;
 
 function openMajorTriad() {
+  openPracticeLibrary();
   fireEvent.click(screen.getByRole("button", { name: /Major Triad/i }));
+}
+
+function openSingleNoteMatch() {
+  openPracticeLibrary();
+  fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+}
+
+function openFiveNoteScale() {
+  openPracticeLibrary();
+  fireEvent.click(screen.getByRole("button", { name: /Five-Note Major Scale/i }));
+}
+
+function openPracticeLibrary() {
+  if (screen.queryByRole("heading", { name: "Practice Library", level: 1 })) {
+    return;
+  }
+
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Practice" }), {
+    button: 0,
+    ctrlKey: false
+  });
 }
 
 async function chooseDropdownOption(trigger: HTMLElement, optionName: string) {

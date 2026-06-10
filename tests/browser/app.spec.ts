@@ -2,11 +2,15 @@ import { expect, test } from "@playwright/test";
 
 test("renders the pitch coach workspace", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Pitch Coach" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Practice Library" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Major Triad/ })).toContainText("No attempts yet");
-  await page.getByRole("button", { name: /Major Triad/ }).click();
-  await expect(page).toHaveURL(/\/exercises\/major-triad$/);
+  await expect(page.getByRole("heading", { name: "Good evening, Robin" })).toBeVisible();
+  await expect(page.getByText("You’re on a 12-day roll")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Resume practice/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Interval Training/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sing a Song/ })).toBeVisible();
+  await expect(page.getByText("1,284")).toBeVisible();
+
+  await page.getByRole("button", { name: /Resume practice/ }).click();
+  await expect(page).toHaveURL(/\/exercises\/third-up-back$/);
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
   await expect(page.getByText("Guide tempo")).toBeVisible();
@@ -21,7 +25,7 @@ test("renders the pitch coach workspace", async ({ page }) => {
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "Practice Library" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Good evening, Robin" })).toBeVisible();
 });
 
 test("opens exercise routes directly", async ({ page }) => {
@@ -68,34 +72,21 @@ test("keeps the exercise usable on a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Pitch Coach" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Single Note Match/ })).toBeVisible();
-  await page.getByRole("button", { name: /Major Triad/ }).click();
-  await expect(page).toHaveURL(/\/exercises\/major-triad$/);
+  await expect(page.getByRole("heading", { name: "Good evening, Robin" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Resume practice/ })).toBeVisible();
+  await page.getByRole("button", { name: /Resume practice/ }).click();
+  await expect(page).toHaveURL(/\/exercises\/third-up-back$/);
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
 });
 
-test("defaults to system dark mode and persists manual theme choice", async ({ page }) => {
+test("uses the mock theme without exposing theme choices", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
 
-  await expect(page.getByRole("radio", { name: "System theme" })).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "One Dark");
-
-  await page.getByRole("radio", { name: "Atom One Light theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "Atom One Light");
-
-  await page.reload();
-  await expect(page.getByRole("radio", { name: "Atom One Light theme" })).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "Atom One Light");
-
-  await page.getByRole("radio", { name: "System theme" }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "One Dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme-name", "Pitch Coach Warm");
+  await expect(page.getByRole("radiogroup", { name: "Theme" })).toHaveCount(0);
 });
 
 test("shows and clears local attempt history", async ({ page }) => {
