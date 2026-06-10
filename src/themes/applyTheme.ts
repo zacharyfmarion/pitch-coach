@@ -60,8 +60,18 @@ function setDerivedPitchCoachTokens(theme: PitchCoachTheme, setVar: (name: strin
   setVar("--status-warning-text", colors["port.color"]);
   setVar("--status-danger-text", colors["status.danger"]);
   setVar("--status-success-text", colors["status.success"]);
+  setVar("--status-info-text", colors["port.image"]);
+  setVar("--accent-song", colors["port.bool"]);
+  setVar("--accent-song-hover", colorMix(colors["port.bool"], isLight ? 82 : 76));
+  setVar("--accent-coral-deep", colors["accent.hover"]);
   setVar("--range-accent", colors["port.bool"]);
   setVar("--score-neutral-bg", colorMix(colors["text.primary"], isLight ? 8 : 10));
+  setVar("--surface-accent", colorMix(colors["accent.primary"], isLight ? 12 : 17));
+  setVar("--surface-song", colorMix(colors["port.bool"], isLight ? 12 : 18));
+  setVar("--surface-info", colorMix(colors["port.image"], isLight ? 12 : 16));
+  setVar("--shadow-card", isLight ? "0 14px 40px rgba(70,45,25,0.08)" : "0 16px 42px rgba(0,0,0,0.28)");
+  setVar("--shadow-card-hover", isLight ? "0 18px 44px rgba(70,45,25,0.13)" : "0 20px 48px rgba(0,0,0,0.36)");
+  setVar("--shadow-accent", hexToRgba(colors["accent.primary"], isLight ? 0.32 : 0.28));
 
   setVar("--timeline-surface", colors["bg.canvas"]);
   setVar("--timeline-target-band", hexToRgba(colors["accent.primary"], isLight ? 0.13 : 0.18));
