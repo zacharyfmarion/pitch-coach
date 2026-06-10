@@ -28,7 +28,9 @@ import { midiToFrequency, midiToNoteName } from "../domain/music";
 import {
   createAttemptHistoryRecord,
   getRecentAttemptsForExercise,
+  recommendPracticeExercise,
   pruneAttemptHistory,
+  summarizePracticeHistory,
   summarizeExerciseProgress
 } from "../domain/progress";
 import { isPitchFirstAttemptComplete, scoreAttempt } from "../domain/scoring";
@@ -110,6 +112,14 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const exerciseProgress = useMemo(
     () => summarizeExerciseProgress(attemptHistory, EXERCISES),
     [attemptHistory]
+  );
+  const practiceSummary = useMemo(
+    () => summarizePracticeHistory(attemptHistory, EXERCISES),
+    [attemptHistory]
+  );
+  const recommendedExercise = useMemo(
+    () => recommendPracticeExercise(attemptHistory, EXERCISES, selectedExercise.id),
+    [attemptHistory, selectedExercise.id]
   );
   const selectedExerciseHistory = useMemo(
     () => getRecentAttemptsForExercise(attemptHistory, selectedExercise.id),
@@ -430,6 +440,8 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     listeningDurationMs: timelineDurationMs,
     errorMessage,
     exerciseProgress,
+    practiceSummary,
+    recommendedExercise,
     attemptHistoryCount: attemptHistory.length,
     selectedExerciseHistory,
     localClip,

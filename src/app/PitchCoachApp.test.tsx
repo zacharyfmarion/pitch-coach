@@ -82,6 +82,36 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: /Major Triad/i })).toBeTruthy();
   });
 
+  it("shows local history stats and a recommendation on the home screen", async () => {
+    await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
+    await saveAttemptHistoryRecord(historyRecord("major-triad", 1, false));
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Recent attempts are trending flat.")).toBeTruthy();
+    });
+    expect(screen.getByText("0 of 2 attempts passed")).toBeTruthy();
+    expect(screen.getByText("0 of 2 notes in tune")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start recommended drill" })).toBeTruthy();
+  });
+
+  it("filters the practice library by exercise category", async () => {
+    window.history.replaceState(null, "", "/practice");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByRole("tab", { name: /Scales/i }), {
+        button: 0,
+        ctrlKey: false
+      });
+    });
+
+    expect(screen.getByRole("button", { name: /Five-Note Major Scale/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Major Triad/i })).toBeNull();
+  });
+
   it("opens song mode and shows runtime requirements when unsupported", async () => {
     render(
       <PitchCoachApp

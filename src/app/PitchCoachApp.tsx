@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  Activity,
   ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
   Gauge,
   History,
   Home,
+  Layers3,
   Mic2,
   Monitor,
   Moon,
@@ -11,6 +16,7 @@ import {
   Play,
   RotateCcw,
   SlidersHorizontal,
+  Sparkles,
   Square,
   Sun,
   Target,
@@ -23,13 +29,23 @@ import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
 import { AppShell } from "../components/ui/AppShell";
 import { Button } from "../components/ui/Button";
-import { Card, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "../components/ui/Card";
+import { Chip } from "../components/ui/Chip";
 import { IconButton } from "../components/ui/IconButton";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SidebarNav } from "../components/ui/SidebarNav";
-import type { SidebarTabItem } from "../components/ui/SidebarTabs";
+import { SidebarTabs, type SidebarTabItem } from "../components/ui/SidebarTabs";
+import { StatCard } from "../components/ui/StatCard";
 import { Toggle } from "../components/ui/Toggle";
 import type {
+  ExerciseCategory,
   ExerciseId,
   ExerciseProgressSummary,
   NoteAssessmentStatus,
@@ -142,6 +158,8 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
             exercises={coach.exercises}
             selectedExerciseId={coach.selectedExercise.id}
             exerciseProgress={coach.exerciseProgress}
+            practiceSummary={coach.practiceSummary}
+            recommendedExercise={coach.recommendedExercise}
             onSelectExercise={openExercise}
             onNavigateToPractice={() => router.navigateToLibrary()}
             onNavigateToSongs={() => router.navigateToSongs()}
@@ -582,24 +600,32 @@ type LibraryScreenProps = {
   disabled: boolean;
 };
 
+type HomeScreenProps = LibraryScreenProps & {
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+  recommendedExercise: ReturnType<typeof usePitchCoachController>["recommendedExercise"];
+  onNavigateToPractice: () => void;
+  onNavigateToSongs: () => void;
+};
+
 function HomeScreen({
   exercises,
   selectedExerciseId,
   exerciseProgress,
+  practiceSummary,
+  recommendedExercise,
   onSelectExercise,
   onNavigateToPractice,
   onNavigateToSongs,
   disabled
-}: LibraryScreenProps & {
-  onNavigateToPractice: () => void;
-  onNavigateToSongs: () => void;
-}) {
+}: HomeScreenProps) {
+  const recommendedProgress = exerciseProgress[recommendedExercise.exercise.id];
+
   return (
     <main className="shell-page shell-page--home" aria-label="Pitch coach home">
       <PageHeader
         icon={<Target size={24} />}
         title="Pitch Coach"
-        description="Choose a guided drill, sing after the prompt, and get private pitch feedback in your browser."
+        description="Choose a guided drill, sing after the prompt, and keep every practice stat local to this browser."
         actions={
           <>
             <Button variant="primary" size="md" onClick={onNavigateToPractice}>
@@ -613,15 +639,103 @@ function HomeScreen({
           </>
         }
       />
+      <section className="home-summary-grid" aria-label="Practice summary">
+        <StatCard
+          tone="accent"
+          icon={<CalendarDays size={16} />}
+          label="Day streak"
+          value={practiceSummary.streakDays}
+          detail={
+            practiceSummary.lastPracticedAt
+              ? formatLastPracticed(practiceSummary.lastPracticedAt)
+              : "No local attempts yet"
+          }
+        />
+        <StatCard
+          tone="success"
+          icon={<Activity size={16} />}
+          label="Recent pass"
+          value={practiceSummary.recentPassRate ?? 0}
+          unit="%"
+          detail={formatAttemptRatio(practiceSummary.passedAttemptCount, practiceSummary.attemptCount)}
+        />
+        <StatCard
+          icon={<CheckCircle2 size={16} />}
+          label="Notes in tune"
+          value={practiceSummary.noteAccuracy ?? 0}
+          unit="%"
+          detail={formatNoteRatio(practiceSummary.notesInTune, practiceSummary.noteCount)}
+        />
+        <StatCard
+          tone="song"
+          icon={<Clock3 size={16} />}
+          label="Practice time"
+          value={practiceSummary.practiceMinutes}
+          unit="min"
+          detail={formatWeekAttemptCount(practiceSummary.weekActivity)}
+        />
+      </section>
+      <section className="home-spotlight-grid" aria-label="Practice shortcuts">
+        <Card className="home-recommendation-card" tone="accent" padding="lg">
+          <CardHeader>
+            <div className="home-card-kicker">
+              <Chip tone="accent" size="sm">
+                <Sparkles size={13} />
+                Recommended
+              </Chip>
+              <Chip tone="neutral" size="sm">
+                {formatCategoryLabel(recommendedExercise.exercise.category)}
+              </Chip>
+            </div>
+            <CardTitle>{recommendedExercise.exercise.title}</CardTitle>
+            <CardDescription>{recommendedExercise.reason}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="home-recommendation-meta">
+              <span>{recommendedExercise.exercise.focus}</span>
+              <span>{recommendedExercise.exercise.defaultTempoBpm} bpm</span>
+              <span>{formatProgressSummary(recommendedProgress)}</span>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => onSelectExercise(recommendedExercise.exercise.id)}
+              disabled={disabled}
+            >
+              <Play size={16} />
+              <span>Start recommended drill</span>
+            </Button>
+          </CardFooter>
+        </Card>
+        <Card className="home-week-card" variant="subtle" padding="lg">
+          <CardHeader>
+            <CardTitle>Last 7 Days</CardTitle>
+            <CardDescription>Attempt volume from local practice history.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <WeekActivityStrip buckets={practiceSummary.weekActivity} />
+          </CardContent>
+        </Card>
+      </section>
       <div className="home-mode-grid">
         <Card variant="interactive" tone="accent" onClick={onNavigateToPractice}>
           <CardHeader>
+            <Chip tone="accent" size="sm">
+              <Target size={13} />
+              Practice
+            </Chip>
             <CardTitle>Interval training</CardTitle>
             <CardDescription>Guided pitch drills for ear and voice.</CardDescription>
           </CardHeader>
         </Card>
         <Card variant="interactive" tone="song" onClick={onNavigateToSongs}>
           <CardHeader>
+            <Chip tone="song" size="sm">
+              <Music2 size={13} />
+              Sing
+            </Chip>
             <CardTitle>Sing a song</CardTitle>
             <CardDescription>Upload a local track and practice against the real vocal contour.</CardDescription>
           </CardHeader>
@@ -1099,6 +1213,16 @@ type ExerciseLibraryProps = {
   disabled: boolean;
 };
 
+type ExerciseCategoryFilter = "all" | ExerciseCategory;
+
+const exerciseCategoryFilters: readonly ExerciseCategoryFilter[] = [
+  "all",
+  "pitch",
+  "interval",
+  "arpeggio",
+  "scale"
+];
+
 function ExerciseLibrary({
   exercises,
   selectedExerciseId,
@@ -1106,6 +1230,42 @@ function ExerciseLibrary({
   onSelectExercise,
   disabled
 }: ExerciseLibraryProps) {
+  const [activeCategory, setActiveCategory] = useState<ExerciseCategoryFilter>("all");
+  const categoryItems = useMemo(
+    () =>
+      exerciseCategoryFilters.map((category): SidebarTabItem<ExerciseCategoryFilter> => {
+        const count =
+          category === "all"
+            ? exercises.length
+            : exercises.filter((exercise) => exercise.category === category).length;
+        return {
+          value: category,
+          label: formatCategoryLabel(category),
+          icon: category === "all" ? <Layers3 size={15} /> : categoryIcon(category),
+          meta: count
+        };
+      }),
+    [exercises]
+  );
+  const visibleExercises = useMemo(
+    () =>
+      activeCategory === "all"
+        ? exercises
+        : exercises.filter((exercise) => exercise.category === activeCategory),
+    [activeCategory, exercises]
+  );
+  const groupedExercises = useMemo(
+    () =>
+      exerciseCategoryFilters
+        .filter((category): category is ExerciseCategory => category !== "all")
+        .map((category) => ({
+          category,
+          exercises: visibleExercises.filter((exercise) => exercise.category === category)
+        }))
+        .filter((group) => group.exercises.length > 0),
+    [visibleExercises]
+  );
+
   return (
     <section className="exercise-library" aria-label="Exercise library">
       <div className="library-heading">
@@ -1113,47 +1273,135 @@ function ExerciseLibrary({
           <span className="readout-label">Exercises</span>
           <h2>Practice Library</h2>
         </div>
-        <span>{exercises.length} drills</span>
+        <span>
+          {visibleExercises.length} of {exercises.length} drills
+        </span>
       </div>
-      <div className="exercise-list">
-        {exercises.map((exercise) => {
-          const isSelected = exercise.id === selectedExerciseId;
-          return (
-            <button
-              key={exercise.id}
-              className={`exercise-option ${isSelected ? "exercise-option-active" : ""}`}
-              type="button"
-              onClick={() => onSelectExercise(exercise.id)}
-              aria-pressed={isSelected}
-              disabled={disabled}
-            >
-              <span className="difficulty-meter" aria-label={`Difficulty ${exercise.difficulty} of 5`}>
-                {Array.from({ length: 5 }, (_, index) => (
-                  <span key={index} className={index < exercise.difficulty ? "difficulty-on" : ""} />
-                ))}
-              </span>
-              <span className="exercise-copy">
-                <strong>{exercise.title}</strong>
-                <span>{exercise.description}</span>
-                <span className="exercise-progress">
-                  {formatProgressSummary(exerciseProgress[exercise.id])}
-                </span>
-              </span>
-              <span className="exercise-meta">
-                <span>{exercise.focus}</span>
-                <span>{formatExercisePatternText(exercise.patternDegrees)}</span>
-              </span>
-              <span className="exercise-start">Start</span>
-            </button>
-          );
-        })}
+      <div className="library-filters">
+        <SidebarTabs
+          value={activeCategory}
+          items={categoryItems}
+          onValueChange={setActiveCategory}
+          ariaLabel="Exercise categories"
+          orientation="horizontal"
+          className="library-filter-tabs"
+        />
+      </div>
+      <div className="exercise-groups">
+        {groupedExercises.map((group) => (
+          <section
+            key={group.category}
+            className="exercise-group"
+            aria-labelledby={`exercise-group-${group.category}`}
+          >
+            <div className="exercise-group__header">
+              <h3 id={`exercise-group-${group.category}`}>{formatCategoryLabel(group.category)}</h3>
+              <span>{group.exercises.length} drills</span>
+            </div>
+            <div className="exercise-list">
+              {group.exercises.map((exercise) => {
+                const isSelected = exercise.id === selectedExerciseId;
+                return (
+                  <button
+                    key={exercise.id}
+                    className={`exercise-option ${isSelected ? "exercise-option-active" : ""}`}
+                    type="button"
+                    onClick={() => onSelectExercise(exercise.id)}
+                    aria-pressed={isSelected}
+                    disabled={disabled}
+                  >
+                    <span
+                      className="difficulty-meter"
+                      aria-label={`Difficulty ${exercise.difficulty} of 5`}
+                    >
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <span
+                          key={index}
+                          className={index < exercise.difficulty ? "difficulty-on" : ""}
+                        />
+                      ))}
+                    </span>
+                    <span className="exercise-copy">
+                      <strong>{exercise.title}</strong>
+                      <span>{exercise.description}</span>
+                      <span className="exercise-progress">
+                        {formatProgressSummary(exerciseProgress[exercise.id])}
+                      </span>
+                    </span>
+                    <span className="exercise-meta">
+                      <span>{exercise.focus}</span>
+                      <span>{formatExercisePatternText(exercise.patternDegrees)}</span>
+                      <span>{midiToNoteName(exercise.startRootMidi)} start</span>
+                      <span>{exercise.defaultTempoBpm} bpm</span>
+                    </span>
+                    <span className="exercise-start">Start</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     </section>
   );
 }
 
+function WeekActivityStrip({
+  buckets
+}: {
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
+}) {
+  const maxAttemptCount = Math.max(1, ...buckets.map((bucket) => bucket.attemptCount));
+
+  return (
+    <div className="week-activity-strip" aria-label="Last seven days of attempts">
+      {buckets.map((bucket) => {
+        const height = bucket.attemptCount === 0 ? 8 : 8 + (bucket.attemptCount / maxAttemptCount) * 42;
+        return (
+          <span key={bucket.date} className="week-activity-strip__day">
+            <span
+              className="week-activity-strip__bar"
+              style={{ height }}
+              title={`${formatWeekday(bucket.date)}: ${bucket.attemptCount} attempts`}
+            />
+            <span>{formatWeekday(bucket.date)}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function formatExercisePatternText(patternDegrees: readonly number[]) {
   return patternDegrees.join("-");
+}
+
+function formatCategoryLabel(category: ExerciseCategoryFilter) {
+  switch (category) {
+    case "all":
+      return "All";
+    case "pitch":
+      return "Pitch";
+    case "interval":
+      return "Intervals";
+    case "arpeggio":
+      return "Arpeggios";
+    case "scale":
+      return "Scales";
+  }
+}
+
+function categoryIcon(category: ExerciseCategory) {
+  switch (category) {
+    case "pitch":
+      return <Target size={15} />;
+    case "interval":
+      return <Activity size={15} />;
+    case "arpeggio":
+      return <TrendingUp size={15} />;
+    case "scale":
+      return <Gauge size={15} />;
+  }
 }
 
 function formatProgressSummary(progress: ExerciseProgressSummary) {
@@ -1165,6 +1413,41 @@ function formatProgressSummary(progress: ExerciseProgressSummary) {
   return `${progress.recentPassRate}% recent pass · ${formatLastPracticed(
     progress.lastPracticedAt
   )}${issue}`;
+}
+
+function formatAttemptRatio(passedAttemptCount: number, attemptCount: number) {
+  if (attemptCount === 0) {
+    return "No attempts yet";
+  }
+
+  return `${passedAttemptCount} of ${attemptCount} attempts passed`;
+}
+
+function formatNoteRatio(notesInTune: number, noteCount: number) {
+  if (noteCount === 0) {
+    return "No notes scored yet";
+  }
+
+  return `${notesInTune} of ${noteCount} notes in tune`;
+}
+
+function formatWeekAttemptCount(
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"]
+) {
+  const attemptCount = buckets.reduce((total, bucket) => total + bucket.attemptCount, 0);
+  if (attemptCount === 0) {
+    return "No attempts this week";
+  }
+
+  return `${attemptCount} attempts this week`;
+}
+
+function formatWeekday(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString([], {
+    weekday: "short"
+  });
 }
 
 function formatLastPracticed(createdAt: string | undefined) {
