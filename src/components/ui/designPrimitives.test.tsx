@@ -9,18 +9,26 @@ import { StatusPill } from "./StatusPill";
 describe("design primitives", () => {
   it("composes card and chip classes from typed variants", () => {
     render(
-      <Card variant="interactive" tone="accent" padding="lg">
-        <CardHeader>
-          <CardTitle>Major Third</CardTitle>
-          <CardDescription>Lock in the landing.</CardDescription>
-        </CardHeader>
-        <Chip tone="success">Ready</Chip>
-      </Card>
+      <>
+        <Card variant="interactive" tone="accent" padding="lg">
+          <CardHeader>
+            <CardTitle>Major Third</CardTitle>
+            <CardDescription>Lock in the landing.</CardDescription>
+          </CardHeader>
+          <Chip tone="success">Ready</Chip>
+        </Card>
+        <Card as="button" variant="mockInteractive" type="button">
+          Sing a Song
+        </Card>
+      </>
     );
 
     const card = screen.getByText("Major Third").closest(".ui-card");
     expect(card?.className).toContain("ui-card--interactive");
     expect(card?.className).toContain("ui-card--accent");
+    expect(screen.getByRole("button", { name: "Sing a Song" }).className).toContain(
+      "ui-card--mock-interactive"
+    );
     expect(screen.getByText("Ready").className).toContain("ui-chip--success");
   });
 

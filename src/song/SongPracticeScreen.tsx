@@ -134,7 +134,13 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
             pipelineSteps={pipelineSteps}
           />
 
-          <section className="mock-song-timeline-card" aria-label="Reference pitch map">
+          <Card
+            as="section"
+            className="mock-song-timeline-card"
+            variant="mock"
+            padding="none"
+            aria-label="Reference pitch map"
+          >
             <div className="mock-song-card-heading">
               <div>
                 <h2>Reference pitch map</h2>
@@ -155,9 +161,9 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
               debugEnabled={debugEnabled}
               debugEnergy={debugEnergy}
             />
-          </section>
+          </Card>
 
-          <div className="mock-song-transport">
+          <Card className="mock-song-transport" variant="mock" padding="none">
             <Button
               className="primary-action"
               variant="song"
@@ -194,7 +200,7 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
               <Square size={18} />
               <span>Stop</span>
             </Button>
-          </div>
+          </Card>
 
           {song.errorMessage ? (
             <div className="error-banner" role="alert">
@@ -454,7 +460,7 @@ function SongEmptyState({
 
   return (
     <section className="mock-song-empty">
-      <div className="mock-song-empty__drop" aria-label="Song upload">
+      <Card className="mock-song-empty__drop" variant="mockDashed" padding="none" aria-label="Song upload">
         <span className="mock-song-empty__upload-icon" aria-hidden="true">
           <Upload size={43} />
         </span>
@@ -486,7 +492,7 @@ function SongEmptyState({
           disabled={isChecking}
         />
         <span className="mock-song-empty__privacy">Everything runs on your device — nothing is uploaded.</span>
-      </div>
+      </Card>
       <SongHowItWorks />
     </section>
   );
@@ -501,7 +507,7 @@ function SongHowItWorks() {
   ];
 
   return (
-    <section className="mock-song-how">
+    <Card as="section" className="mock-song-how" variant="mock" padding="none">
       <h2>How it works · about a minute, on your device</h2>
       <ol>
         {steps.map((step, index) => (
@@ -514,7 +520,7 @@ function SongHowItWorks() {
           </li>
         ))}
       </ol>
-    </section>
+    </Card>
   );
 }
 
@@ -537,7 +543,13 @@ function SongProcessingState({
 }) {
   const activeDetail = createSongProcessingDetail(stage, status, support.supported);
   return (
-    <section className="mock-song-processing-card" aria-label="Song processing">
+    <Card
+      as="section"
+      className="mock-song-processing-card"
+      variant="mock"
+      padding="none"
+      aria-label="Song processing"
+    >
       <div className="mock-song-processing-card__header">
         <span className="mock-song-processing-card__icon" aria-hidden="true">
           <SongWaveGlyph />
@@ -575,7 +587,7 @@ function SongProcessingState({
           Song mode needs WebGPU and cross-origin isolation to process this track locally.
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }
 
@@ -700,7 +712,7 @@ function SongStagePanel({
   if (song.stage === "unsupported") {
     return (
       <section className="song-stage-panel" aria-label="Song setup">
-        <div className="mock-song-unavailable-card">
+        <Card className="mock-song-unavailable-card" variant="mock" padding="none">
           <span className="mock-song-unavailable-card__icon" aria-hidden="true">
             <Headphones size={23} />
           </span>
@@ -708,7 +720,7 @@ function SongStagePanel({
             <h2>Song mode unavailable</h2>
             <p>WebGPU and cross-origin isolation are required for local vocal isolation.</p>
           </div>
-        </div>
+        </Card>
       </section>
     );
   }
@@ -716,7 +728,7 @@ function SongStagePanel({
   if (song.stage === "analyzing") {
     return (
       <section className="song-stage-panel" aria-label="Song setup">
-        <Card className="song-pipeline-card" tone="song" padding="lg">
+        <Card className="song-pipeline-card" variant="mock" tone="song" padding="lg">
           <CardHeader>
             <div className="song-stage-heading">
               <StatusPill tone={statusView.tone} pulse={statusView.pulse}>
@@ -755,7 +767,7 @@ function SongStagePanel({
   if (song.reference) {
     return (
       <section className="song-stage-panel" aria-label="Song setup">
-        <Card className="song-ready-card" tone="song" padding="lg">
+        <Card className="song-ready-card" variant="mock" tone="song" padding="lg">
           <CardHeader>
             <div className="song-stage-heading">
               <StatusPill tone={statusView.tone} pulse={statusView.pulse}>

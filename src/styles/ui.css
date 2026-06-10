@@ -227,6 +227,39 @@
   background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary));
 }
 
+.ui-card--mock,
+.ui-card--mock-soft,
+.ui-card--mock-interactive,
+.ui-card--mock-dashed {
+  border-color: #e3ddd4;
+  border-radius: 18px;
+  background: rgba(255, 254, 250, 0.94);
+  box-shadow: var(--mock-shadow, var(--shadow-card));
+}
+
+.ui-card--mock-soft {
+  background: var(--mock-card-soft, var(--bg-secondary));
+}
+
+.ui-card--mock-interactive {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-card--mock-interactive:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.ui-card--mock-dashed {
+  border-style: dashed;
+  border-color: #d7d0c8;
+  background: rgba(244, 239, 232, 0.68);
+  box-shadow: none;
+}
+
 .ui-card--accent {
   border-color: color-mix(in srgb, var(--accent-primary) 32%, var(--border-subtle));
   background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary));

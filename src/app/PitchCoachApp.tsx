@@ -3,7 +3,6 @@ import {
   Activity,
   ArrowUpRight,
   ArrowLeft,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   Flame,
@@ -832,7 +831,13 @@ function HomeScreen({
         <WeeklyStreakMock />
       </section>
 
-      <section className="mock-resume-card" aria-label="Pick up where you left off">
+      <Card
+        as="section"
+        className="mock-resume-card"
+        variant="mockSoft"
+        padding="none"
+        aria-label="Pick up where you left off"
+      >
         <div className="mock-resume-card__copy">
           <div className="mock-kicker">
             <Sparkles size={18} aria-hidden="true" />
@@ -860,10 +865,17 @@ function HomeScreen({
           </div>
         </div>
         <MockPitchPreview />
-      </section>
+      </Card>
 
       <section className="mock-mode-grid" aria-label="Practice modes">
-        <button className="mock-mode-card mock-mode-card--practice" type="button" onClick={onNavigateToPractice}>
+        <Card
+          as="button"
+          className="mock-mode-card mock-mode-card--practice"
+          variant="mockInteractive"
+          padding="none"
+          type="button"
+          onClick={onNavigateToPractice}
+        >
           <div className="mock-mode-card__header">
             <span className="mock-mode-icon mock-mode-icon--practice">
               <Target size={26} aria-hidden="true" />
@@ -884,9 +896,16 @@ function HomeScreen({
             <span />
             <strong>23 <span>/ 48 done</span></strong>
           </div>
-        </button>
+        </Card>
 
-        <button className="mock-mode-card mock-mode-card--song" type="button" onClick={onNavigateToSongs}>
+        <Card
+          as="button"
+          className="mock-mode-card mock-mode-card--song"
+          variant="mockInteractive"
+          padding="none"
+          type="button"
+          onClick={onNavigateToSongs}
+        >
           <div className="mock-mode-card__header">
             <span className="mock-mode-icon mock-mode-icon--song">
               <Mic size={27} aria-hidden="true" />
@@ -904,41 +923,47 @@ function HomeScreen({
             <strong>Drop a song to begin</strong>
             <span>We split the vocal & map it to pitch targets — locally, in under a minute.</span>
           </div>
-        </button>
+        </Card>
       </section>
 
       <section className="mock-stat-grid" aria-label="Practice stats">
-        <div className="mock-stat-card">
-          <span className="mock-stat-label">
-            <Flame size={19} aria-hidden="true" />
-            Day streak
-          </span>
-          <strong className="mock-stat-card__value mock-stat-card__value--accent">12</strong>
-        </div>
-        <div className="mock-stat-card">
-          <span className="mock-stat-label">
-            <LineChart size={19} aria-hidden="true" />
-            Accuracy
-          </span>
-          <div className="mock-stat-card__split">
-            <strong className="mock-stat-card__value">87<span>%</span></strong>
-            <MockAccuracySparkline />
-          </div>
-        </div>
-        <div className="mock-stat-card">
-          <span className="mock-stat-label">
-            <CheckCircle2 size={18} aria-hidden="true" />
-            Notes in tune
-          </span>
-          <strong className="mock-stat-card__value mock-stat-card__value--green">1,284</strong>
-        </div>
-        <div className="mock-stat-card">
-          <span className="mock-stat-label">
-            <Clock3 size={18} aria-hidden="true" />
-            Practiced
-          </span>
-          <strong className="mock-stat-card__value">142<span>min</span></strong>
-        </div>
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<Flame size={19} />}
+          label="Day streak"
+          value="12"
+          valueClassName="mock-stat-card__value--accent"
+        />
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<LineChart size={19} />}
+          label="Accuracy"
+          value="87"
+          unit="%"
+          trend={<MockAccuracySparkline />}
+        />
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<CheckCircle2 size={18} />}
+          label="Notes in tune"
+          value="1,284"
+          valueClassName="mock-stat-card__value--green"
+        />
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<Clock3 size={18} />}
+          label="Practiced"
+          value="142"
+          unit="min"
+        />
       </section>
     </main>
   );
@@ -1033,51 +1058,54 @@ function ProgressScreen({
   const hasHistory = practiceSummary.attemptCount > 0;
 
   return (
-    <main className="shell-page" aria-label="Pitch coach progress">
-      <PageHeader
-        icon={<TrendingUp size={24} />}
-        eyebrow="Local stats"
-        title="Your Progress"
-        description="Review attempts, note accuracy, weekly activity, and drill progress saved on this device."
-      />
-      <section className="home-summary-grid progress-summary-grid" aria-label="Progress summary">
+    <main className="mock-home mock-progress" aria-label="Pitch coach progress">
+      <section className="mock-home__header mock-progress__header">
+        <div>
+          <h1>Your Progress</h1>
+          <p>Review attempts, note accuracy, weekly activity, and drill progress saved on this device.</p>
+        </div>
+      </section>
+      <section className="mock-stat-grid progress-summary-grid" aria-label="Progress summary">
         <StatCard
-          tone="accent"
-          icon={<CalendarDays size={16} />}
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<Flame size={19} />}
           label="Day streak"
           value={practiceSummary.streakDays}
-          detail={
-            practiceSummary.lastPracticedAt
-              ? formatLastPracticed(practiceSummary.lastPracticedAt)
-              : "No local attempts yet"
-          }
+          valueClassName="mock-stat-card__value--accent"
         />
         <StatCard
-          tone="success"
-          icon={<Activity size={16} />}
-          label="Recent pass"
-          value={practiceSummary.recentPassRate ?? 0}
-          unit="%"
-          detail={formatAttemptRatio(practiceSummary.passedAttemptCount, practiceSummary.attemptCount)}
-        />
-        <StatCard
-          icon={<CheckCircle2 size={16} />}
-          label="Notes in tune"
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<LineChart size={19} />}
+          label="Accuracy"
           value={practiceSummary.noteAccuracy ?? 0}
           unit="%"
-          detail={formatNoteRatio(practiceSummary.notesInTune, practiceSummary.noteCount)}
+          trend={<MockAccuracySparkline />}
         />
         <StatCard
-          tone="song"
-          icon={<Clock3 size={16} />}
-          label="Practice time"
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<CheckCircle2 size={18} />}
+          label="Notes in tune"
+          value={practiceSummary.notesInTune}
+          valueClassName="mock-stat-card__value--green"
+        />
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<Clock3 size={18} />}
+          label="Practiced"
           value={practiceSummary.practiceMinutes}
           unit="min"
-          detail={formatWeekAttemptCount(practiceSummary.weekActivity)}
         />
       </section>
       {!hasHistory ? (
-        <Card variant="subtle" padding="lg">
+        <Card variant="mock" padding="lg">
           <CardHeader>
             <CardTitle>No attempts yet</CardTitle>
             <CardDescription>
@@ -1087,7 +1115,7 @@ function ProgressScreen({
         </Card>
       ) : (
         <section className="progress-dashboard-grid">
-          <Card className="progress-week-card" padding="lg">
+          <Card className="progress-week-card" variant="mock" padding="lg">
             <CardHeader>
               <CardTitle>Last 7 Days</CardTitle>
               <CardDescription>Attempts saved in this browser.</CardDescription>
@@ -1097,7 +1125,7 @@ function ProgressScreen({
             </CardContent>
           </Card>
 
-          <Card className="progress-exercises-card" padding="lg">
+          <Card className="progress-exercises-card" variant="mock" padding="lg">
             <CardHeader>
               <CardTitle>Exercise Progress</CardTitle>
               <CardDescription>Recent pass rate and common issue by drill.</CardDescription>
@@ -1129,7 +1157,7 @@ function ProgressScreen({
             </CardContent>
           </Card>
 
-          <Card className="progress-sessions-card" padding="lg">
+          <Card className="progress-sessions-card" variant="mock" padding="lg">
             <CardHeader>
               <CardTitle>Recent Sessions</CardTitle>
               <CardDescription>Newest local attempts across all exercises.</CardDescription>
@@ -1714,33 +1742,6 @@ function formatProgressSummary(progress: ExerciseProgressSummary) {
   return `${progress.recentPassRate}% recent pass · ${formatLastPracticed(
     progress.lastPracticedAt
   )}${issue}`;
-}
-
-function formatAttemptRatio(passedAttemptCount: number, attemptCount: number) {
-  if (attemptCount === 0) {
-    return "No attempts yet";
-  }
-
-  return `${passedAttemptCount} of ${attemptCount} attempts passed`;
-}
-
-function formatNoteRatio(notesInTune: number, noteCount: number) {
-  if (noteCount === 0) {
-    return "No notes scored yet";
-  }
-
-  return `${notesInTune} of ${noteCount} notes in tune`;
-}
-
-function formatWeekAttemptCount(
-  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"]
-) {
-  const attemptCount = buckets.reduce((total, bucket) => total + bucket.attemptCount, 0);
-  if (attemptCount === 0) {
-    return "No attempts this week";
-  }
-
-  return `${attemptCount} attempts this week`;
 }
 
 function formatWeekday(dateKey: string) {

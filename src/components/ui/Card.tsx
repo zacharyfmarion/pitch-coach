@@ -8,7 +8,11 @@ const card = cva("ui-card", {
       elevated: "ui-card--elevated",
       interactive: "ui-card--interactive",
       subtle: "ui-card--subtle",
-      dashed: "ui-card--dashed"
+      dashed: "ui-card--dashed",
+      mock: "ui-card--mock",
+      mockSoft: "ui-card--mock-soft",
+      mockInteractive: "ui-card--mock-interactive",
+      mockDashed: "ui-card--mock-dashed"
     },
     padding: {
       none: "ui-card--pad-none",
@@ -32,12 +36,16 @@ const card = cva("ui-card", {
 });
 
 export interface CardProps
-  extends HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof card> {}
+  extends HTMLAttributes<HTMLElement>,
+    VariantProps<typeof card> {
+  as?: "aside" | "button" | "div" | "section";
+  disabled?: boolean;
+  type?: "button" | "reset" | "submit";
+}
 
-export const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ variant, padding, tone, className = "", ...props }, ref) => (
-    <div ref={ref} className={card({ variant, padding, tone, className })} {...props} />
+export const Card = forwardRef<HTMLElement, CardProps>(
+  ({ as: Element = "div", variant, padding, tone, className = "", ...props }, ref) => (
+    <Element ref={ref as never} className={card({ variant, padding, tone, className })} {...props} />
   )
 );
 

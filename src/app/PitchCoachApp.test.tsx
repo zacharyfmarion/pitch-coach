@@ -95,7 +95,11 @@ describe("PitchCoachApp", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Recent Sessions" })).toBeTruthy();
     });
-    expect(screen.getByText("1 of 2 attempts passed")).toBeTruthy();
+    expect(screen.queryByText("Local stats")).toBeNull();
+    expect(screen.getByText("Day streak")).toBeTruthy();
+    expect(screen.getByText("Accuracy")).toBeTruthy();
+    expect(screen.getByText("Notes in tune")).toBeTruthy();
+    expect(screen.getByText("Practiced")).toBeTruthy();
     expect(screen.getByText(/Major Triad · A3 major/)).toBeTruthy();
     expect(screen.getByText("A3 was flat.")).toBeTruthy();
     expect(screen.getAllByText(/Five-Note Major Scale/).length).toBeGreaterThan(0);
