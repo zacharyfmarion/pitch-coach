@@ -126,7 +126,7 @@ describe("PitchCoachApp", () => {
     expect(screen.queryByRole("button", { name: /Major Triad/i })).toBeNull();
   });
 
-  it("opens song mode and shows runtime requirements when unsupported", async () => {
+  it("opens song mode in the mock empty state when unsupported", async () => {
     render(
       <PitchCoachApp
         services={createServices([])}
@@ -138,8 +138,13 @@ describe("PitchCoachApp", () => {
     fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/songs"));
-    expect(screen.getByRole("heading", { name: "Song Practice" })).toBeTruthy();
-    expect(screen.getByLabelText("Song mode unavailable").textContent).toMatch(/WebGPU/i);
+    expect(screen.getByRole("tab", { name: "Sing" }).getAttribute("data-state")).toBe("active");
+    expect(screen.getByRole("heading", { name: "Sing a Song" })).toBeTruthy();
+    expect(screen.getByText("Drop a song here")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Choose a file" })).toBeTruthy();
+    expect(screen.getByText(/How it works/i)).toBeTruthy();
+    expect(screen.queryByLabelText("Song pitch timeline")).toBeNull();
+    expect(screen.queryByLabelText("Song controls and feedback")).toBeNull();
   });
 
   it("applies the locked mock theme on direct song mode navigation", async () => {
@@ -153,7 +158,8 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    await screen.findByRole("heading", { name: "Song Practice" });
+    await screen.findByRole("heading", { name: "Sing a Song" });
+    expect(screen.getByRole("tab", { name: "Sing" }).getAttribute("data-state")).toBe("active");
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
     expect(document.documentElement.dataset.themeName).toBe(DEFAULT_THEME.name);
   });
@@ -169,7 +175,8 @@ describe("PitchCoachApp", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
-    expect(await screen.findByRole("heading", { name: "Upload a local song" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Sing a Song" })).toBeTruthy();
+    expect(screen.getByText("Drop a song here")).toBeTruthy();
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -177,12 +184,8 @@ describe("PitchCoachApp", () => {
       }
     });
 
-    await screen.findByText(/0:01 selected/);
+    await screen.findByLabelText("Song processing");
     expect(screen.getAllByText("practice.wav").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Analyze song" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Balanced" }).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "Sensitive" }));
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
 
     await screen.findByText(/1 note/i);
     expect(screen.getByText(/Follow the mapped vocal contour/i)).toBeTruthy();
@@ -196,7 +199,7 @@ describe("PitchCoachApp", () => {
     expect(songServices.separator.separate).toHaveBeenCalled();
     expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ detail: "sensitive" })
+      expect.objectContaining({ detail: "balanced" })
     );
   });
 
@@ -218,19 +221,17 @@ describe("PitchCoachApp", () => {
       }
     });
 
-    await screen.findByText(/0:01 selected/);
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
     await screen.findByText(/1 note/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
-    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Singing").length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
-    await waitFor(() => expect(screen.getByText("Paused")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("On pause").length).toBeGreaterThan(0));
     expect(songServices.practiceEngine.pause).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
-    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Singing").length).toBeGreaterThan(0));
     expect(songServices.practiceEngine.resume).toHaveBeenCalled();
   });
 
@@ -255,11 +256,8 @@ describe("PitchCoachApp", () => {
       }
     });
 
-    await screen.findByText(/0:01 selected/);
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
-
     await screen.findByText(/Transcription engine updated\. Analyze song again\./i);
-    expect(screen.getByLabelText("Debug note timing")).toHaveProperty("disabled", true);
+    expect(screen.queryByLabelText("Debug note timing")).toBeNull();
     expect(songServices.separator.separate).toHaveBeenCalledTimes(1);
   });
 
@@ -286,9 +284,6 @@ describe("PitchCoachApp", () => {
         files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
       }
     });
-
-    await screen.findByText(/0:01 selected/);
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
 
     await screen.findByText(/range C3-C5/i);
     expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(

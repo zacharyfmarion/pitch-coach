@@ -62,9 +62,13 @@ test("opens song mode directly without starting model download on unsupported br
 
   await page.goto("/songs");
 
-  await expect(page.getByRole("heading", { name: "Song Practice" })).toBeVisible();
-  await expect(page.getByLabel("Song pitch timeline")).toBeVisible();
-  await expect(page.getByText(/Song mode needs WebGPU/i)).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Sing" })).toHaveAttribute("data-state", "active");
+  await expect(page.getByRole("heading", { name: "Sing a Song" })).toBeVisible();
+  await expect(page.getByText("Drop a song here")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose a file" })).toBeVisible();
+  await expect(page.getByText(/How it works/i)).toBeVisible();
+  await expect(page.getByLabel("Song pitch timeline")).toHaveCount(0);
+  await expect(page.getByText(/Song mode needs WebGPU/i)).toHaveCount(0);
   expect(requests.some((url) => url.includes("htdemucs_embedded.onnx"))).toBe(false);
 });
 

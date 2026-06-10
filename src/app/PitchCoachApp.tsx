@@ -12,7 +12,7 @@ import {
   Home,
   Layers3,
   LineChart,
-  Mic2,
+  Mic,
   Music2,
   Play,
   RotateCcw,
@@ -70,25 +70,17 @@ const APP_BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 export function PitchCoachApp(props: PitchCoachAppProps) {
   const router = usePitchCoachRouter();
 
-  if (router.route.screen === "songs") {
-    return (
-      <SongPracticeScreen
-        services={props.songServices}
-        onBackToLibrary={() => router.goBackToLibraryFallback()}
-      />
-    );
-  }
-
-  const { songServices: _songServices, ...coachOptions } = props;
-  return <ExercisePracticeApp router={router} coachOptions={coachOptions} />;
+  const { songServices, ...coachOptions } = props;
+  return <ExercisePracticeApp router={router} coachOptions={coachOptions} songServices={songServices} />;
 }
 
 type ExercisePracticeAppProps = {
   router: ReturnType<typeof usePitchCoachRouter>;
   coachOptions: PitchCoachControllerOptions;
+  songServices?: SongModeServices;
 };
 
-function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps) {
+function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePracticeAppProps) {
   const coach = usePitchCoachController({
     ...coachOptions,
     initialExerciseId: router.route.screen === "practice" ? router.route.exerciseId : undefined
@@ -168,6 +160,8 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
+        ) : router.route.screen === "songs" ? (
+          <SongPracticeScreen services={songServices} />
         ) : (
           <ProgressScreen
             exercises={coach.exercises}
@@ -220,7 +214,7 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
               <ArrowLeft size={18} />
             </IconButton>
             <div className="brand-mark" aria-hidden="true">
-              <Mic2 size={22} />
+              <Mic size={22} />
             </div>
             <div className="brand-copy">
               <h1>Pitch Coach</h1>
@@ -634,7 +628,7 @@ function createCoachGuidance({
         title: "Your turn",
         message: "Start the pattern when you are ready; timing begins on your first clear pitch.",
         tone: "accent",
-        icon: <Mic2 size={18} />
+        icon: <Mic size={18} />
       };
     case "listening":
       return {
@@ -730,7 +724,7 @@ type TopLevelScreen = "home" | "library" | "songs" | "progress";
 const navigationItems = [
   { value: "home", label: "Home", icon: <Home size={19} /> },
   { value: "library", label: "Practice", icon: <Target size={19} /> },
-  { value: "songs", label: "Sing", icon: <Music2 size={19} /> },
+  { value: "songs", label: "Sing", icon: <Mic size={19} /> },
   { value: "progress", label: "Progress", icon: <TrendingUp size={19} /> }
 ] satisfies SidebarTabItem<TopLevelScreen>[];
 
@@ -895,7 +889,7 @@ function HomeScreen({
         <button className="mock-mode-card mock-mode-card--song" type="button" onClick={onNavigateToSongs}>
           <div className="mock-mode-card__header">
             <span className="mock-mode-icon mock-mode-icon--song">
-              <Mic2 size={27} aria-hidden="true" />
+              <Mic size={27} aria-hidden="true" />
             </span>
             <span className="mock-mode-copy">
               <strong>Sing a Song</strong>

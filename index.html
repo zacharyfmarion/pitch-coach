@@ -692,6 +692,686 @@
         stroke-linejoin: round;
       }
 
+      .mock-song-page {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 18px;
+        height: 100%;
+        min-height: 0;
+        padding: 28px 40px 24px;
+        background: var(--mock-shell);
+        color: var(--mock-ink);
+      }
+
+      .mock-song-page__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .mock-song-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+      }
+
+      .mock-song-title__icon {
+        display: grid;
+        width: 48px;
+        height: 48px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 14px;
+        color: var(--mock-purple);
+        background: var(--mock-purple-soft);
+      }
+
+      .mock-song-title h1 {
+        margin: 0;
+        color: var(--mock-ink);
+        font-size: 30px;
+        font-weight: 850;
+        letter-spacing: -0.035em;
+        line-height: 1.04;
+      }
+
+      .mock-song-title p {
+        margin: 7px 0 0;
+        color: var(--mock-muted);
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .mock-song-status {
+        display: grid;
+        min-width: 142px;
+        gap: 4px;
+        padding: 13px 18px;
+        border: 1px solid #e3ddd4;
+        border-radius: 16px;
+        background: rgba(255, 254, 250, 0.92);
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-status span {
+        color: var(--mock-muted);
+        font-size: 12px;
+        font-weight: 760;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .mock-song-status strong {
+        color: var(--mock-ink);
+        font-size: 16px;
+        font-weight: 830;
+      }
+
+      .mock-song-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 20px;
+        min-height: 0;
+      }
+
+      .mock-song-workbench,
+      .mock-song-side-panel {
+        min-height: 0;
+      }
+
+      .mock-song-workbench {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 16px;
+      }
+
+      .mock-song-side-panel {
+        display: grid;
+        align-content: start;
+        gap: 14px;
+        overflow: auto;
+        padding-right: 2px;
+      }
+
+      .mock-song-page .song-stage-panel {
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+      }
+
+      .mock-song-page .dropzone {
+        min-height: 204px !important;
+        padding: 26px !important;
+        border: 2px dashed #d9d3cb !important;
+        border-radius: 20px !important;
+        background: #fffcff !important;
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-page .dropzone__icon {
+        width: 52px !important;
+        height: 52px !important;
+        border-radius: 15px !important;
+        color: var(--mock-purple) !important;
+        background: var(--mock-purple-soft) !important;
+      }
+
+      .mock-song-page .dropzone__copy h2,
+      .mock-song-page .ui-card__title {
+        color: var(--mock-ink) !important;
+        font-size: 24px !important;
+        font-weight: 850 !important;
+        letter-spacing: -0.03em !important;
+      }
+
+      .mock-song-page .dropzone__copy p,
+      .mock-song-page .ui-card__description,
+      .mock-song-page .dropzone__privacy {
+        color: var(--mock-muted) !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        line-height: 1.35 !important;
+      }
+
+      .mock-song-page .dropzone__privacy {
+        color: #b8aea4 !important;
+      }
+
+      .mock-song-unavailable-card {
+        display: grid;
+        grid-template-columns: 52px minmax(0, 1fr);
+        align-items: center;
+        gap: 16px;
+        min-height: 96px;
+        padding: 20px;
+        border: 1px solid #e3ddd4;
+        border-radius: 20px;
+        background: rgba(255, 254, 250, 0.94);
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-unavailable-card__icon {
+        display: grid;
+        width: 52px;
+        height: 52px;
+        place-items: center;
+        border-radius: 15px;
+        color: var(--mock-purple);
+        background: var(--mock-purple-soft);
+      }
+
+      .mock-song-unavailable-card h2 {
+        margin: 0;
+        color: var(--mock-ink);
+        font-size: 22px;
+        font-weight: 850;
+        letter-spacing: -0.025em;
+      }
+
+      .mock-song-unavailable-card p {
+        margin: 6px 0 0;
+        color: var(--mock-muted);
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
+      .mock-song-page .song-upload-button {
+        min-height: 42px !important;
+        padding: 0 16px !important;
+        border-color: #e3ddd4 !important;
+        border-radius: 13px !important;
+        color: var(--mock-ink) !important;
+        background: #fffefa !important;
+        font-size: 14px !important;
+      }
+
+      .mock-song-page .ui-button--song {
+        border-color: var(--mock-purple) !important;
+        background: var(--mock-purple) !important;
+      }
+
+      .mock-song-page .song-pipeline-card,
+      .mock-song-page .song-ready-card {
+        border: 1px solid #e3ddd4 !important;
+        border-radius: 20px !important;
+        background: rgba(255, 254, 250, 0.94) !important;
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-page .song-pipeline-steps {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+      }
+
+      .mock-song-page .song-pipeline-step {
+        border-color: #e3ddd4 !important;
+        border-radius: 14px !important;
+        background: #fffaf6 !important;
+      }
+
+      .mock-song-timeline-card {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 300px;
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid #e3ddd4;
+        border-radius: 20px;
+        background: rgba(255, 254, 250, 0.94);
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-card-heading {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .mock-song-card-heading h2 {
+        margin: 0;
+        color: var(--mock-ink);
+        font-size: 20px;
+        font-weight: 850;
+        letter-spacing: -0.025em;
+      }
+
+      .mock-song-card-heading p {
+        margin: 4px 0 0;
+        color: var(--mock-muted);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .mock-song-timeline-card .timeline-frame {
+        height: 100% !important;
+        min-height: 0 !important;
+        border: 1px solid #e9e2d9;
+        border-radius: 16px;
+        background: #fffaf6 !important;
+      }
+
+      .mock-song-transport {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 62px;
+        padding: 10px;
+        border: 1px solid #e3ddd4;
+        border-radius: 18px;
+        background: rgba(255, 254, 250, 0.94);
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-transport .ui-button {
+        min-height: 42px !important;
+        border-radius: 13px !important;
+        font-size: 14px !important;
+        font-weight: 780 !important;
+      }
+
+      .mock-song-side-panel .control-group,
+      .mock-song-side-panel .feedback-panel {
+        gap: 10px !important;
+        padding: 16px !important;
+        border-color: #e3ddd4 !important;
+        border-radius: 18px !important;
+        background: rgba(255, 254, 250, 0.94) !important;
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-side-panel .group-heading h2 {
+        font-size: 14px !important;
+      }
+
+      .mock-song-side-panel .coach-summary,
+      .mock-song-side-panel .history-empty,
+      .mock-song-side-panel .song-reason-list,
+      .mock-song-side-panel label,
+      .mock-song-side-panel .analysis-meter,
+      .mock-song-side-panel .song-section-readout {
+        color: var(--mock-muted) !important;
+        font-size: 13px !important;
+      }
+
+      .mock-song-side-panel .control-group label {
+        grid-template-columns: 72px minmax(0, 1fr) !important;
+      }
+
+      .mock-song-page--empty,
+      .mock-song-page--processing {
+        gap: 26px;
+        padding: 28px 44px 30px 58px;
+      }
+
+      .mock-song-page--empty .mock-song-page__header,
+      .mock-song-page--processing .mock-song-page__header {
+        min-height: 78px;
+      }
+
+      .mock-song-page--empty .mock-song-title,
+      .mock-song-page--processing .mock-song-title {
+        gap: 24px;
+      }
+
+      .mock-song-page--empty .mock-song-title__icon,
+      .mock-song-page--processing .mock-song-title__icon {
+        width: 78px;
+        height: 78px;
+        border-radius: 23px;
+      }
+
+      .mock-song-page--empty .mock-song-title__icon svg,
+      .mock-song-page--processing .mock-song-title__icon svg {
+        width: 44px;
+        height: 44px;
+        stroke-width: 2.1;
+      }
+
+      .mock-song-page--empty .mock-song-title h1,
+      .mock-song-page--processing .mock-song-title h1 {
+        font-size: 42px;
+        line-height: 0.98;
+      }
+
+      .mock-song-page--empty .mock-song-title p,
+      .mock-song-page--processing .mock-song-title p {
+        margin-top: 10px;
+        font-size: 24px;
+        font-weight: 540;
+        letter-spacing: 0;
+      }
+
+      .mock-song-empty {
+        display: grid;
+        grid-template-rows: minmax(390px, 1fr) auto;
+        gap: 34px;
+        min-height: 0;
+      }
+
+      .mock-song-empty__drop {
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 24px;
+        min-height: 420px;
+        border: 3px dashed #d7d0c8;
+        border-radius: 27px;
+        background: rgba(244, 239, 232, 0.68);
+        text-align: center;
+      }
+
+      .mock-song-empty__upload-icon {
+        display: grid;
+        width: 108px;
+        height: 108px;
+        place-items: center;
+        border-radius: 30px;
+        color: var(--mock-purple);
+        background: #dfd9e6;
+      }
+
+      .mock-song-empty__drop h2 {
+        margin: 5px 0 0;
+        color: var(--mock-ink);
+        font-size: 34px;
+        font-weight: 850;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .mock-song-empty__drop p {
+        margin: 0;
+        color: var(--mock-muted);
+        font-size: 22px;
+        font-weight: 560;
+      }
+
+      .mock-song-empty__drop p span {
+        color: var(--mock-purple);
+        font-weight: 780;
+      }
+
+      .mock-song-empty__button {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        min-width: 250px;
+        min-height: 72px;
+        overflow: hidden;
+        border: 0;
+        border-radius: 18px;
+        color: #ffffff;
+        background: var(--mock-purple);
+        box-shadow: 0 19px 42px rgba(128, 114, 216, 0.24);
+        font-size: 22px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .mock-song-empty__input,
+      .mock-song-empty__button input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .mock-song-empty__input {
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+      }
+
+      .mock-song-empty__button:disabled,
+      .mock-song-empty__button:has(input:disabled) {
+        cursor: not-allowed;
+        opacity: 0.62;
+      }
+
+      .mock-song-empty__privacy {
+        color: #b8aea4;
+        font-size: 18px;
+        font-weight: 560;
+      }
+
+      .mock-song-how {
+        display: grid;
+        gap: 26px;
+        padding: 34px 40px;
+        border: 1px solid #e3ddd4;
+        border-radius: 24px;
+        background: rgba(255, 254, 250, 0.94);
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-how h2 {
+        margin: 0;
+        color: var(--mock-muted-2);
+        text-transform: uppercase;
+        font-size: 18px;
+        font-weight: 840;
+        letter-spacing: 0.11em;
+      }
+
+      .mock-song-how ol {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 42px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+
+      .mock-song-how li {
+        position: relative;
+        display: grid;
+        grid-template-columns: 52px minmax(0, 1fr);
+        align-items: start;
+        gap: 18px;
+      }
+
+      .mock-song-how li:not(:last-child)::after {
+        position: absolute;
+        top: 14px;
+        right: -28px;
+        color: var(--mock-muted-2);
+        font-size: 38px;
+        line-height: 1;
+        content: "›";
+      }
+
+      .mock-song-how__number {
+        display: grid;
+        width: 50px;
+        height: 50px;
+        place-items: center;
+        border: 3px solid #ded8ce;
+        border-radius: 50%;
+        color: var(--mock-muted-2);
+        background: #f2eee7;
+        font-size: 22px;
+        font-weight: 840;
+      }
+
+      .mock-song-how strong {
+        display: block;
+        color: var(--mock-muted);
+        font-size: 20px;
+        font-weight: 820;
+        line-height: 1.2;
+      }
+
+      .mock-song-how li span:last-child {
+        display: block;
+        margin-top: 5px;
+        color: #b7ada3;
+        font-size: 17px;
+        font-weight: 560;
+        line-height: 1.22;
+      }
+
+      .mock-song-reset-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 11px;
+        min-width: 222px;
+        min-height: 76px;
+        border: 1px solid #e3ddd4;
+        border-radius: 20px;
+        color: var(--mock-muted);
+        background: rgba(255, 254, 250, 0.94);
+        box-shadow: var(--mock-shadow);
+        font: inherit;
+        font-size: 21px;
+        font-weight: 760;
+        cursor: pointer;
+      }
+
+      .mock-song-processing-card {
+        display: grid;
+        grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+        min-height: 0;
+        padding: 52px 56px 48px;
+        border: 1px solid #e3ddd4;
+        border-radius: 30px;
+        background: rgba(255, 254, 250, 0.96);
+        box-shadow: var(--mock-shadow);
+      }
+
+      .mock-song-processing-card__header {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 26px;
+      }
+
+      .mock-song-processing-card__icon {
+        display: grid;
+        width: 88px;
+        height: 88px;
+        place-items: center;
+        border-radius: 25px;
+        color: var(--mock-purple);
+        background: #f1ece4;
+      }
+
+      .mock-song-processing-card__header h2 {
+        margin: 0;
+        color: var(--mock-ink);
+        font-size: 34px;
+        font-weight: 860;
+        letter-spacing: -0.035em;
+        line-height: 1.05;
+      }
+
+      .mock-song-processing-card__header p {
+        margin: 8px 0 0;
+        color: var(--mock-muted);
+        font-size: 22px;
+        font-weight: 540;
+      }
+
+      .mock-song-processing-card__header > strong {
+        color: var(--mock-purple);
+        font-size: 45px;
+        font-weight: 860;
+        letter-spacing: -0.045em;
+      }
+
+      .mock-song-processing-card__bar {
+        position: relative;
+        height: 16px;
+        margin: 40px 0 54px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #eee8dd;
+      }
+
+      .mock-song-processing-card__bar span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #9b8dea, var(--mock-purple));
+      }
+
+      .mock-song-processing-steps {
+        display: grid;
+        align-content: start;
+        gap: 24px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+
+      .mock-song-processing-step {
+        display: grid;
+        grid-template-columns: 60px minmax(0, 1fr);
+        align-items: center;
+        gap: 24px;
+      }
+
+      .mock-song-processing-step > span:first-child {
+        display: grid;
+        width: 60px;
+        height: 60px;
+        place-items: center;
+        border: 3px solid #ded8ce;
+        border-radius: 50%;
+        color: var(--mock-muted-2);
+        background: #f2eee7;
+        font-size: 24px;
+        font-weight: 850;
+      }
+
+      .mock-song-processing-step.is-done > span:first-child {
+        border-color: #dceee1;
+        color: var(--mock-green);
+        background: #e6f3e9;
+      }
+
+      .mock-song-processing-step.is-active > span:first-child {
+        border-color: #ddd6f4;
+        color: var(--mock-purple);
+        background: #ece7fb;
+        box-shadow: 0 0 0 7px rgba(128, 114, 216, 0.12);
+      }
+
+      .mock-song-processing-step strong {
+        color: #2a2521;
+        font-size: 22px;
+        font-weight: 830;
+        letter-spacing: -0.02em;
+      }
+
+      .mock-song-processing-step.is-pending strong {
+        color: var(--mock-muted);
+      }
+
+      .mock-song-processing-step p {
+        margin: 5px 0 0;
+        color: #b8aea4;
+        font-size: 19px;
+        font-weight: 540;
+      }
+
+      .mock-song-processing-card__privacy {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin: 0;
+        color: #b7ada3;
+        font-size: 20px;
+        font-weight: 540;
+      }
+
       @media (max-width: 760px) {
         body {
           margin: 0;
@@ -751,6 +1431,35 @@
           min-height: 260px;
           border-top: 1px solid #e3ddd4;
           border-left: 0;
+        }
+
+        .mock-song-page {
+          height: auto;
+          padding: 28px;
+        }
+
+        .mock-song-page__header,
+        .mock-song-layout,
+        .mock-song-card-heading {
+          grid-template-columns: 1fr;
+          align-items: stretch;
+        }
+
+        .mock-song-page__header,
+        .mock-song-card-heading {
+          display: grid;
+        }
+
+        .mock-song-layout {
+          display: grid;
+        }
+
+        .mock-song-side-panel {
+          overflow: visible;
+        }
+
+        .mock-song-page .song-pipeline-steps {
+          grid-template-columns: 1fr !important;
         }
       }
     </style>
