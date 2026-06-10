@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   Gauge,
   History,
+  Home,
   Mic2,
   Monitor,
   Moon,
@@ -12,14 +13,21 @@ import {
   SlidersHorizontal,
   Square,
   Sun,
+  Target,
   Trash2,
+  TrendingUp,
   Volume2
 } from "lucide-react";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
+import { AppShell } from "../components/ui/AppShell";
 import { Button } from "../components/ui/Button";
+import { Card, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
 import { IconButton } from "../components/ui/IconButton";
+import { PageHeader } from "../components/ui/PageHeader";
+import { SidebarNav } from "../components/ui/SidebarNav";
+import type { SidebarTabItem } from "../components/ui/SidebarTabs";
 import { Toggle } from "../components/ui/Toggle";
 import type {
   ExerciseId,
@@ -79,7 +87,7 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
   }, [coach.selectedExercise.id, coach.selectExercise, router.route]);
 
   useEffect(() => {
-    if (router.route.screen === "library") {
+    if (router.route.screen !== "practice") {
       void coach.stopAttempt();
     }
   }, [coach.stopAttempt, router.route.screen]);
@@ -102,51 +110,55 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
     router.goBackToLibraryFallback();
   };
 
-  if (router.route.screen === "library") {
+  if (router.route.screen !== "practice") {
     return (
-      <main className="app-shell">
-        <section className="coach-workspace" aria-label="Pitch coach exercises">
-          <header className="top-bar">
-            <div className="brand-lockup">
-              <div className="brand-mark" aria-hidden="true">
-                <Mic2 size={22} />
-              </div>
-              <div className="brand-copy">
-                <h1>Pitch Coach</h1>
-                <p>Vocal exercise library</p>
-              </div>
-            </div>
-            <div className="top-actions">
-              <ThemePicker
-                value={coach.settings.themePreference}
-                onValueChange={(themePreference) =>
-                  coach.setSettings({
-                    ...coach.settings,
-                    themePreference
-                  })
-                }
-              />
-              <Button
-                className="mode-action"
-                variant="secondary"
-                size="md"
-                onClick={() => router.navigateToSongs()}
-              >
-                <Music2 size={16} />
-                <span>Song mode</span>
-              </Button>
-            </div>
-          </header>
-
-          <ExerciseLibrary
+      <MainShell
+        activeScreen={router.route.screen}
+        settingsThemePreference={coach.settings.themePreference}
+        onThemeChange={(themePreference) =>
+          coach.setSettings({
+            ...coach.settings,
+            themePreference
+          })
+        }
+        onNavigate={(screen) => {
+          if (screen === "home") {
+            router.navigateToHome();
+            return;
+          }
+          if (screen === "library") {
+            router.navigateToLibrary();
+            return;
+          }
+          if (screen === "songs") {
+            router.navigateToSongs();
+            return;
+          }
+          router.navigateToProgress();
+        }}
+      >
+        {router.route.screen === "home" ? (
+          <HomeScreen
+            exercises={coach.exercises}
+            selectedExerciseId={coach.selectedExercise.id}
+            exerciseProgress={coach.exerciseProgress}
+            onSelectExercise={openExercise}
+            onNavigateToPractice={() => router.navigateToLibrary()}
+            onNavigateToSongs={() => router.navigateToSongs()}
+            disabled={coach.isBusy}
+          />
+        ) : router.route.screen === "library" ? (
+          <PracticeLibraryScreen
             exercises={coach.exercises}
             selectedExerciseId={coach.selectedExercise.id}
             exerciseProgress={coach.exerciseProgress}
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
-        </section>
-      </main>
+        ) : (
+          <ProgressScaffoldScreen />
+        )}
+      </MainShell>
     );
   }
 
@@ -481,6 +493,187 @@ const statusCopy = {
   complete: "Complete"
 } as const;
 
+type TopLevelScreen = "home" | "library" | "songs" | "progress";
+
+const navigationItems = [
+  { value: "home", label: "Home", icon: <Home size={19} /> },
+  { value: "library", label: "Practice", icon: <Target size={19} /> },
+  { value: "songs", label: "Sing", icon: <Music2 size={19} /> },
+  { value: "progress", label: "Progress", icon: <TrendingUp size={19} /> }
+] satisfies SidebarTabItem<TopLevelScreen>[];
+
+function MainShell({
+  activeScreen,
+  settingsThemePreference,
+  onThemeChange,
+  onNavigate,
+  children
+}: {
+  activeScreen: TopLevelScreen;
+  settingsThemePreference: ThemePreference;
+  onThemeChange: (themePreference: ThemePreference) => void;
+  onNavigate: (screen: TopLevelScreen) => void;
+  children: ReactNode;
+}) {
+  return (
+    <AppShell
+      className="pitch-shell"
+      sidebar={
+        <SidebarNav
+          brand={<PitchCoachBrand />}
+          items={navigationItems}
+          activeValue={activeScreen}
+          onNavigate={onNavigate}
+          footer={<LocalSaveFooter />}
+        />
+      }
+      header={
+        <div className="shell-topbar">
+          <div className="shell-topbar__copy">
+            <span className="readout-label">Pitch Coach</span>
+            <strong>{screenTitle[activeScreen]}</strong>
+          </div>
+          <ThemePicker value={settingsThemePreference} onValueChange={onThemeChange} />
+        </div>
+      }
+    >
+      {children}
+    </AppShell>
+  );
+}
+
+const screenTitle = {
+  home: "Home",
+  library: "Practice Library",
+  songs: "Sing",
+  progress: "Progress"
+} as const;
+
+function PitchCoachBrand() {
+  return (
+    <div className="shell-brand">
+      <span className="shell-brand__mark" aria-hidden="true">
+        <Target size={19} />
+      </span>
+      <span className="shell-brand__name">Pitch Coach</span>
+    </div>
+  );
+}
+
+function LocalSaveFooter() {
+  return (
+    <div className="shell-local-save">
+      <span className="shell-local-save__mark" aria-hidden="true">
+        <Mic2 size={17} />
+      </span>
+      <span>
+        <strong>Local practice</strong>
+        <span>Saved on this device</span>
+      </span>
+    </div>
+  );
+}
+
+type LibraryScreenProps = {
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"];
+  selectedExerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"];
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
+  onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
+  disabled: boolean;
+};
+
+function HomeScreen({
+  exercises,
+  selectedExerciseId,
+  exerciseProgress,
+  onSelectExercise,
+  onNavigateToPractice,
+  onNavigateToSongs,
+  disabled
+}: LibraryScreenProps & {
+  onNavigateToPractice: () => void;
+  onNavigateToSongs: () => void;
+}) {
+  return (
+    <main className="shell-page shell-page--home" aria-label="Pitch coach home">
+      <PageHeader
+        icon={<Target size={24} />}
+        title="Pitch Coach"
+        description="Choose a guided drill, sing after the prompt, and get private pitch feedback in your browser."
+        actions={
+          <>
+            <Button variant="primary" size="md" onClick={onNavigateToPractice}>
+              <Target size={16} />
+              <span>Practice Library</span>
+            </Button>
+            <Button className="mode-action" variant="song" size="md" onClick={onNavigateToSongs}>
+              <Music2 size={16} />
+              <span>Song mode</span>
+            </Button>
+          </>
+        }
+      />
+      <div className="home-mode-grid">
+        <Card variant="interactive" tone="accent" onClick={onNavigateToPractice}>
+          <CardHeader>
+            <CardTitle>Interval training</CardTitle>
+            <CardDescription>Guided pitch drills for ear and voice.</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card variant="interactive" tone="song" onClick={onNavigateToSongs}>
+          <CardHeader>
+            <CardTitle>Sing a song</CardTitle>
+            <CardDescription>Upload a local track and practice against the real vocal contour.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+      <ExerciseLibrary
+        exercises={exercises}
+        selectedExerciseId={selectedExerciseId}
+        exerciseProgress={exerciseProgress}
+        onSelectExercise={onSelectExercise}
+        disabled={disabled}
+      />
+    </main>
+  );
+}
+
+function PracticeLibraryScreen(props: LibraryScreenProps) {
+  return (
+    <main className="shell-page" aria-label="Pitch coach exercises">
+      <PageHeader
+        icon={<Target size={24} />}
+        eyebrow="Exercises"
+        title="Practice Library"
+        description="Pick a focused drill and keep the feedback loop moving."
+      />
+      <ExerciseLibrary {...props} />
+    </main>
+  );
+}
+
+function ProgressScaffoldScreen() {
+  return (
+    <main className="shell-page" aria-label="Pitch coach progress">
+      <PageHeader
+        icon={<TrendingUp size={24} />}
+        eyebrow="Local stats"
+        title="Your Progress"
+        description="A fuller local progress dashboard lands in a later phase."
+      />
+      <Card variant="subtle" padding="lg">
+        <CardHeader>
+          <CardTitle>Progress dashboard coming next</CardTitle>
+          <CardDescription>
+            This route is wired into the app shell now; phase six will replace this scaffold with
+            real local-history charts and recent session summaries.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    </main>
+  );
+}
+
 type ThemePickerOption = {
   key: string;
   label: string;
@@ -564,6 +757,10 @@ function formatClipDuration(durationMs: number) {
 
 type AppRoute =
   | {
+      screen: "home";
+      fromAppNavigation: boolean;
+    }
+  | {
       screen: "library";
       fromAppNavigation: boolean;
     }
@@ -574,11 +771,18 @@ type AppRoute =
     }
   | {
       screen: "songs";
+      fromAppNavigation: boolean;
+    }
+  | {
+      screen: "progress";
       fromAppNavigation: boolean;
     };
 
 type RouteLocation =
   | {
+      screen: "home";
+    }
+  | {
       screen: "library";
     }
   | {
@@ -587,6 +791,9 @@ type RouteLocation =
     }
   | {
       screen: "songs";
+    }
+  | {
+      screen: "progress";
     };
 
 type ParsedRoute = {
@@ -607,9 +814,9 @@ function usePitchCoachRouter() {
     const syncRoute = () => {
       const parsed = parsePathname(window.location.pathname);
       if (parsed.invalid) {
-        window.history.replaceState(createHistoryState(false), "", routePath({ screen: "library" }));
+        window.history.replaceState(createHistoryState(false), "", routePath({ screen: "home" }));
         setRoute({
-          screen: "library",
+          screen: "home",
           fromAppNavigation: false
         });
         return;
@@ -629,6 +836,20 @@ function usePitchCoachRouter() {
     syncRoute();
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  const navigateToHome = useCallback((options: { replace?: boolean } = {}) => {
+    const nextRoute = {
+      screen: "home" as const,
+      fromAppNavigation: true
+    };
+    const state = createHistoryState(true);
+    if (options.replace) {
+      window.history.replaceState(state, "", routePath({ screen: "home" }));
+    } else {
+      window.history.pushState(state, "", routePath({ screen: "home" }));
+    }
+    setRoute(nextRoute);
   }, []);
 
   const navigateToLibrary = useCallback((options: { replace?: boolean } = {}) => {
@@ -678,6 +899,20 @@ function usePitchCoachRouter() {
     setRoute(nextRoute);
   }, []);
 
+  const navigateToProgress = useCallback((options: { replace?: boolean } = {}) => {
+    const nextRoute = {
+      screen: "progress" as const,
+      fromAppNavigation: true
+    };
+    const state = createHistoryState(true);
+    if (options.replace) {
+      window.history.replaceState(state, "", routePath({ screen: "progress" }));
+    } else {
+      window.history.pushState(state, "", routePath({ screen: "progress" }));
+    }
+    setRoute(nextRoute);
+  }, []);
+
   const goBackToLibraryFallback = useCallback(() => {
     if ((route.screen === "practice" || route.screen === "songs") && route.fromAppNavigation) {
       window.history.back();
@@ -689,9 +924,11 @@ function usePitchCoachRouter() {
 
   return {
     route,
+    navigateToHome,
     navigateToLibrary,
     navigateToExercise,
     navigateToSongs,
+    navigateToProgress,
     goBackToLibraryFallback
   };
 }
@@ -700,7 +937,7 @@ function readCurrentRoute(): AppRoute {
   const parsed = parsePathname(window.location.pathname);
   if (parsed.invalid) {
     return {
-      screen: "library",
+      screen: "home",
       fromAppNavigation: false
     };
   }
@@ -718,6 +955,13 @@ function parsePathname(pathname: string): ParsedRoute {
 
   if (appPathname === "/" || appPathname === "") {
     return {
+      route: { screen: "home" },
+      invalid: false
+    };
+  }
+
+  if (appPathname === "/practice" || appPathname === "/practice/") {
+    return {
       route: { screen: "library" },
       invalid: false
     };
@@ -730,10 +974,24 @@ function parsePathname(pathname: string): ParsedRoute {
     };
   }
 
+  if (appPathname === "/sing" || appPathname === "/sing/") {
+    return {
+      route: { screen: "songs" },
+      invalid: false
+    };
+  }
+
+  if (appPathname === "/progress" || appPathname === "/progress/") {
+    return {
+      route: { screen: "progress" },
+      invalid: false
+    };
+  }
+
   const exerciseMatch = appPathname.match(/^\/exercises\/([^/]+)\/?$/);
   if (!exerciseMatch) {
     return {
-      route: { screen: "library" },
+      route: { screen: "home" },
       invalid: true
     };
   }
@@ -743,14 +1001,14 @@ function parsePathname(pathname: string): ParsedRoute {
     exerciseId = decodeURIComponent(exerciseMatch[1]);
   } catch {
     return {
-      route: { screen: "library" },
+      route: { screen: "home" },
       invalid: true
     };
   }
 
   if (!isExerciseId(exerciseId)) {
     return {
-      route: { screen: "library" },
+      route: { screen: "home" },
       invalid: true
     };
   }
@@ -766,7 +1024,15 @@ function parsePathname(pathname: string): ParsedRoute {
 
 function routePath(route: RouteLocation) {
   const pathname =
-    route.screen === "library" ? "/" : route.screen === "songs" ? "/songs" : `/exercises/${route.exerciseId}`;
+    route.screen === "home"
+      ? "/"
+      : route.screen === "library"
+        ? "/practice"
+        : route.screen === "songs"
+          ? "/songs"
+          : route.screen === "progress"
+            ? "/progress"
+            : `/exercises/${route.exerciseId}`;
   return withAppBase(pathname);
 }
 

@@ -48,6 +48,40 @@ describe("PitchCoachApp", () => {
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 
+  it("navigates top-level shell tabs without leaving the app shell", async () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getByRole("tab", { name: "Home" }).getAttribute("data-state")).toBe("active");
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Practice" }), {
+        button: 0,
+        ctrlKey: false
+      });
+    });
+    expect(window.location.pathname).toBe("/practice");
+    expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Progress" }), {
+        button: 0,
+        ctrlKey: false
+      });
+    });
+    expect(window.location.pathname).toBe("/progress");
+    expect(screen.getByRole("heading", { name: "Your Progress" })).toBeTruthy();
+  });
+
+  it("opens the practice library route directly", () => {
+    window.history.replaceState(null, "", "/practice");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getByRole("tab", { name: "Practice" }).getAttribute("data-state")).toBe("active");
+    expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Major Triad/i })).toBeTruthy();
+  });
+
   it("opens song mode and shows runtime requirements when unsupported", async () => {
     render(
       <PitchCoachApp
