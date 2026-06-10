@@ -1,6 +1,9 @@
 import {
   ArrowLeft,
   Bug,
+  CheckCircle2,
+  Clock3,
+  FileAudio,
   Gauge,
   Headphones,
   Music2,
@@ -13,13 +16,23 @@ import {
 import { useMemo, useState } from "react";
 import { usePitchCoachTheme } from "../app/theme";
 import { Button } from "../components/ui/Button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
+import { Chip } from "../components/ui/Chip";
+import { CoachBubble } from "../components/ui/CoachBubble";
+import { Dropzone } from "../components/ui/Dropzone";
 import { IconButton } from "../components/ui/IconButton";
+import { ProgressBar } from "../components/ui/ProgressBar";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { StatusPill } from "../components/ui/StatusPill";
 import { Toggle } from "../components/ui/Toggle";
 import { createSongDebugInfo, createVocalEnergyTrace } from "./debugDiagnostics";
 import { formatSongReferenceRange } from "./referenceRange";
 import { SongPitchTimeline } from "./SongPitchTimeline";
-import { SONG_SECTION_LIMITS, useSongPracticeController } from "./useSongPracticeController";
+import {
+  SONG_SECTION_LIMITS,
+  useSongPracticeController,
+  type SongPracticeStage
+} from "./useSongPracticeController";
 import type { SongModeServices } from "./types";
 
 export type SongPracticeScreenProps = {
@@ -61,6 +74,8 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
       song.trimStartMs
     ]
   );
+  const songStatusView = createSongStatusView(song.stage);
+  const pipelineSteps = createSongPipelineSteps(song);
 
   return (
     <main className="app-shell">
@@ -92,6 +107,12 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
 
         <section className="practice-layout song-practice-layout">
           <div className="lesson-panel song-workbench">
+            <SongStagePanel
+              song={song}
+              statusView={songStatusView}
+              pipelineSteps={pipelineSteps}
+            />
+
             <SongPitchTimeline
               reference={song.reference}
               liveFrames={song.liveFrames}
@@ -166,70 +187,44 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
               </section>
             ) : (
               <>
-                <section className="control-group" aria-label="Upload song">
-                  <div className="group-heading">
-                    <Upload size={17} />
-                    <h2>Upload</h2>
-                  </div>
-                  <label className="file-input-row">
-                    <span>Audio</span>
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0];
-                        if (file) {
-                          void song.chooseFile(file);
-                        }
-                      }}
-                      disabled={song.isBusy}
-                    />
-                  </label>
-                  {song.decodedAudio ? (
-                    <>
-                      <label>
-                        <span>Start</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max={Math.max(1, song.decodedAudio.durationMs - 1000)}
-                          value={song.trimStartMs}
-                          onChange={(event) => song.setTrimStartMs(Number(event.target.value))}
-                          disabled={song.isBusy}
-                          aria-label="Section start"
-                        />
-                        <output>{formatDuration(song.trimStartMs)}</output>
-                      </label>
-                      <label>
-                        <span>End</span>
-                        <input
-                          type="range"
-                          min={Math.min(song.trimStartMs + 1000, song.decodedAudio.durationMs)}
-                          max={Math.min(song.decodedAudio.durationMs, song.trimStartMs + SONG_SECTION_LIMITS.maxMs)}
-                          value={song.trimEndMs}
-                          onChange={(event) => song.setTrimEndMs(Number(event.target.value))}
-                          disabled={song.isBusy}
-                          aria-label="Section end"
-                        />
-                        <output>{formatDuration(song.trimEndMs)}</output>
-                      </label>
-                      <div className="song-section-readout">
-                        <span>{formatDuration(song.selectedDurationMs)} selected</span>
-                        <span>V1 target: 0:30-1:30</span>
-                      </div>
-                      <Button
-                        className="song-full-action"
-                        variant="secondary"
-                        size="md"
-                        onClick={() => void song.analyzeSong()}
-                        disabled={!song.canAnalyze}
-                      >
-                        <Music2 size={16} />
-                        <span>Analyze song</span>
-                      </Button>
-                    </>
-                  ) : null}
-                </section>
+                {song.decodedAudio ? (
+                  <section className="control-group" aria-label="Song section">
+                    <div className="group-heading">
+                      <Clock3 size={17} />
+                      <h2>Section</h2>
+                    </div>
+                    <label>
+                      <span>Start</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max={Math.max(1, song.decodedAudio.durationMs - 1000)}
+                        value={song.trimStartMs}
+                        onChange={(event) => song.setTrimStartMs(Number(event.target.value))}
+                        disabled={song.isBusy}
+                        aria-label="Section start"
+                      />
+                      <output>{formatDuration(song.trimStartMs)}</output>
+                    </label>
+                    <label>
+                      <span>End</span>
+                      <input
+                        type="range"
+                        min={Math.min(song.trimStartMs + 1000, song.decodedAudio.durationMs)}
+                        max={Math.min(song.decodedAudio.durationMs, song.trimStartMs + SONG_SECTION_LIMITS.maxMs)}
+                        value={song.trimEndMs}
+                        onChange={(event) => song.setTrimEndMs(Number(event.target.value))}
+                        disabled={song.isBusy}
+                        aria-label="Section end"
+                      />
+                      <output>{formatDuration(song.trimEndMs)}</output>
+                    </label>
+                    <div className="song-section-readout">
+                      <span>{formatDuration(song.selectedDurationMs)} selected</span>
+                      <span>V1 target: 0:30-1:30</span>
+                    </div>
+                  </section>
+                ) : null}
 
                 <section className="control-group" aria-label="Song analysis">
                   <div className="group-heading">
@@ -238,17 +233,32 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
                   </div>
                   <div className="analysis-meter">
                     <span>Model</span>
-                    <progress value={song.analysisProgress.modelProgress} max="1" />
+                    <ProgressBar
+                      value={song.analysisProgress.modelProgress * 100}
+                      max={100}
+                      tone="song"
+                      aria-label="Model progress"
+                    />
                     <span>{Math.round(song.analysisProgress.modelProgress * 100)}%</span>
                   </div>
                   <div className="analysis-meter">
                     <span>Vocals</span>
-                    <progress value={song.analysisProgress.separationProgress} max="1" />
+                    <ProgressBar
+                      value={song.analysisProgress.separationProgress * 100}
+                      max={100}
+                      tone="song"
+                      aria-label="Vocal separation progress"
+                    />
                     <span>{Math.round(song.analysisProgress.separationProgress * 100)}%</span>
                   </div>
                   <div className="analysis-meter">
                     <span>Notes</span>
-                    <progress value={song.analysisProgress.transcriptionProgress} max="1" />
+                    <ProgressBar
+                      value={song.analysisProgress.transcriptionProgress * 100}
+                      max={100}
+                      tone="song"
+                      aria-label="Note mapping progress"
+                    />
                     <span>{Math.round(song.analysisProgress.transcriptionProgress * 100)}%</span>
                   </div>
                   <SegmentedControl
@@ -391,6 +401,288 @@ export function SongPracticeScreen({ services, onBackToLibrary }: SongPracticeSc
   );
 }
 
+type SongStatusView = {
+  label: string;
+  detail: string;
+  tone: "idle" | "active" | "success" | "warning" | "danger" | "info";
+  bubbleTone: "accent" | "success" | "warning" | "info";
+  pulse?: boolean;
+};
+
+type SongPipelineStep = {
+  id: string;
+  label: string;
+  detail: string;
+  progress: number;
+};
+
+type SongController = ReturnType<typeof useSongPracticeController>;
+
+function SongStagePanel({
+  song,
+  statusView,
+  pipelineSteps
+}: {
+  song: SongController;
+  statusView: SongStatusView;
+  pipelineSteps: SongPipelineStep[];
+}) {
+  if (song.stage === "unsupported") {
+    return (
+      <section className="song-stage-panel" aria-label="Song setup">
+        <CoachBubble tone="warning" icon={<Headphones size={18} />}>
+          <strong>Song mode unavailable</strong>
+          <span>WebGPU and cross-origin isolation are required for local vocal isolation.</span>
+        </CoachBubble>
+      </section>
+    );
+  }
+
+  if (song.stage === "analyzing") {
+    return (
+      <section className="song-stage-panel" aria-label="Song setup">
+        <Card className="song-pipeline-card" tone="song" padding="lg">
+          <CardHeader>
+            <div className="song-stage-heading">
+              <StatusPill tone={statusView.tone} pulse={statusView.pulse}>
+                {statusView.label}
+              </StatusPill>
+              <span>{song.analysisProgress.status}</span>
+            </div>
+            <CardTitle>Mapping the vocal</CardTitle>
+            <CardDescription>
+              The selected section is being separated and transcribed locally in this browser.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="song-pipeline-steps">
+              {pipelineSteps.map((step) => (
+                <div key={step.id} className="song-pipeline-step">
+                  <div>
+                    <strong>{step.label}</strong>
+                    <span>{step.detail}</span>
+                  </div>
+                  <ProgressBar
+                    value={step.progress}
+                    max={100}
+                    tone="song"
+                    aria-label={`${step.label} progress`}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+
+  if (song.reference) {
+    return (
+      <section className="song-stage-panel" aria-label="Song setup">
+        <Card className="song-ready-card" tone="song" padding="lg">
+          <CardHeader>
+            <div className="song-stage-heading">
+              <StatusPill tone={statusView.tone} pulse={statusView.pulse}>
+                {statusView.label}
+              </StatusPill>
+              <span>{statusView.detail}</span>
+            </div>
+            <CardTitle>{song.fileName ?? "Song practice"}</CardTitle>
+            <CardDescription>
+              Follow the mapped vocal contour, then compare your live pitch against the reference.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="song-ready-chips">
+              <Chip tone="song" size="sm">
+                <Music2 size={13} />
+                {formatMappedNoteCount(song.reference.quality.noteCount)}
+              </Chip>
+              <Chip tone="accent" size="sm">
+                <FileAudio size={13} />
+                {formatCount(song.reference.phrases.length, "phrase")}
+              </Chip>
+              <Chip tone="neutral" size="sm">
+                {formatSongReferenceRange(song.reference.analysisRange)} vocal range
+              </Chip>
+              <Chip tone={song.reference.quality.lowConfidenceCount > 0 ? "warning" : "success"} size="sm">
+                {song.reference.quality.lowConfidenceCount} low confidence
+              </Chip>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+
+  const isDecoding = song.stage === "decoding";
+  const hasDecodedAudio = song.decodedAudio !== null;
+  return (
+    <section className="song-stage-panel" aria-label="Song setup">
+      <Dropzone
+        tone="song"
+        isActive={isDecoding}
+        icon={hasDecodedAudio ? <CheckCircle2 size={24} /> : <Upload size={24} />}
+        title={song.fileName ?? "Upload a local song"}
+        description={
+          hasDecodedAudio
+            ? `Selected section: ${formatDuration(song.selectedDurationMs)}`
+            : "Choose a short audio section, map the vocal, then practice against it."
+        }
+        action={
+          <div className="song-stage-actions">
+            <label className="song-upload-button">
+              <Upload size={16} />
+              <span>{hasDecodedAudio ? "Replace audio" : "Choose audio"}</span>
+              <input
+                type="file"
+                accept="audio/*"
+                aria-label="Audio"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) {
+                    void song.chooseFile(file);
+                  }
+                }}
+                disabled={song.isBusy}
+              />
+            </label>
+            {hasDecodedAudio ? (
+              <Button
+                variant="song"
+                size="md"
+                onClick={() => void song.analyzeSong()}
+                disabled={!song.canAnalyze}
+              >
+                <Music2 size={16} />
+                <span>Analyze song</span>
+              </Button>
+            ) : null}
+          </div>
+        }
+        privacyNote="Audio stays on this device while the browser isolates and maps the vocal."
+      />
+    </section>
+  );
+}
+
+function createSongStatusView(stage: SongPracticeStage): SongStatusView {
+  switch (stage) {
+    case "checking":
+      return {
+        label: "Checking",
+        detail: "Verifying local song runtime support.",
+        tone: "info",
+        bubbleTone: "info",
+        pulse: true
+      };
+    case "unsupported":
+      return {
+        label: "Unavailable",
+        detail: "Local song processing is not available in this browser.",
+        tone: "danger",
+        bubbleTone: "warning"
+      };
+    case "decoding":
+      return {
+        label: "Loading",
+        detail: "Decoding the selected audio file.",
+        tone: "active",
+        bubbleTone: "accent",
+        pulse: true
+      };
+    case "decoded":
+      return {
+        label: "Ready to map",
+        detail: "Choose the section and analyze the vocal.",
+        tone: "info",
+        bubbleTone: "info"
+      };
+    case "analyzing":
+      return {
+        label: "Analyzing",
+        detail: "Separating and mapping the vocal locally.",
+        tone: "active",
+        bubbleTone: "accent",
+        pulse: true
+      };
+    case "ready":
+      return {
+        label: "Ready",
+        detail: "Press Start practice when you are set.",
+        tone: "success",
+        bubbleTone: "success"
+      };
+    case "practicing":
+      return {
+        label: "Singing",
+        detail: "Live pitch is being compared locally.",
+        tone: "active",
+        bubbleTone: "accent",
+        pulse: true
+      };
+    case "paused":
+      return {
+        label: "On pause",
+        detail: "Resume when you are ready.",
+        tone: "warning",
+        bubbleTone: "warning"
+      };
+    case "complete":
+      return {
+        label: "Complete",
+        detail: "Review the score or start another pass.",
+        tone: "success",
+        bubbleTone: "success"
+      };
+    case "error":
+      return {
+        label: "Needs attention",
+        detail: "Check the message below and try again.",
+        tone: "danger",
+        bubbleTone: "warning"
+      };
+    case "empty":
+    default:
+      return {
+        label: "Upload",
+        detail: "Choose audio to start song practice.",
+        tone: "idle",
+        bubbleTone: "accent"
+      };
+  }
+}
+
+function createSongPipelineSteps(song: SongController): SongPipelineStep[] {
+  return [
+    {
+      id: "load",
+      label: "Load track",
+      detail: song.fileName ?? "Waiting for audio",
+      progress: song.decodedAudio ? 100 : song.stage === "decoding" ? 50 : 0
+    },
+    {
+      id: "model",
+      label: "Get model",
+      detail: "Vocal isolation runtime",
+      progress: Math.round(song.analysisProgress.modelProgress * 100)
+    },
+    {
+      id: "separate",
+      label: "Separate vocals",
+      detail: "Local accompaniment and vocal stems",
+      progress: Math.round(song.analysisProgress.separationProgress * 100)
+    },
+    {
+      id: "map",
+      label: "Map vocal",
+      detail: song.referenceDetail,
+      progress: Math.round(song.analysisProgress.transcriptionProgress * 100)
+    }
+  ];
+}
+
 function formatStage(stage: string) {
   switch (stage) {
     case "checking":
@@ -427,6 +719,10 @@ function formatDuration(durationMs: number) {
 
 function formatCount(count: number, singular: string) {
   return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
+
+function formatMappedNoteCount(count: number) {
+  return `${count} mapped note${count === 1 ? "" : "s"}`;
 }
 
 function formatDecimal(value: number) {

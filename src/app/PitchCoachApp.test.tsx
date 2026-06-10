@@ -154,6 +154,7 @@ describe("PitchCoachApp", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    expect(await screen.findByRole("heading", { name: "Upload a local song" })).toBeTruthy();
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -162,11 +163,14 @@ describe("PitchCoachApp", () => {
     });
 
     await screen.findByText(/0:01 selected/);
+    expect(screen.getAllByText("practice.wav").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Analyze song" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Balanced" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Sensitive" }));
     fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
 
     await screen.findByText(/1 note/i);
+    expect(screen.getByText(/Follow the mapped vocal contour/i)).toBeTruthy();
     expect(screen.getByRole("group", { name: "Reference detail" })).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Debug note timing"));
     expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/C4 MIDI 60/);
