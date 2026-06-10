@@ -31,6 +31,21 @@ test("opens exercise routes directly", async ({ page }) => {
   await expect(page.getByText("A3 major")).toBeVisible();
 });
 
+test("navigates the shell and renders progress from local history", async ({ page }) => {
+  await page.goto("/");
+  await seedAttemptHistory(page);
+
+  await page.goto("/progress");
+  await expect(page.getByRole("heading", { name: "Your Progress" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent Sessions" })).toBeVisible();
+  await expect(page.getByText(/Major Triad · A3 major/)).toBeVisible();
+  await expect(page.getByText("Nice triad.")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Practice" }).click();
+  await expect(page).toHaveURL(/\/practice$/);
+  await expect(page.getByRole("heading", { name: "Practice Library", level: 1 })).toBeVisible();
+});
+
 test("opens song mode directly without starting model download on unsupported browsers", async ({ page }) => {
   const requests: string[] = [];
   await page.addInitScript(() => {

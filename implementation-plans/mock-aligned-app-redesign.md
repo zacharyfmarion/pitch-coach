@@ -100,4 +100,4 @@ Treat this as a phased redesign because the mock changes both the visual languag
 - [x] Phase 4: Rework focused exercise practice UI around the guided mock flow.
 - [x] Phase 5: Rework Sing mode idle/processing/ready/practice flow.
 - [x] Phase 6: Add Progress dashboard and domain aggregate helpers.
-- [ ] Phase 7: Add unit/component/browser coverage and run deterministic validation.
+- [x] Phase 7: Add unit/component/browser coverage and run deterministic validation.
