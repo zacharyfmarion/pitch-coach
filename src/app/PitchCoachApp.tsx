@@ -38,17 +38,22 @@ import {
   CardTitle
 } from "../components/ui/Card";
 import { Chip } from "../components/ui/Chip";
+import { CoachBubble } from "../components/ui/CoachBubble";
 import { IconButton } from "../components/ui/IconButton";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SidebarNav } from "../components/ui/SidebarNav";
 import { SidebarTabs, type SidebarTabItem } from "../components/ui/SidebarTabs";
 import { StatCard } from "../components/ui/StatCard";
+import { StatusPill } from "../components/ui/StatusPill";
 import { Toggle } from "../components/ui/Toggle";
 import type {
+  AttemptScore,
   ExerciseCategory,
   ExerciseId,
   ExerciseProgressSummary,
+  LessonStatus,
   NoteAssessmentStatus,
+  TargetNote,
   ThemePreference
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
@@ -197,6 +202,13 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
     value: note.midi,
     label: note.label
   })) satisfies DropdownOption<number>[];
+  const practiceStatusView = createPracticeStatusView(coach.lessonState.status, coach.attemptScore);
+  const coachGuidance = createCoachGuidance({
+    status: coach.lessonState.status,
+    exerciseTitle: coach.selectedExercise.title,
+    targetNotes: coach.targetNotes,
+    attemptScore: coach.attemptScore
+  });
 
   return (
     <main className="app-shell">
@@ -264,6 +276,24 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
                 <strong>{statusCopy[coach.lessonState.status]}</strong>
               </div>
             </div>
+
+            <div className="practice-guidance" aria-label="Practice guidance">
+              <CoachBubble tone={coachGuidance.tone} icon={coachGuidance.icon}>
+                <strong>{coachGuidance.title}</strong>
+                <span>{coachGuidance.message}</span>
+              </CoachBubble>
+              <div className="practice-status-stack">
+                <StatusPill tone={practiceStatusView.tone} pulse={practiceStatusView.pulse}>
+                  {practiceStatusView.label}
+                </StatusPill>
+                <span>{practiceStatusView.detail}</span>
+              </div>
+            </div>
+
+            <NoteCheckpointStrip
+              targetNotes={coach.targetNotes}
+              attemptScore={coach.attemptScore}
+            />
 
             <PitchTimeline
               frames={coach.pitchFrames}
@@ -510,6 +540,204 @@ const statusCopy = {
   retry: "Retry",
   complete: "Complete"
 } as const;
+
+type PracticeStatusView = {
+  label: string;
+  detail: string;
+  tone: "idle" | "active" | "success" | "warning" | "danger" | "info";
+  pulse?: boolean;
+};
+
+type CoachGuidanceView = {
+  title: string;
+  message: string;
+  tone: "accent" | "success" | "warning" | "info";
+  icon: ReactNode;
+};
+
+function createPracticeStatusView(
+  status: LessonStatus,
+  attemptScore: AttemptScore | null
+): PracticeStatusView {
+  switch (status) {
+    case "idle":
+      return {
+        label: "Ready",
+        detail: "Guide starts when you press Start.",
+        tone: "idle"
+      };
+    case "promptPlaying":
+      return {
+        label: "Listen",
+        detail: "The reference is playing.",
+        tone: "active",
+        pulse: true
+      };
+    case "awaitingVoice":
+      return {
+        label: "Get ready",
+        detail: "Sing when you are set.",
+        tone: "active",
+        pulse: true
+      };
+    case "listening":
+      return {
+        label: "Sing now",
+        detail: "Pitch is being tracked locally.",
+        tone: "active",
+        pulse: true
+      };
+    case "scoring":
+      return {
+        label: "Scoring",
+        detail: "Checking center, timing, and stability.",
+        tone: "info",
+        pulse: true
+      };
+    case "passed":
+      return {
+        label: "Passed",
+        detail: "Moving to the next key.",
+        tone: "success"
+      };
+    case "retry":
+      return {
+        label: "Retry",
+        detail: attemptScore?.summary ?? "Review the notes and try again.",
+        tone: "warning"
+      };
+    case "complete":
+      return {
+        label: "Complete",
+        detail: "Range loop finished.",
+        tone: "success"
+      };
+  }
+}
+
+function createCoachGuidance({
+  status,
+  exerciseTitle,
+  targetNotes,
+  attemptScore
+}: {
+  status: LessonStatus;
+  exerciseTitle: string;
+  targetNotes: TargetNote[];
+  attemptScore: AttemptScore | null;
+}): CoachGuidanceView {
+  const notePattern = targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ");
+
+  switch (status) {
+    case "idle":
+      return {
+        title: exerciseTitle,
+        message: `Listen to the guide, then sing ${notePattern}.`,
+        tone: "accent",
+        icon: <Music2 size={18} />
+      };
+    case "promptPlaying":
+      return {
+        title: "Listen first",
+        message: "Let the guide set the pitch center before you answer.",
+        tone: "info",
+        icon: <Volume2 size={18} />
+      };
+    case "awaitingVoice":
+      return {
+        title: "Your turn",
+        message: "Start the pattern when you are ready; timing begins on your first clear pitch.",
+        tone: "accent",
+        icon: <Mic2 size={18} />
+      };
+    case "listening":
+      return {
+        title: "Keep it steady",
+        message: "Aim for clean centers and smooth motion between notes.",
+        tone: "accent",
+        icon: <Activity size={18} />
+      };
+    case "scoring":
+      return {
+        title: "Checking your take",
+        message: "Pitch centers, stability, and missed notes are being scored locally.",
+        tone: "info",
+        icon: <Gauge size={18} />
+      };
+    case "passed":
+      return {
+        title: "Nice pass",
+        message: "That attempt is logged locally. The next key is queued.",
+        tone: "success",
+        icon: <CheckCircle2 size={18} />
+      };
+    case "retry":
+      return {
+        title: "One more pass",
+        message: attemptScore?.summary ?? "Use the note checkpoints to choose what to adjust.",
+        tone: "warning",
+        icon: <RotateCcw size={18} />
+      };
+    case "complete":
+      return {
+        title: "Lesson complete",
+        message: "Reset the lesson or choose another drill when you are ready.",
+        tone: "success",
+        icon: <CheckCircle2 size={18} />
+      };
+  }
+}
+
+function NoteCheckpointStrip({
+  targetNotes,
+  attemptScore
+}: {
+  targetNotes: TargetNote[];
+  attemptScore: AttemptScore | null;
+}) {
+  const notes = attemptScore?.notes ?? targetNotes.map((note) => ({ ...note, score: null }));
+
+  return (
+    <ol className="note-checkpoint-strip" aria-label="Target notes">
+      {notes.map((note, index) => {
+        const status = note.score?.status ?? "target";
+        return (
+          <li
+            key={`${index}-${note.degree}-${note.midi}`}
+            className={`note-checkpoint note-checkpoint--${status}`}
+          >
+            <span className="note-checkpoint__degree">{note.degree}</span>
+            <strong>{note.label}</strong>
+            <span>{describeCheckpointStatus(status)}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function describeCheckpointStatus(status: NoteAssessmentStatus | "target") {
+  switch (status) {
+    case "target":
+      return "Target";
+    case "pass":
+      return "Pass";
+    case "passWithWarning":
+      return "Watch";
+    case "flat":
+      return "Flat";
+    case "sharp":
+      return "Sharp";
+    case "wrongNote":
+      return "Wrong";
+    case "unstable":
+      return "Unstable";
+    case "unclear":
+      return "Unclear";
+    case "missed":
+      return "Missed";
+  }
+}
 
 type TopLevelScreen = "home" | "library" | "songs" | "progress";
 

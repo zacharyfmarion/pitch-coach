@@ -515,6 +515,24 @@ describe("PitchCoachApp", () => {
     expect(screen.getAllByText(/Nice work/).length).toBeGreaterThan(0);
   });
 
+  it("shows guided practice status and updates note checkpoints after scoring", async () => {
+    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    expect(screen.getByLabelText("Practice guidance").textContent).toContain("Listen to the guide");
+    expect(screen.getByLabelText("Target notes").textContent).toContain("Target");
+    expect(screen.getByLabelText("Target notes").textContent).toContain("A3");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Practice guidance").textContent).toContain("Nice pass");
+      expect(screen.getByLabelText("Target notes").textContent).toContain("Pass");
+    });
+  });
+
   it("records attempt history and updates exercise progress", async () => {
     render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
 

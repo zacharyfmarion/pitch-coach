@@ -97,7 +97,7 @@ Treat this as a phased redesign because the mock changes both the visual languag
 - [x] Phase 1: Add design-system tokens and Radix-backed primitive coverage.
 - [x] Phase 2: Implement responsive app shell and top-level Home/Practice/Sing/Progress routes.
 - [x] Phase 3: Build Home and Practice Library using real local data.
-- [ ] Phase 4: Rework focused exercise practice UI around the guided mock flow.
+- [x] Phase 4: Rework focused exercise practice UI around the guided mock flow.
 - [ ] Phase 5: Rework Sing mode idle/processing/ready/practice flow.
 - [ ] Phase 6: Add Progress dashboard and domain aggregate helpers.
 - [ ] Phase 7: Add unit/component/browser coverage and run deterministic validation.
