@@ -3,6 +3,7 @@ import type { AttemptHistoryRecord, ExerciseId, NoteAssessmentStatus } from "./c
 import { EXERCISES } from "./exercise";
 import { parseNoteName } from "./music";
 import {
+  getRecentPracticeAttempts,
   recommendPracticeExercise,
   summarizePracticeHistory,
   WEEK_ACTIVITY_DAYS
@@ -61,6 +62,19 @@ describe("progress aggregation", () => {
 
     expect(recommendation.exercise.id).toBe("major-triad");
     expect(recommendation.reason).toMatch(/flat/i);
+  });
+
+  it("returns recent practice attempts across exercises newest first", () => {
+    const records = [
+      historyRecord("single-note-match", "2026-06-08T16:00:00.000Z", true, 60000, ["pass"]),
+      historyRecord("major-triad", "2026-06-10T16:00:00.000Z", false, 60000, ["flat"]),
+      historyRecord("five-note-scale", "2026-06-09T16:00:00.000Z", true, 60000, ["pass"])
+    ];
+
+    expect(getRecentPracticeAttempts(records, 2).map((record) => record.exerciseId)).toEqual([
+      "major-triad",
+      "five-note-scale"
+    ]);
   });
 });
 

@@ -11,6 +11,7 @@ import { EXERCISES } from "./exercise";
 export const ATTEMPT_HISTORY_LIMIT_PER_EXERCISE = 50;
 export const RECENT_PROGRESS_ATTEMPT_COUNT = 10;
 export const RECENT_ATTEMPT_DISPLAY_COUNT = 5;
+export const RECENT_SESSION_DISPLAY_COUNT = 8;
 export const WEEK_ACTIVITY_DAYS = 7;
 
 export type WeekActivityBucket = {
@@ -207,6 +208,13 @@ export function getRecentAttemptsForExercise(
     .filter((record) => record.exerciseId === exerciseId)
     .sort(compareAttemptsNewestFirst)
     .slice(0, limit);
+}
+
+export function getRecentPracticeAttempts(
+  records: AttemptHistoryRecord[],
+  limit = RECENT_SESSION_DISPLAY_COUNT
+) {
+  return [...records].sort(compareAttemptsNewestFirst).slice(0, limit);
 }
 
 function compareRecommendationCandidates(

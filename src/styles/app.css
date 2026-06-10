@@ -195,6 +195,74 @@
   background: linear-gradient(180deg, var(--accent-primary), var(--accent-tertiary));
 }
 
+.progress-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.progress-exercises-card {
+  grid-row: span 2;
+}
+
+.progress-exercise-list,
+.progress-session-list {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.progress-exercise-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(82px, auto) minmax(120px, auto);
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.progress-exercise-list li > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.progress-exercise-list strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-exercise-list span span,
+.progress-exercise-list li > span:nth-child(2),
+.progress-exercise-list li > span:nth-child(3) {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.progress-session-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
 .shell-page .exercise-library {
   margin: 0;
 }
@@ -1296,6 +1364,14 @@
     grid-template-columns: 1fr;
   }
 
+  .progress-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-exercises-card {
+    grid-row: auto;
+  }
+
   .song-pipeline-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1433,6 +1509,11 @@
   .library-heading {
     align-items: start;
     flex-direction: column;
+  }
+
+  .progress-exercise-list li {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 
   .library-filter-tabs .sidebar-tabs__trigger {

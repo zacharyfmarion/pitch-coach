@@ -179,7 +179,12 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
             disabled={coach.isBusy}
           />
         ) : (
-          <ProgressScaffoldScreen />
+          <ProgressScreen
+            exercises={coach.exercises}
+            exerciseProgress={coach.exerciseProgress}
+            practiceSummary={coach.practiceSummary}
+            recentAttempts={coach.recentAttempts}
+          />
         )}
       </MainShell>
     );
@@ -994,24 +999,144 @@ function PracticeLibraryScreen(props: LibraryScreenProps) {
   );
 }
 
-function ProgressScaffoldScreen() {
+type ProgressScreenProps = {
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"];
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+  recentAttempts: ReturnType<typeof usePitchCoachController>["recentAttempts"];
+};
+
+function ProgressScreen({
+  exercises,
+  exerciseProgress,
+  practiceSummary,
+  recentAttempts
+}: ProgressScreenProps) {
+  const hasHistory = practiceSummary.attemptCount > 0;
+
   return (
     <main className="shell-page" aria-label="Pitch coach progress">
       <PageHeader
         icon={<TrendingUp size={24} />}
         eyebrow="Local stats"
         title="Your Progress"
-        description="A fuller local progress dashboard lands in a later phase."
+        description="Review attempts, note accuracy, weekly activity, and drill progress saved on this device."
       />
-      <Card variant="subtle" padding="lg">
-        <CardHeader>
-          <CardTitle>Progress dashboard coming next</CardTitle>
-          <CardDescription>
-            This route is wired into the app shell now; phase six will replace this scaffold with
-            real local-history charts and recent session summaries.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <section className="home-summary-grid progress-summary-grid" aria-label="Progress summary">
+        <StatCard
+          tone="accent"
+          icon={<CalendarDays size={16} />}
+          label="Day streak"
+          value={practiceSummary.streakDays}
+          detail={
+            practiceSummary.lastPracticedAt
+              ? formatLastPracticed(practiceSummary.lastPracticedAt)
+              : "No local attempts yet"
+          }
+        />
+        <StatCard
+          tone="success"
+          icon={<Activity size={16} />}
+          label="Recent pass"
+          value={practiceSummary.recentPassRate ?? 0}
+          unit="%"
+          detail={formatAttemptRatio(practiceSummary.passedAttemptCount, practiceSummary.attemptCount)}
+        />
+        <StatCard
+          icon={<CheckCircle2 size={16} />}
+          label="Notes in tune"
+          value={practiceSummary.noteAccuracy ?? 0}
+          unit="%"
+          detail={formatNoteRatio(practiceSummary.notesInTune, practiceSummary.noteCount)}
+        />
+        <StatCard
+          tone="song"
+          icon={<Clock3 size={16} />}
+          label="Practice time"
+          value={practiceSummary.practiceMinutes}
+          unit="min"
+          detail={formatWeekAttemptCount(practiceSummary.weekActivity)}
+        />
+      </section>
+      {!hasHistory ? (
+        <Card variant="subtle" padding="lg">
+          <CardHeader>
+            <CardTitle>No attempts yet</CardTitle>
+            <CardDescription>
+              Complete a guided exercise and your local progress dashboard will fill in here.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <section className="progress-dashboard-grid">
+          <Card className="progress-week-card" padding="lg">
+            <CardHeader>
+              <CardTitle>Last 7 Days</CardTitle>
+              <CardDescription>Attempts saved in this browser.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <WeekActivityStrip buckets={practiceSummary.weekActivity} />
+            </CardContent>
+          </Card>
+
+          <Card className="progress-exercises-card" padding="lg">
+            <CardHeader>
+              <CardTitle>Exercise Progress</CardTitle>
+              <CardDescription>Recent pass rate and common issue by drill.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ol className="progress-exercise-list">
+                {exercises.map((exercise) => {
+                  const progress = exerciseProgress[exercise.id];
+                  return (
+                    <li key={exercise.id}>
+                      <span>
+                        <strong>{exercise.title}</strong>
+                        <span>{formatCategoryLabel(exercise.category)}</span>
+                      </span>
+                      <span>
+                        {progress.recentPassRate === undefined
+                          ? "No attempts"
+                          : `${progress.recentPassRate}% pass`}
+                      </span>
+                      <span>
+                        {progress.commonIssue
+                          ? `Issue: ${describeIssue(progress.commonIssue)}`
+                          : formatLastPracticed(progress.lastPracticedAt)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </CardContent>
+          </Card>
+
+          <Card className="progress-sessions-card" padding="lg">
+            <CardHeader>
+              <CardTitle>Recent Sessions</CardTitle>
+              <CardDescription>Newest local attempts across all exercises.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ol className="progress-session-list">
+                {recentAttempts.map((attempt) => (
+                  <li key={attempt.id}>
+                    <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
+                      {attempt.passed ? "Pass" : "Retry"}
+                    </span>
+                    <span className="history-copy">
+                      <strong>
+                        {getExerciseTitle(exercises, attempt.exerciseId)} · {midiToNoteName(attempt.rootMidi)} major
+                      </strong>
+                      <span>{formatHistoryDate(attempt.createdAt)}</span>
+                      <span>{attempt.summary}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        </section>
+      )}
     </main>
   );
 }
@@ -1617,6 +1742,13 @@ function formatCategoryLabel(category: ExerciseCategoryFilter) {
     case "scale":
       return "Scales";
   }
+}
+
+function getExerciseTitle(
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"],
+  exerciseId: ExerciseId
+) {
+  return exercises.find((exercise) => exercise.id === exerciseId)?.title ?? "Exercise";
 }
 
 function categoryIcon(category: ExerciseCategory) {

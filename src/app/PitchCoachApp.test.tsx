@@ -82,6 +82,22 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: /Major Triad/i })).toBeTruthy();
   });
 
+  it("renders the progress route from local attempt history", async () => {
+    await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
+    await saveAttemptHistoryRecord(historyRecord("five-note-scale", 1, true));
+    window.history.replaceState(null, "", "/progress");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Recent Sessions" })).toBeTruthy();
+    });
+    expect(screen.getByText("1 of 2 attempts passed")).toBeTruthy();
+    expect(screen.getByText(/Major Triad · A3 major/)).toBeTruthy();
+    expect(screen.getByText("A3 was flat.")).toBeTruthy();
+    expect(screen.getAllByText(/Five-Note Major Scale/).length).toBeGreaterThan(0);
+  });
+
   it("shows local history stats and a recommendation on the home screen", async () => {
     await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
     await saveAttemptHistoryRecord(historyRecord("major-triad", 1, false));
