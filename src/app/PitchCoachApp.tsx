@@ -197,6 +197,10 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     targetNotes: coach.targetNotes,
     attemptScore: coach.attemptScore
   });
+  const notesInTuneCount =
+    coach.attemptScore?.notes.filter((note) =>
+      note.score ? ["pass", "passWithWarning"].includes(note.score.status) : false
+    ).length ?? 0;
 
   return (
     <main className="app-shell">
@@ -216,13 +220,20 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
               <Mic size={22} />
             </div>
             <div className="brand-copy">
-              <h1>Pitch Coach</h1>
-              <p>{coach.selectedExercise.title}</p>
+              <Dropdown
+                ariaLabel="Exercise"
+                value={coach.selectedExercise.id}
+                options={exerciseOptions}
+                onValueChange={openExercise}
+                disabled={coach.isBusy}
+                triggerClassName="practice-title-dropdown"
+              />
+              <p>Take {coach.lessonState.attemptNumber + 1}</p>
             </div>
           </div>
           <div className="top-actions">
             <div className="session-readout" aria-live="polite">
-              <span className="readout-label">Current key</span>
+              <span className="readout-label">Key of</span>
               <strong>{coach.currentKeyLabel}</strong>
             </div>
           </div>
@@ -230,32 +241,6 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
 
         <section className="practice-layout">
           <div className="lesson-panel">
-            <div className="exercise-strip">
-              <div className="exercise-select-card">
-                <span className="readout-label">Exercise</span>
-                <Dropdown
-                  ariaLabel="Exercise"
-                  value={coach.selectedExercise.id}
-                  options={exerciseOptions}
-                  onValueChange={openExercise}
-                  disabled={coach.isBusy}
-                  triggerClassName="readout-dropdown-trigger"
-                />
-              </div>
-              <div>
-                <span className="readout-label">Pattern</span>
-                <strong>{coach.exerciseLabel}</strong>
-              </div>
-              <div>
-                <span className="readout-label">Attempt</span>
-                <strong>{coach.lessonState.attemptNumber + 1}</strong>
-              </div>
-              <div>
-                <span className="readout-label">Status</span>
-                <strong>{statusCopy[coach.lessonState.status]}</strong>
-              </div>
-            </div>
-
             <div className="practice-guidance" aria-label="Practice guidance">
               <CoachBubble tone={coachGuidance.tone} icon={coachGuidance.icon}>
                 <strong>{coachGuidance.title}</strong>
@@ -265,14 +250,26 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
                 <StatusPill tone={practiceStatusView.tone} pulse={practiceStatusView.pulse}>
                   {practiceStatusView.label}
                 </StatusPill>
-                <span>{practiceStatusView.detail}</span>
+                <span className="practice-status-detail">{practiceStatusView.detail}</span>
+                <span className="practice-status-legacy">
+                  {legacyStatusCopy[coach.lessonState.status]}
+                </span>
               </div>
             </div>
 
-            <NoteCheckpointStrip
-              targetNotes={coach.targetNotes}
-              attemptScore={coach.attemptScore}
-            />
+            <div className="practice-target-row">
+              <NoteCheckpointStrip
+                targetNotes={coach.targetNotes}
+                attemptScore={coach.attemptScore}
+              />
+              <div className="practice-score-readout" aria-label={`${notesInTuneCount} notes in tune`}>
+                <strong>
+                  {notesInTuneCount}
+                  <span>/{coach.targetNotes.length}</span>
+                </strong>
+                <span>notes in tune</span>
+              </div>
+            </div>
 
             <PitchTimeline
               frames={coach.pitchFrames}
@@ -509,7 +506,14 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   );
 }
 
-const statusCopy = {
+type PracticeStatusView = {
+  label: string;
+  detail: string;
+  tone: "idle" | "active" | "success" | "warning" | "danger" | "info";
+  pulse?: boolean;
+};
+
+const legacyStatusCopy = {
   idle: "Ready",
   promptPlaying: "Prompt",
   awaitingVoice: "Waiting for voice",
@@ -519,13 +523,6 @@ const statusCopy = {
   retry: "Retry",
   complete: "Complete"
 } as const;
-
-type PracticeStatusView = {
-  label: string;
-  detail: string;
-  tone: "idle" | "active" | "success" | "warning" | "danger" | "info";
-  pulse?: boolean;
-};
 
 type CoachGuidanceView = {
   title: string;
@@ -687,12 +684,40 @@ function NoteCheckpointStrip({
           >
             <span className="note-checkpoint__degree">{note.degree}</span>
             <strong>{note.label}</strong>
-            <span>{describeCheckpointStatus(status)}</span>
+            <span className="note-checkpoint__label">{describeCheckpointLabel(note, status, index)}</span>
+            <span className="checkpoint-status-legacy">{describeCheckpointStatus(status)}</span>
           </li>
         );
       })}
     </ol>
   );
+}
+
+function describeCheckpointLabel(
+  note: TargetNote,
+  status: NoteAssessmentStatus | "target",
+  index: number
+) {
+  if (status !== "target") {
+    return describeCheckpointStatus(status);
+  }
+
+  switch (note.degree) {
+    case 1:
+      return "Root";
+    case 2:
+      return "Second";
+    case 3:
+      return "Third";
+    case 4:
+      return "Fourth";
+    case 5:
+      return "Fifth";
+    case 8:
+      return "Octave";
+    default:
+      return `Note ${index + 1}`;
+  }
 }
 
 function describeCheckpointStatus(status: NoteAssessmentStatus | "target") {

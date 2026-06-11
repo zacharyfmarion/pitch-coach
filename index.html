@@ -3122,6 +3122,498 @@
         color: #ffffff !important;
       }
 
+      /* Live exercise practice mock parity */
+      .app-shell {
+        min-height: 100vh !important;
+        background: var(--mock-shell) !important;
+        color: var(--mock-ink) !important;
+      }
+
+      .coach-workspace {
+        display: grid !important;
+        grid-template-rows: auto minmax(0, 1fr) !important;
+        width: 100% !important;
+        max-width: none !important;
+        min-height: 100vh !important;
+        margin: 0 !important;
+        background: var(--mock-shell) !important;
+      }
+
+      .coach-workspace .top-bar {
+        display: flex !important;
+        align-items: center !important;
+        gap: 16px !important;
+        min-height: 0 !important;
+        padding: 20px 32px 18px !important;
+        border: 0 !important;
+        background: transparent !important;
+      }
+
+      .coach-workspace .top-bar::after {
+        display: none !important;
+      }
+
+      .coach-workspace .brand-lockup {
+        display: flex !important;
+        align-items: center !important;
+        gap: 16px !important;
+        min-width: 0 !important;
+      }
+
+      .coach-workspace .back-action {
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 12px !important;
+        background: var(--mock-card) !important;
+        color: var(--mock-muted) !important;
+        box-shadow: none !important;
+      }
+
+      .coach-workspace .brand-mark {
+        display: none !important;
+      }
+
+      .coach-workspace .brand-copy {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        min-width: 0 !important;
+      }
+
+      .coach-workspace .brand-lockup h1,
+      .coach-workspace .practice-title-dropdown {
+        margin: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        overflow: hidden !important;
+        color: var(--mock-ink) !important;
+        font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif !important;
+        font-size: 20px !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.01em !important;
+        line-height: 1.05 !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      .coach-workspace .practice-title-dropdown:hover:not(:disabled),
+      .coach-workspace .practice-title-dropdown:focus-visible {
+        background: transparent !important;
+        color: var(--mock-ink) !important;
+      }
+
+      .coach-workspace .practice-title-dropdown svg {
+        display: none !important;
+      }
+
+      .coach-workspace .brand-lockup p {
+        margin: 0 !important;
+        padding: 5px 12px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 9px !important;
+        background: var(--mock-card) !important;
+        color: var(--mock-muted) !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        line-height: 1.2 !important;
+        white-space: nowrap !important;
+      }
+
+      .coach-workspace .top-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        margin-left: auto !important;
+      }
+
+      .coach-workspace .session-readout {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        min-width: 0 !important;
+        padding: 7px 14px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 11px !important;
+        background: var(--mock-card) !important;
+      }
+
+      .coach-workspace .session-readout .readout-label {
+        color: var(--mock-muted) !important;
+        font-size: 12.5px !important;
+        font-weight: 500 !important;
+      }
+
+      .coach-workspace .session-readout strong {
+        color: var(--mock-ink) !important;
+        font-family: var(--font-mono), ui-monospace, monospace !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+      }
+
+      .coach-workspace .practice-layout {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        grid-template-rows: minmax(0, 1fr) auto !important;
+        gap: 20px !important;
+        min-height: 0 !important;
+        padding: 0 32px 26px !important;
+        overflow: auto !important;
+      }
+
+      .coach-workspace .lesson-panel {
+        display: flex !important;
+        flex-direction: column !important;
+        height: calc(100vh - 122px) !important;
+        max-height: 720px !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        padding: 22px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 22px !important;
+        background: var(--mock-card) !important;
+        box-shadow: 0 20px 50px rgba(70, 45, 25, 0.10) !important;
+      }
+
+      .coach-workspace .exercise-strip {
+        position: absolute !important;
+        left: -10000px !important;
+        width: 1px !important;
+        height: 1px !important;
+        overflow: hidden !important;
+      }
+
+      .coach-workspace .practice-guidance {
+        display: flex !important;
+        grid-template-columns: none !important;
+        align-items: center !important;
+        gap: 14px !important;
+        padding: 0 0 18px !important;
+        border-bottom: 0 !important;
+        background: transparent !important;
+      }
+
+      .coach-workspace .practice-guidance .coach-bubble {
+        display: flex !important;
+        align-items: center !important;
+        gap: 14px !important;
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+      }
+
+      .coach-workspace .practice-guidance .coach-bubble__icon {
+        display: grid !important;
+        width: 46px !important;
+        height: 46px !important;
+        flex: 0 0 46px !important;
+        place-items: center !important;
+        border-radius: 14px !important;
+        color: #ffffff !important;
+        background: linear-gradient(145deg, #ff9f6b, var(--mock-coral)) !important;
+        box-shadow: 0 8px 20px rgba(238, 108, 77, 0.30) !important;
+      }
+
+      .coach-workspace .practice-guidance .coach-bubble__message {
+        display: grid !important;
+        max-width: 820px !important;
+        min-height: 0 !important;
+        align-content: center !important;
+        gap: 2px !important;
+        padding: 13px 18px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 4px 16px 16px 16px !important;
+        background: var(--mock-card) !important;
+      }
+
+      .coach-workspace .practice-guidance .coach-bubble__message strong {
+        color: var(--mock-ink) !important;
+        font-size: 15.5px !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+      }
+
+      .coach-workspace .practice-guidance .coach-bubble__message span {
+        color: var(--mock-muted) !important;
+        font-size: 14px !important;
+        font-weight: 400 !important;
+        line-height: 1.3 !important;
+      }
+
+      .coach-workspace .practice-status-stack {
+        display: grid !important;
+        min-width: 190px !important;
+        justify-items: end !important;
+        align-content: center !important;
+        gap: 5px !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+      }
+
+      .coach-workspace .practice-status-detail {
+        max-width: 240px !important;
+        color: var(--mock-muted) !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        line-height: 1.25 !important;
+        text-align: right !important;
+      }
+
+      .coach-workspace .practice-status-legacy {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0 0 0 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+
+      .coach-workspace .practice-target-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 18px !important;
+        margin: 0 0 16px !important;
+      }
+
+      .coach-workspace .note-checkpoint-strip {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0 !important;
+        flex: 1 1 auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        border: 0 !important;
+        background: transparent !important;
+        list-style: none !important;
+      }
+
+      .coach-workspace .note-checkpoint {
+        position: relative !important;
+        display: grid !important;
+        grid-template-columns: 26px auto !important;
+        grid-template-rows: auto auto !important;
+        align-items: center !important;
+        column-gap: 11px !important;
+        row-gap: 1px !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        padding: 10px 16px 10px 11px !important;
+        border: 1px solid transparent !important;
+        border-radius: 14px !important;
+        background: var(--mock-surface-2) !important;
+      }
+
+      .coach-workspace .note-checkpoint:not(:last-child) {
+        margin-right: 40px !important;
+      }
+
+      .coach-workspace .note-checkpoint:not(:last-child)::after {
+        position: absolute !important;
+        top: 50% !important;
+        right: -36px !important;
+        display: block !important;
+        width: 32px !important;
+        height: 0 !important;
+        border-top: 2px dotted var(--mock-muted-2) !important;
+        content: "" !important;
+        transform: translateY(-50%) !important;
+      }
+
+      .coach-workspace .note-checkpoint__degree {
+        display: grid !important;
+        width: 26px !important;
+        height: 26px !important;
+        flex: 0 0 26px !important;
+        grid-row: 1 / span 2 !important;
+        grid-column: 1 !important;
+        place-items: center !important;
+        border: 1.5px dashed var(--mock-muted-2) !important;
+        border-radius: 999px !important;
+        color: var(--mock-muted-2) !important;
+        background: var(--mock-card) !important;
+        font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+      }
+
+      .coach-workspace .note-checkpoint strong {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+        color: var(--mock-ink) !important;
+        font-family: var(--font-mono), ui-monospace, monospace !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+      }
+
+      .coach-workspace .note-checkpoint__label {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        color: var(--mock-muted) !important;
+        font-size: 11.5px !important;
+        font-weight: 500 !important;
+        line-height: 1.2 !important;
+      }
+
+      .coach-workspace .checkpoint-status-legacy {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0 0 0 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+
+      .coach-workspace .note-checkpoint--pass,
+      .coach-workspace .note-checkpoint--passWithWarning {
+        background: rgba(63, 164, 106, 0.12) !important;
+      }
+
+      .coach-workspace .note-checkpoint--pass .note-checkpoint__degree,
+      .coach-workspace .note-checkpoint--passWithWarning .note-checkpoint__degree {
+        border-color: transparent !important;
+        color: #ffffff !important;
+        background: var(--mock-green) !important;
+      }
+
+      .coach-workspace .note-checkpoint--flat,
+      .coach-workspace .note-checkpoint--sharp,
+      .coach-workspace .note-checkpoint--wrongNote,
+      .coach-workspace .note-checkpoint--unstable,
+      .coach-workspace .note-checkpoint--unclear,
+      .coach-workspace .note-checkpoint--missed {
+        background: rgba(207, 138, 38, 0.13) !important;
+      }
+
+      .coach-workspace .note-checkpoint--flat .note-checkpoint__degree,
+      .coach-workspace .note-checkpoint--sharp .note-checkpoint__degree,
+      .coach-workspace .note-checkpoint--wrongNote .note-checkpoint__degree,
+      .coach-workspace .note-checkpoint--unstable .note-checkpoint__degree,
+      .coach-workspace .note-checkpoint--unclear .note-checkpoint__degree,
+      .coach-workspace .note-checkpoint--missed .note-checkpoint__degree {
+        border-color: transparent !important;
+        color: #ffffff !important;
+        background: var(--mock-amber) !important;
+      }
+
+      .coach-workspace .practice-score-readout {
+        display: grid !important;
+        flex: 0 0 auto !important;
+        justify-items: end !important;
+        margin-left: auto !important;
+        line-height: 1.1 !important;
+        text-align: right !important;
+      }
+
+      .coach-workspace .practice-score-readout strong {
+        color: var(--mock-muted) !important;
+        font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif !important;
+        font-size: 30px !important;
+        font-weight: 700 !important;
+        line-height: 1 !important;
+      }
+
+      .coach-workspace .practice-score-readout strong span {
+        color: var(--mock-muted) !important;
+        font-size: 18px !important;
+        font-weight: 500 !important;
+      }
+
+      .coach-workspace .practice-score-readout > span {
+        margin-top: 2px !important;
+        color: var(--mock-muted) !important;
+        font-size: 11.5px !important;
+        font-weight: 500 !important;
+      }
+
+      .coach-workspace .timeline-frame {
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 14px !important;
+        background: var(--mock-card) !important;
+      }
+
+      .coach-workspace .pitch-timeline {
+        --timeline-surface: var(--mock-card);
+        --timeline-target-band: rgba(110, 160, 192, 0.14);
+        --timeline-target-line: rgba(74, 132, 166, 0.70);
+        --timeline-target-text: #2e2620;
+        --timeline-grid-border: var(--mock-line);
+        --timeline-grid-line: rgba(70, 48, 30, 0.05);
+        --timeline-grid-strong-line: rgba(70, 48, 30, 0.10);
+        --timeline-grid-label: #a89a8b;
+        --timeline-pitch-line: rgba(125, 111, 208, 0.78);
+      }
+
+      .coach-workspace .transport-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 14px !important;
+        min-height: 0 !important;
+        margin-top: 18px !important;
+        padding: 0 !important;
+        border-top: 0 !important;
+        background: transparent !important;
+      }
+
+      .coach-workspace .transport-row .primary-action {
+        flex: 1 1 auto !important;
+        justify-content: center !important;
+        min-height: 52px !important;
+        border-radius: 14px !important;
+        background: linear-gradient(180deg, #ff8a5f, var(--mock-coral)) !important;
+        box-shadow: 0 12px 28px rgba(238, 108, 77, 0.32) !important;
+        color: #ffffff !important;
+        font-size: 17px !important;
+        font-weight: 600 !important;
+      }
+
+      .coach-workspace .transport-row .ui-icon-button {
+        width: 54px !important;
+        height: 54px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 14px !important;
+        background: var(--mock-card) !important;
+        color: var(--mock-muted) !important;
+      }
+
+      .coach-workspace .side-panel {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
+        gap: 10px !important;
+        margin-top: 40px !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 0 8px !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+      }
+
+      .coach-workspace .side-panel .control-group,
+      .coach-workspace .side-panel .feedback-panel {
+        align-content: start !important;
+        padding: 13px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 13px !important;
+        background: var(--mock-card) !important;
+      }
+
       @media (max-width: 760px) {
         body {
           margin: 0;
@@ -3210,6 +3702,90 @@
 
         .mock-song-page .song-pipeline-steps {
           grid-template-columns: 1fr !important;
+        }
+
+        .coach-workspace {
+          min-height: 100vh !important;
+          overflow: visible !important;
+        }
+
+        .coach-workspace .top-bar {
+          align-items: flex-start !important;
+          flex-direction: column !important;
+          gap: 12px !important;
+          padding: 18px 20px 14px !important;
+        }
+
+        .coach-workspace .top-actions {
+          width: 100% !important;
+          margin-left: 0 !important;
+          justify-content: flex-start !important;
+        }
+
+        .coach-workspace .practice-layout {
+          display: grid !important;
+          gap: 18px !important;
+          padding: 0 20px 24px !important;
+          overflow: visible !important;
+        }
+
+        .coach-workspace .lesson-panel {
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+          padding: 16px !important;
+        }
+
+        .coach-workspace .practice-guidance {
+          align-items: stretch !important;
+          flex-direction: column !important;
+        }
+
+        .coach-workspace .practice-status-stack {
+          justify-items: start !important;
+          min-width: 0 !important;
+        }
+
+        .coach-workspace .practice-status-detail {
+          max-width: none !important;
+          text-align: left !important;
+        }
+
+        .coach-workspace .practice-target-row {
+          align-items: flex-start !important;
+          flex-direction: column !important;
+        }
+
+        .coach-workspace .note-checkpoint-strip {
+          width: 100% !important;
+          overflow-x: auto !important;
+          padding-bottom: 4px !important;
+        }
+
+        .coach-workspace .practice-score-readout {
+          justify-items: start !important;
+          margin-left: 0 !important;
+          text-align: left !important;
+        }
+
+        .coach-workspace .timeline-frame {
+          flex: 0 0 auto !important;
+          height: 320px !important;
+          min-height: 320px !important;
+        }
+
+        .coach-workspace .transport-row {
+          align-items: stretch !important;
+          flex-wrap: wrap !important;
+        }
+
+        .coach-workspace .transport-row .primary-action {
+          flex: 1 1 100% !important;
+        }
+
+        .coach-workspace .side-panel {
+          grid-template-columns: 1fr !important;
+          margin-top: 0 !important;
         }
       }
     </style>
