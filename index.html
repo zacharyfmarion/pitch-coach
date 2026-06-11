@@ -3208,9 +3208,12 @@
       }
 
       .mock-practice-page .exercise-library {
+        display: flex !important;
+        flex-direction: column !important;
         flex: 1 !important;
+        min-height: 0 !important;
         margin: 0 !important;
-        overflow: hidden !important;
+        overflow: visible !important;
         border: 0 !important;
         border-radius: 0 !important;
         background: transparent !important;
@@ -3288,7 +3291,8 @@
       }
 
       .library-filters {
-        padding: 16px 0 20px !important;
+        margin: 0 -34px !important;
+        padding: 16px 34px 20px !important;
         border-bottom: 1px solid var(--mock-line) !important;
         background: transparent !important;
       }
@@ -3323,7 +3327,10 @@
 
       .exercise-groups {
         gap: 22px !important;
-        padding: 20px 0 0 !important;
+        margin: 0 -22px !important;
+        padding: 20px 22px 28px !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
       }
 
       .exercise-group__header {
