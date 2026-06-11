@@ -3383,6 +3383,26 @@
         border-radius: 12px !important;
         background: var(--mock-card) !important;
         color: var(--mock-ink) !important;
+        transition:
+          transform 0.13s ease,
+          box-shadow 0.13s ease,
+          border-color 0.13s ease,
+          background-color 0.13s ease !important;
+      }
+
+      .exercise-option:not(:disabled):hover,
+      .exercise-option:not(:disabled):focus-visible {
+        border-color: var(--mock-line) !important;
+        background: var(--mock-card) !important;
+        box-shadow: 0 8px 20px rgba(70, 45, 25, 0.1) !important;
+        transform: translateY(-1px) !important;
+      }
+
+      .exercise-option:not(:disabled):focus-visible {
+        outline: none !important;
+        box-shadow:
+          0 0 0 2px rgba(238, 108, 77, 0.22),
+          0 8px 20px rgba(70, 45, 25, 0.1) !important;
       }
 
       .exercise-option-active {
