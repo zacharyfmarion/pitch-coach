@@ -15,6 +15,7 @@ import {
   midiToNoteName,
   parseNoteName
 } from "./music";
+import { DEFAULT_RANGE_SETUP } from "./vocalRange";
 
 export const MAJOR_TRIAD_EXERCISE: ExerciseDefinition = {
   id: "major-triad",
@@ -155,6 +156,7 @@ export const DEFAULT_SETTINGS: CoachSettings = {
     lowestMidi: parseNoteName("C3"),
     highestMidi: parseNoteName("C5")
   },
+  rangeSetup: DEFAULT_RANGE_SETUP,
   tempoBpm: 80,
   toleranceCents: 35,
   exerciseId: "major-triad",

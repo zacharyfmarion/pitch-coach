@@ -27,6 +27,11 @@ import {
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
+import {
+  RangeControlSummary,
+  RangeSetupModal,
+  RangeSetupToast
+} from "../components/range/RangeSetupModal";
 import { AppShell } from "../components/ui/AppShell";
 import { Button } from "../components/ui/Button";
 import {
@@ -86,6 +91,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const activeTheme = usePitchCoachTheme(coach.settings.themePreference);
   const activePracticeExerciseId =
     router.route.screen === "practice" ? router.route.exerciseId : null;
+  const [rangeSetupRequest, setRangeSetupRequest] = useState<"start" | "edit" | null>(null);
 
   useEffect(() => {
     if (
@@ -101,6 +107,13 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
       void coach.stopAttempt();
     }
   }, [coach.stopAttempt, router.route.screen]);
+
+  useEffect(() => {
+    if (router.route.screen !== "practice") {
+      setRangeSetupRequest(null);
+      void coach.stopRangeCapture();
+    }
+  }, [coach.stopRangeCapture, router.route.screen]);
 
   useEffect(() => {
     if (!activePracticeExerciseId) {
@@ -143,6 +156,20 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const backToLibrary = async () => {
     await coach.stopAttempt();
     router.goBackToLibraryFallback();
+  };
+
+  const closeRangeSetup = () => {
+    void coach.stopRangeCapture();
+    setRangeSetupRequest(null);
+  };
+
+  const continueAfterRangeSetup = () => {
+    const shouldStart = rangeSetupRequest === "start";
+    void coach.stopRangeCapture();
+    setRangeSetupRequest(null);
+    if (shouldStart) {
+      void coach.startAttempt();
+    }
   };
 
   if (router.route.screen !== "practice") {
@@ -188,7 +215,19 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     );
   }
 
-  const primaryAction = coach.lessonState.status === "complete" ? coach.resetLesson : coach.startAttempt;
+  const primaryAction = async () => {
+    if (coach.lessonState.status === "complete") {
+      await coach.resetLesson();
+      return;
+    }
+
+    if (coach.settings.rangeSetup.status === "unseen") {
+      setRangeSetupRequest("start");
+      return;
+    }
+
+    await coach.startAttempt();
+  };
   const primaryLabel =
     coach.lessonState.status === "retry"
       ? coach.selectedExercise.id === "major-triad"
@@ -201,10 +240,6 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     value: exercise.id,
     label: exercise.title
   })) satisfies DropdownOption<(typeof coach.exercises)[number]["id"]>[];
-  const noteOptions = coach.noteOptions.map((note) => ({
-    value: note.midi,
-    label: note.label
-  })) satisfies DropdownOption<number>[];
   const practiceStatusView = createPracticeStatusView(coach.lessonState.status, coach.attemptScore);
   const coachGuidance = createCoachGuidance({
     status: coach.lessonState.status,
@@ -348,40 +383,11 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
                   <CardTitle>Range</CardTitle>
                 </CardHeader>
                 <CardContent className="control-group__body">
-                  <label>
-                    <span>Low</span>
-                    <Dropdown
-                      ariaLabel="Low"
-                      value={coach.settings.range.lowestMidi}
-                      options={noteOptions}
-                      onValueChange={(lowestMidi) =>
-                        coach.setSettings({
-                          ...coach.settings,
-                          range: {
-                            ...coach.settings.range,
-                            lowestMidi
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>High</span>
-                    <Dropdown
-                      ariaLabel="High"
-                      value={coach.settings.range.highestMidi}
-                      options={noteOptions}
-                      onValueChange={(highestMidi) =>
-                        coach.setSettings({
-                          ...coach.settings,
-                          range: {
-                            ...coach.settings.range,
-                            highestMidi
-                          }
-                        })
-                      }
-                    />
-                  </label>
+                  <RangeControlSummary
+                    range={coach.settings.range}
+                    status={coach.settings.rangeSetup.status}
+                    onEdit={() => setRangeSetupRequest("edit")}
+                  />
                 </CardContent>
               </Card>
 
@@ -548,6 +554,23 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             </aside>
           </section>
         </section>
+        <RangeSetupModal
+          open={rangeSetupRequest !== null}
+          initialRange={coach.settings.range}
+          captureState={coach.rangeCaptureState}
+          allowSkip={rangeSetupRequest === "start"}
+          savedContext={rangeSetupRequest === "start" ? "start" : "edit"}
+          completionLabel={rangeSetupRequest === "start" ? "Start practicing" : "Done"}
+          onStartCapture={(target) => void coach.startRangeCapture(target)}
+          onStopCapture={() => void coach.stopRangeCapture()}
+          onSave={coach.saveRangeSetup}
+          onSkip={coach.skipRangeSetup}
+          onDismiss={closeRangeSetup}
+          onContinue={continueAfterRangeSetup}
+        />
+        {coach.settings.rangeSetup.status === "skipped" && rangeSetupRequest === null ? (
+          <RangeSetupToast range={coach.settings.range} onOpen={() => setRangeSetupRequest("edit")} />
+        ) : null}
       </main>
     </MainShell>
   );

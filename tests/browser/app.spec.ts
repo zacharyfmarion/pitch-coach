@@ -37,6 +37,21 @@ test("opens exercise routes directly", async ({ page }) => {
   await expect(page.getByText("A3 major")).toBeVisible();
 });
 
+test("shows range setup before the first lesson starts", async ({ page }) => {
+  await page.goto("/exercises/major-triad");
+
+  await page.getByRole("button", { name: "Start lesson" }).click();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Range keyboard from C3 to C5" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Bass" }).click();
+  await expect(page.getByRole("img", { name: "Range keyboard from E2 to E4" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Save range" }).click();
+  await expect(page.getByRole("dialog", { name: "Range saved" })).toBeVisible();
+  await expect(page.getByText(/between E2 and E4/)).toBeVisible();
+});
+
 test("navigates the shell and renders progress from local history", async ({ page }) => {
   await page.goto("/");
   await seedAttemptHistory(page, [browserAttemptRecord()]);

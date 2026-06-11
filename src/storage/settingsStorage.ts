@@ -1,5 +1,6 @@
-import type { CoachSettings, ThemePreference } from "../domain/contracts";
+import type { CoachSettings, ThemePreference, VocalRangeSetup } from "../domain/contracts";
 import { DEFAULT_SETTINGS, isExerciseId, normalizeRange } from "../domain/exercise";
+import { isDefaultRange } from "../domain/vocalRange";
 import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, getThemeByName } from "../themes";
 
 const STORAGE_KEY = "pitch-coach-settings-v1";
@@ -15,10 +16,7 @@ export function loadSettings(): CoachSettings {
       return DEFAULT_SETTINGS;
     }
 
-    return normalizeSettings({
-      ...DEFAULT_SETTINGS,
-      ...JSON.parse(raw)
-    });
+    return normalizeSettings(JSON.parse(raw));
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -50,8 +48,44 @@ export function normalizeSettings(settings: Partial<CoachSettings>): CoachSettin
       DEFAULT_SETTINGS.toleranceCents
     ),
     range: normalizeRange(settings.range ?? DEFAULT_SETTINGS.range),
+    rangeSetup: normalizeRangeSetup(settings),
     themePreference: normalizeThemePreference(settings.themePreference)
   };
+}
+
+function normalizeRangeSetup(settings: Partial<CoachSettings>): VocalRangeSetup {
+  const value = settings.rangeSetup;
+  if (isRangeSetup(value)) {
+    return {
+      status: value.status,
+      source: value.source,
+      completedAt: typeof value.completedAt === "string" ? value.completedAt : undefined,
+      skippedAt: typeof value.skippedAt === "string" ? value.skippedAt : undefined,
+      lastPromptedAt: typeof value.lastPromptedAt === "string" ? value.lastPromptedAt : undefined
+    };
+  }
+
+  const range = normalizeRange(settings.range ?? DEFAULT_SETTINGS.range);
+  if (settings.range && !isDefaultRange(range, DEFAULT_SETTINGS.range)) {
+    return {
+      status: "completed",
+      source: "manual"
+    };
+  }
+
+  return DEFAULT_SETTINGS.rangeSetup;
+}
+
+function isRangeSetup(value: unknown): value is VocalRangeSetup {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const setup = value as Partial<VocalRangeSetup>;
+  return (
+    (setup.status === "unseen" || setup.status === "skipped" || setup.status === "completed") &&
+    (setup.source === "default" || setup.source === "manual" || setup.source === "sing")
+  );
 }
 
 function normalizeThemePreference(value: unknown): ThemePreference {

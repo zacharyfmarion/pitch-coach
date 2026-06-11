@@ -23,6 +23,15 @@ import { installFakeIndexedDB } from "../test/fakeIndexedDB";
 import { DEFAULT_THEME } from "../themes";
 import { PitchCoachApp } from "./PitchCoachApp";
 
+const ONBOARDED_SETTINGS: CoachSettings = {
+  ...DEFAULT_SETTINGS,
+  rangeSetup: {
+    status: "completed",
+    source: "manual",
+    completedAt: "2026-06-11T20:00:00.000Z"
+  }
+};
+
 describe("PitchCoachApp", () => {
   beforeEach(() => {
     installFakeIndexedDB();
@@ -43,7 +52,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("renders the initial exercise screen", () => {
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
     expect(screen.getByText("Your local practice stats will build as you sing.")).toBeTruthy();
@@ -62,7 +71,7 @@ describe("PitchCoachApp", () => {
     await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
     await saveAttemptHistoryRecord(historyRecord("five-note-scale", 1, true));
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("2 attempts logged")
@@ -74,7 +83,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("navigates top-level shell tabs without leaving the app shell", async () => {
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     expect(screen.getByRole("tab", { name: "Home" }).getAttribute("data-state")).toBe("active");
 
@@ -100,7 +109,7 @@ describe("PitchCoachApp", () => {
   it("opens the practice library route directly", () => {
     window.history.replaceState(null, "", "/practice");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     expect(screen.getByRole("tab", { name: "Practice" }).getAttribute("data-state")).toBe("active");
     expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
@@ -120,7 +129,7 @@ describe("PitchCoachApp", () => {
     await saveAttemptHistoryRecord(scaleAttempt);
     window.history.replaceState(null, "", "/progress");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     expect(screen.getByRole("heading", { name: "Recent sessions" })).toBeTruthy();
     await waitFor(() => {
@@ -150,7 +159,7 @@ describe("PitchCoachApp", () => {
     await saveAttemptHistoryRecord(historyRecord("step-up-back", 2, false, session.id));
     window.history.replaceState(null, "", "/progress");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await waitFor(() => {
       expect(screen.getAllByRole("link", { name: /Step Up and Back/ })).toHaveLength(1);
@@ -169,7 +178,7 @@ describe("PitchCoachApp", () => {
     await saveAttemptHistoryRecord(historyRecord("step-up-back", 1, true, secondSession.id));
     window.history.replaceState(null, "", "/progress");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await waitFor(() => {
       expect(screen.getAllByRole("link", { name: /Step Up and Back/ })).toHaveLength(2);
@@ -177,7 +186,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("opens the recommendation card into the matching exercise route", () => {
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
 
@@ -185,10 +194,86 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
   });
 
+  it("opens first-run range setup before the first lesson and starts after saving", async () => {
+    const services = createServices(stableFrames(0));
+    render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+
+    expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
+    expect(services.promptPlayer.playPrompt).not.toHaveBeenCalled();
+    expect(screen.getAllByText("C3-C5").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save range" }));
+    expect(screen.getByRole("dialog", { name: "Range saved" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start practicing" }));
+    await flushReact();
+
+    expect(services.promptPlayer.playPrompt).toHaveBeenCalledWith(
+      expect.any(Array),
+      80,
+      "chord-then-sequence"
+    );
+  });
+
+  it("can skip first-run setup and re-open it from the recovery banner", async () => {
+    const services = createServices(stableFrames(0));
+    render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+
+    const skipButtons = screen.getAllByRole("button", { name: "Skip for now" });
+    fireEvent.click(skipButtons.at(-1)!);
+    await flushReact();
+
+    expect(services.promptPlayer.playPrompt).toHaveBeenCalled();
+    expect(screen.getByText(/Using a default range - C3-C5/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Set my range" }));
+    expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
+  });
+
+  it("edits a completed range from the range panel", () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Bass" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save range" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(screen.getByLabelText("Range").textContent).toContain("E2-E4");
+  });
+
+  it("captures low and high notes in singing setup mode", async () => {
+    const services = createServices(rangeCaptureFrames());
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Find it by singing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start - sing your lowest" }));
+
+    await waitFor(() => expect(screen.getByText(/Lowest:/).textContent).toContain("C3"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Now the highest" }));
+    await waitFor(() => expect(screen.getByText("Got your range")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Save range" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(screen.getByLabelText("Range").textContent).toContain("C3-C5");
+  });
+
   it("filters the practice library by exercise category", async () => {
     window.history.replaceState(null, "", "/practice");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await act(async () => {
       fireEvent.mouseDown(screen.getByRole("tab", { name: /Scales/i }), {
@@ -206,7 +291,7 @@ describe("PitchCoachApp", () => {
       <PitchCoachApp
         services={createServices([])}
         songServices={createSongServices({ supported: false })}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -229,7 +314,7 @@ describe("PitchCoachApp", () => {
       <PitchCoachApp
         services={createServices([])}
         songServices={createSongServices({ supported: false })}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -270,7 +355,7 @@ describe("PitchCoachApp", () => {
       <PitchCoachApp
         services={createServices([])}
         songServices={songServices}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -309,7 +394,7 @@ describe("PitchCoachApp", () => {
       <PitchCoachApp
         services={createServices([])}
         songServices={songServices}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -344,7 +429,7 @@ describe("PitchCoachApp", () => {
       <PitchCoachApp
         services={createServices([])}
         songServices={songServices}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -368,7 +453,7 @@ describe("PitchCoachApp", () => {
         services={createServices([])}
         songServices={songServices}
         initialSettings={{
-          ...DEFAULT_SETTINGS,
+          ...ONBOARDED_SETTINGS,
           range: {
             lowestMidi: parseNoteName("C3"),
             highestMidi: parseNoteName("D4")
@@ -405,7 +490,7 @@ describe("PitchCoachApp", () => {
 
   it("advances a half step after a passing attempt", async () => {
     vi.useFakeTimers();
-    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -424,7 +509,7 @@ describe("PitchCoachApp", () => {
 
   it("shows retry feedback and keeps the same root for a flat attempt", async () => {
     vi.useFakeTimers();
-    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -438,7 +523,7 @@ describe("PitchCoachApp", () => {
 
   it("advances after a pass with warning", async () => {
     vi.useFakeTimers();
-    render(<PitchCoachApp services={createServices(scoopedFrames())} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(scoopedFrames())} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -464,7 +549,7 @@ describe("PitchCoachApp", () => {
           { timeMs: 1200, frequencyHz: null, clarity: 0.1, rms: 0.002 },
           ...stableFrames(0, 2600)
         ])}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -478,7 +563,7 @@ describe("PitchCoachApp", () => {
 
   it("passes slow singing without depending on the guide tempo", async () => {
     vi.useFakeTimers();
-    render(<PitchCoachApp services={createServices(slowTriadFrames())} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(slowTriadFrames())} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -493,7 +578,7 @@ describe("PitchCoachApp", () => {
     render(
       <PitchCoachApp
         services={createServices(triadFrames({ offsets: [0, 100, 0] }))}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -515,7 +600,7 @@ describe("PitchCoachApp", () => {
           { timeMs: 0, frequencyHz: null, clarity: 0, rms: 0 },
           { timeMs: 1200, frequencyHz: null, clarity: 0.1, rms: 0.002 }
         ])}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -535,7 +620,7 @@ describe("PitchCoachApp", () => {
     render(
       <PitchCoachApp
         services={createServices([], new DOMException("Denied", "NotAllowedError"))}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -547,7 +632,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("keeps local clip capture off by default", () => {
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     const switchControl = screen.getByRole("switch", { name: "Local clips" });
@@ -573,7 +658,7 @@ describe("PitchCoachApp", () => {
     render(
       <PitchCoachApp
         services={createServices(stableFramesForTargets(targets, 0))}
-        initialSettings={DEFAULT_SETTINGS}
+        initialSettings={ONBOARDED_SETTINGS}
       />
     );
 
@@ -590,7 +675,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("shows guided practice status and updates note checkpoints after scoring", async () => {
-    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     expect(screen.getByLabelText("Practice guidance").textContent).toContain("Listen to the guide");
@@ -608,7 +693,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("records attempt history and updates exercise progress", async () => {
-    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -626,7 +711,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("keeps repeated attempts in one session until leaving the exercise route", async () => {
-    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -642,7 +727,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("starts a new session after leaving and reopening an exercise route", async () => {
-    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -664,7 +749,7 @@ describe("PitchCoachApp", () => {
     await saveAttemptHistoryRecord(historyRecord("five-note-scale", 0, true));
     window.history.replaceState(null, "", "/exercises/five-note-scale");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await waitFor(() => {
       expect(screen.getByLabelText("Attempt history").textContent).toContain("Pass");
@@ -674,7 +759,7 @@ describe("PitchCoachApp", () => {
 
   it("clears local attempt history after confirmation", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -691,7 +776,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("returns to the library when browser history goes back from practice", async () => {
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     expect(window.location.pathname).toBe("/exercises/major-triad");
@@ -712,7 +797,7 @@ describe("PitchCoachApp", () => {
   it("opens directly to an exercise route", () => {
     window.history.replaceState(null, "", "/exercises/five-note-scale");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     expect(screen.getAllByText("Five-Note Major Scale").length).toBeGreaterThan(0);
     expect(screen.getByText("92 BPM")).toBeTruthy();
@@ -720,7 +805,7 @@ describe("PitchCoachApp", () => {
   });
 
   it("changes lessons from the exercise dropdown", async () => {
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     openSingleNoteMatch();
     expect(window.location.pathname).toBe("/exercises/single-note-match");
@@ -742,20 +827,21 @@ describe("PitchCoachApp", () => {
   });
 
   it("uses shared dropdown controls instead of native selects", () => {
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
 
     expect(document.querySelector("select")).toBeNull();
     expect(screen.getByRole("combobox", { name: "Exercise" }).tagName).toBe("BUTTON");
-    expect(screen.getByRole("combobox", { name: "Low" }).tagName).toBe("BUTTON");
-    expect(screen.getByRole("combobox", { name: "High" }).tagName).toBe("BUTTON");
+    expect(screen.getByLabelText("Range").textContent).toContain("C3-C5");
+    expect(screen.getByLabelText("Range").textContent).toContain("2.0 oct");
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
   });
 
   it("replaces invalid exercise routes with the home route", async () => {
     window.history.replaceState(null, "", "/exercises/not-real");
 
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
     expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
@@ -765,7 +851,7 @@ describe("PitchCoachApp", () => {
   it("uses a chord-then-sequence prompt for the major triad", async () => {
     vi.useFakeTimers();
     const services = createServices(stableFrames(0));
-    render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
 
     openMajorTriad();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -783,7 +869,7 @@ describe("PitchCoachApp", () => {
     const exercise = getExerciseById("five-note-scale");
     const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm);
     const services = createServices(stableFramesForTargets(targets, 0));
-    render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
 
     openFiveNoteScale();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
@@ -799,6 +885,14 @@ describe("PitchCoachApp", () => {
 
 function stableFrames(offsetCents: number, rawStartMs = 0): PitchFrame[] {
   return triadFrames({ offsets: [offsetCents, offsetCents, offsetCents], rawStartMs });
+}
+
+function rangeCaptureFrames(): PitchFrame[] {
+  return [
+    { timeMs: 0, frequencyHz: midiToFrequency(parseNoteName("C3")), clarity: 0.96, rms: 0.04 },
+    { timeMs: 420, frequencyHz: midiToFrequency(parseNoteName("E3")), clarity: 0.96, rms: 0.04 },
+    { timeMs: 920, frequencyHz: midiToFrequency(parseNoteName("C5")), clarity: 0.96, rms: 0.04 }
+  ];
 }
 
 function slowTriadFrames(): PitchFrame[] {
