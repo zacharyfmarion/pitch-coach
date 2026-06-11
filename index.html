@@ -1981,7 +1981,7 @@
 
       /* Source mock reference audit: values copied from Pitch Coach UI Redesign JSX mocks. */
       .pc-app-shell.pitch-shell {
-        grid-template-columns: 212px minmax(0, 1fr) !important;
+        grid-template-columns: 240px minmax(0, 1fr) !important;
         background: var(--mock-shell) !important;
         color: var(--mock-ink) !important;
       }
@@ -2113,6 +2113,8 @@
       }
 
       .mock-home {
+        grid-template-rows: auto auto auto auto !important;
+        align-content: start !important;
         gap: 22px !important;
         padding: 28px 34px !important;
       }
@@ -2166,7 +2168,9 @@
 
       .mock-resume-card {
         grid-template-columns: minmax(0, 1fr) 300px !important;
+        height: 198px !important;
         min-height: 198px !important;
+        max-height: 198px !important;
         border-color: var(--mock-line) !important;
         border-radius: 20px !important;
         background: linear-gradient(120deg, #fff6ef, var(--mock-card)) !important;
@@ -2174,11 +2178,15 @@
       }
 
       .mock-resume-card__copy {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 14px !important;
+        align-content: unset !important;
         padding: 24px 26px !important;
       }
 
       .mock-kicker {
-        margin-bottom: 14px !important;
+        margin-bottom: 0 !important;
         color: var(--mock-coral-dark) !important;
         font-size: 12.5px !important;
         font-weight: 700 !important;
