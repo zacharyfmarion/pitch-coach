@@ -1,37 +1,61 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
+  Activity,
+  ArrowUpRight,
   ArrowLeft,
+  Check,
+  CheckCircle2,
+  Clock3,
+  Flame,
   Gauge,
   History,
-  Mic2,
-  Monitor,
-  Moon,
+  Home,
+  LineChart,
+  Mic,
   Music2,
   Play,
   RotateCcw,
   SlidersHorizontal,
+  Sparkles,
   Square,
-  Sun,
+  Target,
   Trash2,
+  TrendingUp,
+  Upload,
   Volume2
 } from "lucide-react";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
+import { AppShell } from "../components/ui/AppShell";
 import { Button } from "../components/ui/Button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "../components/ui/Card";
+import { CoachBubble } from "../components/ui/CoachBubble";
 import { IconButton } from "../components/ui/IconButton";
+import { SidebarNav } from "../components/ui/SidebarNav";
+import { SidebarTabs, type SidebarTabItem } from "../components/ui/SidebarTabs";
+import { StatCard } from "../components/ui/StatCard";
+import { StatusPill } from "../components/ui/StatusPill";
 import { Toggle } from "../components/ui/Toggle";
 import type {
+  AttemptScore,
+  ExerciseCategory,
+  ExerciseDefinition,
   ExerciseId,
   ExerciseProgressSummary,
+  LessonStatus,
   NoteAssessmentStatus,
-  ThemePreference
+  TargetNote
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
-import { midiToNoteName } from "../domain/music";
+import { degreeToSemitones, midiToNoteName } from "../domain/music";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
-import { PRESET_THEMES, type PitchCoachTheme } from "../themes";
 import { usePitchCoachTheme } from "./theme";
 import { usePitchCoachController, type PitchCoachControllerOptions } from "./usePitchCoachController";
 
@@ -44,30 +68,24 @@ const APP_BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 export function PitchCoachApp(props: PitchCoachAppProps) {
   const router = usePitchCoachRouter();
 
-  if (router.route.screen === "songs") {
-    return (
-      <SongPracticeScreen
-        services={props.songServices}
-        onBackToLibrary={() => router.goBackToLibraryFallback()}
-      />
-    );
-  }
-
-  const { songServices: _songServices, ...coachOptions } = props;
-  return <ExercisePracticeApp router={router} coachOptions={coachOptions} />;
+  const { songServices, ...coachOptions } = props;
+  return <ExercisePracticeApp router={router} coachOptions={coachOptions} songServices={songServices} />;
 }
 
 type ExercisePracticeAppProps = {
   router: ReturnType<typeof usePitchCoachRouter>;
   coachOptions: PitchCoachControllerOptions;
+  songServices?: SongModeServices;
 };
 
-function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps) {
+function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePracticeAppProps) {
   const coach = usePitchCoachController({
     ...coachOptions,
     initialExerciseId: router.route.screen === "practice" ? router.route.exerciseId : undefined
   });
   const activeTheme = usePitchCoachTheme(coach.settings.themePreference);
+  const activePracticeExerciseId =
+    router.route.screen === "practice" ? router.route.exerciseId : null;
 
   useEffect(() => {
     if (
@@ -79,10 +97,19 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
   }, [coach.selectedExercise.id, coach.selectExercise, router.route]);
 
   useEffect(() => {
-    if (router.route.screen === "library") {
+    if (router.route.screen !== "practice") {
       void coach.stopAttempt();
     }
   }, [coach.stopAttempt, router.route.screen]);
+
+  useEffect(() => {
+    if (!activePracticeExerciseId) {
+      return;
+    }
+
+    coach.startPracticeSession(activePracticeExerciseId);
+    return () => coach.endPracticeSession(activePracticeExerciseId);
+  }, [activePracticeExerciseId, coach.endPracticeSession, coach.startPracticeSession]);
 
   const openExercise = (exerciseId: (typeof coach.exercises)[number]["id"]) => {
     if (router.route.screen === "practice" && exerciseId === coach.selectedExercise.id) {
@@ -97,56 +124,67 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
     });
   };
 
+  const navigateTopLevel = (screen: TopLevelScreen) => {
+    if (screen === "home") {
+      router.navigateToHome();
+      return;
+    }
+    if (screen === "library") {
+      router.navigateToLibrary();
+      return;
+    }
+    if (screen === "songs") {
+      router.navigateToSongs();
+      return;
+    }
+    router.navigateToProgress();
+  };
+
   const backToLibrary = async () => {
     await coach.stopAttempt();
     router.goBackToLibraryFallback();
   };
 
-  if (router.route.screen === "library") {
+  if (router.route.screen !== "practice") {
     return (
-      <main className="app-shell">
-        <section className="coach-workspace" aria-label="Pitch coach exercises">
-          <header className="top-bar">
-            <div className="brand-lockup">
-              <div className="brand-mark" aria-hidden="true">
-                <Mic2 size={22} />
-              </div>
-              <div className="brand-copy">
-                <h1>Pitch Coach</h1>
-                <p>Vocal exercise library</p>
-              </div>
-            </div>
-            <div className="top-actions">
-              <ThemePicker
-                value={coach.settings.themePreference}
-                onValueChange={(themePreference) =>
-                  coach.setSettings({
-                    ...coach.settings,
-                    themePreference
-                  })
-                }
-              />
-              <Button
-                className="mode-action"
-                variant="secondary"
-                size="md"
-                onClick={() => router.navigateToSongs()}
-              >
-                <Music2 size={16} />
-                <span>Song mode</span>
-              </Button>
-            </div>
-          </header>
-
-          <ExerciseLibrary
+      <MainShell
+        activeScreen={router.route.screen}
+        onNavigate={navigateTopLevel}
+        practiceSummary={coach.practiceSummary}
+      >
+        {router.route.screen === "home" ? (
+          <HomeScreen
             exercises={coach.exercises}
             selectedExerciseId={coach.selectedExercise.id}
             exerciseProgress={coach.exerciseProgress}
+            practiceSummary={coach.practiceSummary}
+            recommendedExercise={coach.recommendedExercise}
+            onSelectExercise={openExercise}
+            onNavigateToPractice={() => router.navigateToLibrary()}
+            onNavigateToSongs={() => router.navigateToSongs()}
+            disabled={coach.isBusy}
+          />
+        ) : router.route.screen === "library" ? (
+          <PracticeLibraryScreen
+            exercises={coach.exercises}
+            selectedExerciseId={coach.selectedExercise.id}
+            exerciseProgress={coach.exerciseProgress}
+            practiceSummary={coach.practiceSummary}
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
-        </section>
-      </main>
+        ) : router.route.screen === "songs" ? (
+          <SongPracticeScreen services={songServices} />
+        ) : (
+          <ProgressScreen
+            exercises={coach.exercises}
+            exerciseProgress={coach.exerciseProgress}
+            practiceSummary={coach.practiceSummary}
+            recentSessions={coach.recentSessions}
+            onSelectExercise={openExercise}
+          />
+        )}
+      </MainShell>
     );
   }
 
@@ -167,310 +205,362 @@ function ExercisePracticeApp({ router, coachOptions }: ExercisePracticeAppProps)
     value: note.midi,
     label: note.label
   })) satisfies DropdownOption<number>[];
+  const practiceStatusView = createPracticeStatusView(coach.lessonState.status, coach.attemptScore);
+  const coachGuidance = createCoachGuidance({
+    status: coach.lessonState.status,
+    exerciseTitle: coach.selectedExercise.title,
+    targetNotes: coach.targetNotes,
+    attemptScore: coach.attemptScore
+  });
+  const notesInTuneCount =
+    coach.attemptScore?.notes.filter((note) =>
+      note.score ? ["pass", "passWithWarning"].includes(note.score.status) : false
+    ).length ?? 0;
 
   return (
-    <main className="app-shell">
-      <section className="coach-workspace" aria-label="Pitch coach exercise">
-        <header className="top-bar">
-          <div className="brand-lockup">
-            <IconButton
-              className="back-action"
-              size="sm"
-              onClick={() => void backToLibrary()}
-              aria-label="Back to exercises"
-              title="Back to exercises"
-            >
-              <ArrowLeft size={18} />
-            </IconButton>
-            <div className="brand-mark" aria-hidden="true">
-              <Mic2 size={22} />
-            </div>
-            <div className="brand-copy">
-              <h1>Pitch Coach</h1>
-              <p>{coach.selectedExercise.title}</p>
-            </div>
-          </div>
-          <div className="top-actions">
-            <ThemePicker
-              value={coach.settings.themePreference}
-              onValueChange={(themePreference) =>
-                coach.setSettings({
-                  ...coach.settings,
-                  themePreference
-                })
-              }
-            />
-            <div className="session-readout" aria-live="polite">
-              <span className="readout-label">Current key</span>
-              <strong>{coach.currentKeyLabel}</strong>
-            </div>
-          </div>
-        </header>
-
-        <section className="practice-layout">
-          <div className="lesson-panel">
-            <div className="exercise-strip">
-              <div className="exercise-select-card">
-                <span className="readout-label">Exercise</span>
+    <MainShell activeScreen="library" onNavigate={navigateTopLevel} practiceSummary={coach.practiceSummary}>
+      <main className="practice-detail-page">
+        <section className="coach-workspace" aria-label="Pitch coach exercise">
+          <header className="top-bar">
+            <div className="brand-lockup">
+              <IconButton
+                className="back-action"
+                size="sm"
+                onClick={() => void backToLibrary()}
+                aria-label="Back to exercises"
+                title="Back to exercises"
+              >
+                <ArrowLeft size={18} />
+              </IconButton>
+              <div className="brand-mark" aria-hidden="true">
+                <Mic size={22} />
+              </div>
+              <div className="brand-copy">
                 <Dropdown
                   ariaLabel="Exercise"
                   value={coach.selectedExercise.id}
                   options={exerciseOptions}
                   onValueChange={openExercise}
                   disabled={coach.isBusy}
-                  triggerClassName="readout-dropdown-trigger"
+                  triggerClassName="practice-title-dropdown"
                 />
-              </div>
-              <div>
-                <span className="readout-label">Pattern</span>
-                <strong>{coach.exerciseLabel}</strong>
-              </div>
-              <div>
-                <span className="readout-label">Attempt</span>
-                <strong>{coach.lessonState.attemptNumber + 1}</strong>
-              </div>
-              <div>
-                <span className="readout-label">Status</span>
-                <strong>{statusCopy[coach.lessonState.status]}</strong>
+                <p>Take {coach.lessonState.attemptNumber + 1}</p>
               </div>
             </div>
-
-            <PitchTimeline
-              frames={coach.pitchFrames}
-              targetNotes={coach.targetNotes}
-              attemptScore={coach.attemptScore}
-              totalDurationMs={coach.listeningDurationMs}
-              toleranceCents={coach.settings.toleranceCents}
-              status={coach.lessonState.status}
-              themeName={activeTheme.name}
-            />
-
-            <div className="transport-row">
-              <Button
-                className="primary-action"
-                variant="primary"
-                size="lg"
-                onClick={() => void primaryAction()}
-                disabled={coach.isBusy || coach.lessonState.status === "passed"}
-                aria-label={primaryLabel}
-                title={primaryLabel}
-              >
-                {coach.lessonState.status === "complete" ? <RotateCcw size={18} /> : <Play size={18} />}
-                <span>{primaryLabel}</span>
-              </Button>
-              <IconButton
-                size="lg"
-                variant="toolbar"
-                onClick={() => void coach.stopAttempt()}
-                disabled={!coach.isBusy && coach.lessonState.status !== "passed"}
-                aria-label="Stop"
-                title="Stop"
-              >
-                <Square size={18} />
-              </IconButton>
-              <IconButton
-                size="lg"
-                variant="toolbar"
-                onClick={() => void coach.resetLesson()}
-                disabled={coach.isBusy}
-                aria-label="Reset"
-                title="Reset"
-              >
-                <RotateCcw size={18} />
-              </IconButton>
+            <div className="top-actions">
+              <div className="session-readout" aria-live="polite">
+                <span className="readout-label">Key of</span>
+                <strong>{coach.currentKeyLabel}</strong>
+              </div>
             </div>
+          </header>
 
-            {coach.errorMessage ? (
-              <div className="error-banner" role="alert">
-                {coach.errorMessage}
-              </div>
-            ) : null}
-          </div>
-
-          <aside className="side-panel" aria-label="Lesson controls and feedback">
-            <section className="control-group" aria-label="Range">
-              <div className="group-heading">
-                <SlidersHorizontal size={17} />
-                <h2>Range</h2>
-              </div>
-              <label>
-                <span>Low</span>
-                <Dropdown
-                  ariaLabel="Low"
-                  value={coach.settings.range.lowestMidi}
-                  options={noteOptions}
-                  onValueChange={(lowestMidi) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      range: {
-                        ...coach.settings.range,
-                        lowestMidi
-                      }
-                    })
-                  }
-                />
-              </label>
-              <label>
-                <span>High</span>
-                <Dropdown
-                  ariaLabel="High"
-                  value={coach.settings.range.highestMidi}
-                  options={noteOptions}
-                  onValueChange={(highestMidi) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      range: {
-                        ...coach.settings.range,
-                        highestMidi
-                      }
-                    })
-                  }
-                />
-              </label>
-            </section>
-
-            <section className="control-group" aria-label="Scoring">
-              <div className="group-heading">
-                <Gauge size={17} />
-                <h2>Scoring</h2>
-              </div>
-              <label>
-                <span>Guide tempo</span>
-                <input
-                  type="range"
-                  min="50"
-                  max="140"
-                  value={coach.settings.tempoBpm}
-                  onChange={(event) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      tempoBpm: Number(event.target.value)
-                    })
-                  }
-                />
-                <output>{coach.settings.tempoBpm} BPM</output>
-              </label>
-              <label>
-                <span>Tolerance</span>
-                <input
-                  type="range"
-                  min="15"
-                  max="60"
-                  value={coach.settings.toleranceCents}
-                  onChange={(event) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      toleranceCents: Number(event.target.value)
-                    })
-                  }
-                />
-                <output>{coach.settings.toleranceCents} cents</output>
-              </label>
-              <label className="toggle-row">
-                <span>Local clips</span>
-                <Toggle
-                  aria-label="Local clips"
-                  checked={coach.settings.saveLocalClips}
-                  onChange={(saveLocalClips) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      saveLocalClips
-                    })
-                  }
-                />
-              </label>
-            </section>
-
-            {coach.localClip || coach.clipErrorMessage ? (
-              <section className="control-group" aria-label="Latest local clip">
-                <div className="group-heading">
-                  <Volume2 size={17} />
-                  <h2>Latest Clip</h2>
+          <section className="practice-layout">
+            <div className="lesson-panel">
+              <div className="practice-guidance" aria-label="Practice guidance">
+                <CoachBubble tone={coachGuidance.tone} icon={coachGuidance.icon}>
+                  <strong>{coachGuidance.title}</strong>
+                  <span>{coachGuidance.message}</span>
+                </CoachBubble>
+                <div className="practice-status-stack">
+                  <StatusPill tone={practiceStatusView.tone} pulse={practiceStatusView.pulse}>
+                    {practiceStatusView.label}
+                  </StatusPill>
+                  <span className="practice-status-detail">{practiceStatusView.detail}</span>
+                  <span className="practice-status-legacy">
+                    {legacyStatusCopy[coach.lessonState.status]}
+                  </span>
                 </div>
-                {coach.localClip ? (
-                  <>
-                    <audio className="clip-player" controls src={coach.localClip.url} />
-                    <div className="clip-actions">
-                      <span>{formatClipDuration(coach.localClip.durationMs)}</span>
-                      <Button
-                        className="text-action"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void coach.deleteLocalClip()}
-                      >
-                        <Trash2 size={16} />
-                        <span>Delete</span>
-                      </Button>
-                    </div>
-                  </>
-                ) : null}
-                {coach.clipErrorMessage ? (
-                  <p className="clip-error" role="alert">
-                    {coach.clipErrorMessage}
-                  </p>
-                ) : null}
-              </section>
-            ) : null}
-
-            <section className="feedback-panel" aria-label="Attempt feedback">
-              <div className="group-heading">
-                <Music2 size={17} />
-                <h2>Feedback</h2>
               </div>
-              <p className="coach-summary">
-                {coach.attemptScore?.summary ??
-                  `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`}
-              </p>
-              <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
-            </section>
 
-            <section className="control-group history-panel" aria-label="Attempt history">
-              <div className="group-heading">
-                <History size={17} />
-                <h2>History</h2>
+              <div className="practice-main-card">
+                <div className="practice-target-row">
+                  <NoteCheckpointStrip
+                    targetNotes={coach.targetNotes}
+                    attemptScore={coach.attemptScore}
+                  />
+                  <div className="practice-score-readout" aria-label={`${notesInTuneCount} notes in tune`}>
+                    <strong>
+                      {notesInTuneCount}
+                      <span>/{coach.targetNotes.length}</span>
+                    </strong>
+                    <span>notes in tune</span>
+                  </div>
+                </div>
+
+                <PitchTimeline
+                  frames={coach.pitchFrames}
+                  targetNotes={coach.targetNotes}
+                  attemptScore={coach.attemptScore}
+                  totalDurationMs={coach.listeningDurationMs}
+                  toleranceCents={coach.settings.toleranceCents}
+                  status={coach.lessonState.status}
+                  themeName={activeTheme.name}
+                />
               </div>
-              {coach.selectedExerciseHistory.length > 0 ? (
-                <ol className="history-list">
-                  {coach.selectedExerciseHistory.map((attempt) => (
-                    <li key={attempt.id}>
-                      <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
-                        {attempt.passed ? "Pass" : "Retry"}
-                      </span>
-                      <span className="history-copy">
-                        <strong>
-                          {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
-                        </strong>
-                        <span>{attempt.summary}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="history-empty">No attempts yet for this exercise.</p>
-              )}
-              <Button
-                className="text-action"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (window.confirm("Clear all local attempt history?")) {
-                    void coach.clearLocalAttemptHistory();
-                  }
-                }}
-                disabled={coach.attemptHistoryCount === 0}
+
+              <div className="transport-row">
+                <Button
+                  className="primary-action"
+                  variant="primary"
+                  size="lg"
+                  onClick={() => void primaryAction()}
+                  disabled={coach.isBusy || coach.lessonState.status === "passed"}
+                  aria-label={primaryLabel}
+                  title={primaryLabel}
+                >
+                  {coach.lessonState.status === "complete" ? <RotateCcw size={18} /> : <Play size={18} />}
+                  <span>{primaryLabel}</span>
+                </Button>
+                <IconButton
+                  size="lg"
+                  variant="toolbar"
+                  onClick={() => void coach.stopAttempt()}
+                  disabled={!coach.isBusy && coach.lessonState.status !== "passed"}
+                  aria-label="Stop"
+                  title="Stop"
+                >
+                  <Square size={18} />
+                </IconButton>
+                <IconButton
+                  size="lg"
+                  variant="toolbar"
+                  onClick={() => void coach.resetLesson()}
+                  disabled={coach.isBusy}
+                  aria-label="Reset"
+                  title="Reset"
+                >
+                  <RotateCcw size={18} />
+                </IconButton>
+              </div>
+
+              {coach.errorMessage ? (
+                <div className="error-banner" role="alert">
+                  {coach.errorMessage}
+                </div>
+              ) : null}
+            </div>
+
+            <aside className="side-panel practice-side-panel" aria-label="Lesson controls and feedback">
+              <Card as="section" className="control-group" variant="mock" padding="md" aria-label="Range">
+                <CardHeader className="group-heading">
+                  <SlidersHorizontal size={17} />
+                  <CardTitle>Range</CardTitle>
+                </CardHeader>
+                <CardContent className="control-group__body">
+                  <label>
+                    <span>Low</span>
+                    <Dropdown
+                      ariaLabel="Low"
+                      value={coach.settings.range.lowestMidi}
+                      options={noteOptions}
+                      onValueChange={(lowestMidi) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          range: {
+                            ...coach.settings.range,
+                            lowestMidi
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>High</span>
+                    <Dropdown
+                      ariaLabel="High"
+                      value={coach.settings.range.highestMidi}
+                      options={noteOptions}
+                      onValueChange={(highestMidi) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          range: {
+                            ...coach.settings.range,
+                            highestMidi
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                </CardContent>
+              </Card>
+
+              <Card as="section" className="control-group" variant="mock" padding="md" aria-label="Scoring">
+                <CardHeader className="group-heading">
+                  <Gauge size={17} />
+                  <CardTitle>Scoring</CardTitle>
+                </CardHeader>
+                <CardContent className="control-group__body">
+                  <label>
+                    <span>Guide tempo</span>
+                    <input
+                      type="range"
+                      min="50"
+                      max="140"
+                      value={coach.settings.tempoBpm}
+                      onChange={(event) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          tempoBpm: Number(event.target.value)
+                        })
+                      }
+                    />
+                    <output>{coach.settings.tempoBpm} BPM</output>
+                  </label>
+                  <label>
+                    <span>Tolerance</span>
+                    <input
+                      type="range"
+                      min="15"
+                      max="60"
+                      value={coach.settings.toleranceCents}
+                      onChange={(event) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          toleranceCents: Number(event.target.value)
+                        })
+                      }
+                    />
+                    <output>{coach.settings.toleranceCents} cents</output>
+                  </label>
+                  <label className="toggle-row">
+                    <span>Local clips</span>
+                    <Toggle
+                      aria-label="Local clips"
+                      checked={coach.settings.saveLocalClips}
+                      onChange={(saveLocalClips) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          saveLocalClips
+                        })
+                      }
+                    />
+                  </label>
+                </CardContent>
+              </Card>
+
+              {coach.localClip || coach.clipErrorMessage ? (
+                <Card
+                  as="section"
+                  className="control-group"
+                  variant="mock"
+                  padding="md"
+                  aria-label="Latest local clip"
+                >
+                  <CardHeader className="group-heading">
+                    <Volume2 size={17} />
+                    <CardTitle>Latest Clip</CardTitle>
+                  </CardHeader>
+                  <CardContent className="control-group__body">
+                    {coach.localClip ? (
+                      <>
+                        <audio className="clip-player" controls src={coach.localClip.url} />
+                        <div className="clip-actions">
+                          <span>{formatClipDuration(coach.localClip.durationMs)}</span>
+                          <Button
+                            className="text-action"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void coach.deleteLocalClip()}
+                          >
+                            <Trash2 size={16} />
+                            <span>Delete</span>
+                          </Button>
+                        </div>
+                      </>
+                    ) : null}
+                    {coach.clipErrorMessage ? (
+                      <p className="clip-error" role="alert">
+                        {coach.clipErrorMessage}
+                      </p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              <Card
+                as="section"
+                className="feedback-panel"
+                variant="mock"
+                padding="md"
+                aria-label="Attempt feedback"
               >
-                <Trash2 size={16} />
-                <span>Clear history</span>
-              </Button>
-            </section>
-          </aside>
+                <CardHeader className="group-heading">
+                  <Music2 size={17} />
+                  <CardTitle>Feedback</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="coach-summary">
+                    {coach.attemptScore?.summary ??
+                      `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`}
+                  </p>
+                  <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
+                </CardContent>
+              </Card>
+
+              <Card
+                as="section"
+                className="control-group history-panel"
+                variant="mock"
+                padding="md"
+                aria-label="Attempt history"
+              >
+                <CardHeader className="group-heading">
+                  <History size={17} />
+                  <CardTitle>History</CardTitle>
+                </CardHeader>
+                <CardContent className="control-group__body">
+                  {coach.selectedExerciseHistory.length > 0 ? (
+                    <ol className="history-list">
+                      {coach.selectedExerciseHistory.map((attempt) => (
+                        <li key={attempt.id}>
+                          <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
+                            {attempt.passed ? "Pass" : "Retry"}
+                          </span>
+                          <span className="history-copy">
+                            <strong>
+                              {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
+                            </strong>
+                            <span>{attempt.summary}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="history-empty">No attempts yet for this exercise.</p>
+                  )}
+                  <Button
+                    className="text-action"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (window.confirm("Clear all local attempt history?")) {
+                        void coach.clearLocalAttemptHistory();
+                      }
+                    }}
+                    disabled={coach.attemptHistoryCount === 0}
+                  >
+                    <Trash2 size={16} />
+                    <span>Clear history</span>
+                  </Button>
+                </CardContent>
+              </Card>
+            </aside>
+          </section>
         </section>
-      </section>
-    </main>
+      </main>
+    </MainShell>
   );
 }
 
-const statusCopy = {
+type PracticeStatusView = {
+  label: string;
+  detail: string;
+  tone: "idle" | "active" | "success" | "warning" | "danger" | "info";
+  pulse?: boolean;
+};
+
+const legacyStatusCopy = {
   idle: "Ready",
   promptPlaying: "Prompt",
   awaitingVoice: "Waiting for voice",
@@ -481,81 +571,1021 @@ const statusCopy = {
   complete: "Complete"
 } as const;
 
-type ThemePickerOption = {
-  key: string;
-  label: string;
-  preference: ThemePreference;
-  icon: typeof Monitor;
-  theme?: PitchCoachTheme;
+type CoachGuidanceView = {
+  title: string;
+  message: string;
+  tone: "accent" | "success" | "warning" | "info";
+  icon: ReactNode;
 };
 
-const themeOptions: ThemePickerOption[] = [
-  {
-    key: "system",
-    label: "System",
-    preference: {
-      mode: "system"
-    },
-    icon: Monitor
-  },
-  ...PRESET_THEMES.map(
-    (theme): ThemePickerOption => ({
-      key: `theme:${theme.name}`,
-      label: theme.name,
-      preference: {
-        mode: "theme",
-        themeName: theme.name
-      },
-      icon: theme.type === "light" ? Sun : Moon,
-      theme
-    })
-  )
-];
+function createPracticeStatusView(
+  status: LessonStatus,
+  attemptScore: AttemptScore | null
+): PracticeStatusView {
+  switch (status) {
+    case "idle":
+      return {
+        label: "Ready",
+        detail: "Guide starts when you press Start.",
+        tone: "idle"
+      };
+    case "promptPlaying":
+      return {
+        label: "Listen",
+        detail: "The reference is playing.",
+        tone: "active",
+        pulse: true
+      };
+    case "awaitingVoice":
+      return {
+        label: "Get ready",
+        detail: "Sing when you are set.",
+        tone: "active",
+        pulse: true
+      };
+    case "listening":
+      return {
+        label: "Sing now",
+        detail: "Pitch is being tracked locally.",
+        tone: "active",
+        pulse: true
+      };
+    case "scoring":
+      return {
+        label: "Scoring",
+        detail: "Checking center, timing, and stability.",
+        tone: "info",
+        pulse: true
+      };
+    case "passed":
+      return {
+        label: "Passed",
+        detail: "Moving to the next key.",
+        tone: "success"
+      };
+    case "retry":
+      return {
+        label: "Retry",
+        detail: attemptScore?.summary ?? "Review the notes and try again.",
+        tone: "warning"
+      };
+    case "complete":
+      return {
+        label: "Complete",
+        detail: "Range loop finished.",
+        tone: "success"
+      };
+  }
+}
 
-function ThemePicker({
-  value,
-  onValueChange
+function createCoachGuidance({
+  status,
+  exerciseTitle,
+  targetNotes,
+  attemptScore
 }: {
-  value: ThemePreference;
-  onValueChange: (themePreference: ThemePreference) => void;
+  status: LessonStatus;
+  exerciseTitle: string;
+  targetNotes: TargetNote[];
+  attemptScore: AttemptScore | null;
+}): CoachGuidanceView {
+  const notePattern = targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ");
+
+  switch (status) {
+    case "idle":
+      return {
+        title: exerciseTitle,
+        message: `Listen to the guide, then sing ${notePattern}.`,
+        tone: "accent",
+        icon: <Music2 size={18} />
+      };
+    case "promptPlaying":
+      return {
+        title: "Listen first",
+        message: "Let the guide set the pitch center before you answer.",
+        tone: "info",
+        icon: <Volume2 size={18} />
+      };
+    case "awaitingVoice":
+      return {
+        title: "Your turn",
+        message: "Start the pattern when you are ready; timing begins on your first clear pitch.",
+        tone: "accent",
+        icon: <Mic size={18} />
+      };
+    case "listening":
+      return {
+        title: "Keep it steady",
+        message: "Aim for clean centers and smooth motion between notes.",
+        tone: "accent",
+        icon: <Activity size={18} />
+      };
+    case "scoring":
+      return {
+        title: "Checking your take",
+        message: "Pitch centers, stability, and missed notes are being scored locally.",
+        tone: "info",
+        icon: <Gauge size={18} />
+      };
+    case "passed":
+      return {
+        title: "Nice pass",
+        message: "That attempt is logged locally. The next key is queued.",
+        tone: "success",
+        icon: <CheckCircle2 size={18} />
+      };
+    case "retry":
+      return {
+        title: "One more pass",
+        message: attemptScore?.summary ?? "Use the note checkpoints to choose what to adjust.",
+        tone: "warning",
+        icon: <RotateCcw size={18} />
+      };
+    case "complete":
+      return {
+        title: "Lesson complete",
+        message: "Reset the lesson or choose another drill when you are ready.",
+        tone: "success",
+        icon: <CheckCircle2 size={18} />
+      };
+  }
+}
+
+function NoteCheckpointStrip({
+  targetNotes,
+  attemptScore
+}: {
+  targetNotes: TargetNote[];
+  attemptScore: AttemptScore | null;
 }) {
-  const selectedKey = themePreferenceKey(value);
+  const notes = attemptScore?.notes ?? targetNotes.map((note) => ({ ...note, score: null }));
 
   return (
-    <div className="theme-picker" role="radiogroup" aria-label="Theme">
-      {themeOptions.map((option) => {
-        const Icon = option.icon;
-        const isSelected = selectedKey === option.key;
+    <ol className="note-checkpoint-strip" aria-label="Target notes">
+      {notes.map((note, index) => {
+        const status = note.score?.status ?? "target";
         return (
-          <button
-            key={option.key}
-            className={`theme-option${isSelected ? " theme-option-active" : ""}`}
-            type="button"
-            role="radio"
-            aria-checked={isSelected}
-            aria-label={`${option.label} theme`}
-            title={`${option.label} theme`}
-            onClick={() => onValueChange(option.preference)}
+          <li
+            key={`${index}-${note.degree}-${note.midi}`}
+            className={`note-checkpoint note-checkpoint--${status}`}
           >
-            {option.theme ? (
-              <span className="theme-option__swatches" aria-hidden="true">
-                <span style={{ background: option.theme.colors["bg.primary"] }} />
-                <span style={{ background: option.theme.colors["bg.secondary"] }} />
-                <span style={{ background: option.theme.colors["accent.primary"] }} />
+            <span className="note-checkpoint__degree">{note.degree}</span>
+            <strong>{note.label}</strong>
+            <span className="note-checkpoint__label">{describeCheckpointLabel(note, status, index)}</span>
+            <span className="checkpoint-status-legacy">{describeCheckpointStatus(status)}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function describeCheckpointLabel(
+  note: TargetNote,
+  status: NoteAssessmentStatus | "target",
+  index: number
+) {
+  if (status !== "target") {
+    return describeCheckpointStatus(status);
+  }
+
+  switch (note.degree) {
+    case 1:
+      return "Root";
+    case 2:
+      return "Second";
+    case 3:
+      return "Third";
+    case 4:
+      return "Fourth";
+    case 5:
+      return "Fifth";
+    case 8:
+      return "Octave";
+    default:
+      return `Note ${index + 1}`;
+  }
+}
+
+function describeCheckpointStatus(status: NoteAssessmentStatus | "target") {
+  switch (status) {
+    case "target":
+      return "Target";
+    case "pass":
+      return "Pass";
+    case "passWithWarning":
+      return "Watch";
+    case "flat":
+      return "Flat";
+    case "sharp":
+      return "Sharp";
+    case "wrongNote":
+      return "Wrong";
+    case "unstable":
+      return "Unstable";
+    case "unclear":
+      return "Unclear";
+    case "missed":
+      return "Missed";
+  }
+}
+
+type TopLevelScreen = "home" | "library" | "songs" | "progress";
+
+const navigationItems = [
+  { value: "home", label: "Home", icon: <Home size={19} /> },
+  { value: "library", label: "Practice", icon: <Target size={19} /> },
+  { value: "songs", label: "Sing", icon: <Mic size={19} /> },
+  { value: "progress", label: "Progress", icon: <TrendingUp size={19} /> }
+] satisfies SidebarTabItem<TopLevelScreen>[];
+
+function MainShell({
+  activeScreen,
+  onNavigate,
+  practiceSummary,
+  children
+}: {
+  activeScreen: TopLevelScreen;
+  onNavigate: (screen: TopLevelScreen) => void;
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+  children: ReactNode;
+}) {
+  return (
+    <AppShell
+      className="pitch-shell"
+      sidebar={
+        <SidebarNav
+          brand={<PitchCoachBrand />}
+          items={navigationItems}
+          activeValue={activeScreen}
+          onNavigate={onNavigate}
+          footer={<LocalSaveFooter practiceSummary={practiceSummary} />}
+        />
+      }
+    >
+      {children}
+    </AppShell>
+  );
+}
+
+function PitchCoachBrand() {
+  return (
+    <div className="shell-brand">
+      <span className="shell-brand__mark" aria-hidden="true">
+        <Target size={24} />
+      </span>
+      <span className="shell-brand__name">Pitch Coach</span>
+    </div>
+  );
+}
+
+function LocalSaveFooter({
+  practiceSummary
+}: {
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+}) {
+  return (
+    <div className="shell-local-footer">
+      <div className="shell-streak-card">
+        <Flame size={22} aria-hidden="true" />
+        <span>
+          <strong>{formatDayCount(practiceSummary.streakDays)}</strong>
+          <span>practice streak</span>
+        </span>
+      </div>
+      <div className="shell-user-card">
+        <span className="shell-user-avatar" aria-hidden="true">
+          L
+        </span>
+        <span className="shell-user-copy">
+          <strong>Local practice</strong>
+          <span>Saved on this device</span>
+        </span>
+        <span className="shell-user-sun" aria-hidden="true">
+          <SunGlyph />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SunGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" />
+    </svg>
+  );
+}
+
+type LibraryScreenProps = {
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"];
+  selectedExerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"];
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+  onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
+  disabled: boolean;
+};
+
+type HomeScreenProps = LibraryScreenProps & {
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+  recommendedExercise: ReturnType<typeof usePitchCoachController>["recommendedExercise"];
+  onNavigateToPractice: () => void;
+  onNavigateToSongs: () => void;
+};
+
+function HomeScreen({
+  exercises,
+  exerciseProgress,
+  practiceSummary,
+  recommendedExercise,
+  onSelectExercise,
+  onNavigateToPractice,
+  onNavigateToSongs,
+  disabled
+}: HomeScreenProps) {
+  const recommendedProgress = exerciseProgress[recommendedExercise.exercise.id];
+  const completedExerciseCount = countExercisesTried(exercises, exerciseProgress);
+  const exerciseCoveragePercent =
+    exercises.length > 0 ? Math.round((completedExerciseCount / exercises.length) * 100) : 0;
+  const hasRecommendedHistory = recommendedProgress.attemptCount > 0;
+
+  return (
+    <main className="mock-home" aria-label="Pitch coach home">
+      <section className="mock-home__header">
+        <div>
+          <h1>Good evening</h1>
+          <p>{createHomeIntroCopy(practiceSummary)}</p>
+        </div>
+        <WeeklyStreakSummary buckets={practiceSummary.weekActivity} />
+      </section>
+
+      <Card
+        as="section"
+        className="mock-resume-card"
+        variant="mockSoft"
+        padding="none"
+        aria-label={hasRecommendedHistory ? "Pick up where you left off" : "Recommended practice"}
+      >
+        <div className="mock-resume-card__copy">
+          <div className="mock-kicker">
+            <Sparkles size={18} aria-hidden="true" />
+            <span>{hasRecommendedHistory ? "Pick up where you left off" : "Recommended practice"}</span>
+          </div>
+          <div className="mock-resume-card__title-row">
+            <h2>{recommendedExercise.exercise.title}</h2>
+            <span>{createRecommendationMeta(recommendedExercise.exercise)}</span>
+          </div>
+          <p>{createRecommendationCopy(recommendedExercise.reason, recommendedProgress)}</p>
+          <div className="mock-resume-card__actions">
+            <button
+              className="mock-primary-action"
+              type="button"
+              onClick={() => onSelectExercise(recommendedExercise.exercise.id)}
+              disabled={disabled}
+            >
+              <Play size={17} fill="currentColor" aria-hidden="true" />
+              <span>{hasRecommendedHistory ? "Resume practice" : "Start practice"}</span>
+            </button>
+            {hasRecommendedHistory && recommendedProgress.recentPassRate !== undefined ? (
+              <span>
+                <strong>{recommendedProgress.recentPassRate}%</strong>
+                recent pass
               </span>
-            ) : (
-              <Icon size={14} />
-            )}
-            <span className="theme-option__label">{option.label}</span>
-          </button>
+            ) : null}
+          </div>
+        </div>
+        <ExercisePitchPreview exercise={recommendedExercise.exercise} />
+      </Card>
+
+      <section className="mock-mode-grid" aria-label="Practice modes">
+        <Card
+          as="button"
+          className="mock-mode-card mock-mode-card--practice"
+          variant="mockInteractive"
+          padding="none"
+          type="button"
+          onClick={onNavigateToPractice}
+        >
+          <div className="mock-mode-card__header">
+            <span className="mock-mode-icon mock-mode-icon--practice">
+              <Target size={26} aria-hidden="true" />
+            </span>
+            <span className="mock-mode-copy">
+              <strong>Interval Training</strong>
+              <span>{exercises.length} guided exercises · ear &amp; voice</span>
+            </span>
+            <ArrowUpRight size={27} aria-hidden="true" />
+          </div>
+          <div className="mock-chip-row" aria-hidden="true">
+            <span>Warm-ups</span>
+            <span>Intervals</span>
+            <span>Triads</span>
+            <span>Scales</span>
+          </div>
+          <div className="mock-practice-progress">
+            <span
+              style={
+                {
+                  "--practice-progress": `${exerciseCoveragePercent}%`
+                } as CSSProperties
+              }
+            />
+            <strong>
+              {formatInteger(practiceSummary.attemptCount)}{" "}
+              <span>{practiceSummary.attemptCount === 1 ? "attempt logged" : "attempts logged"}</span>
+            </strong>
+          </div>
+        </Card>
+
+        <Card
+          as="button"
+          className="mock-mode-card mock-mode-card--song"
+          variant="mockInteractive"
+          padding="none"
+          type="button"
+          onClick={onNavigateToSongs}
+        >
+          <div className="mock-mode-card__header">
+            <span className="mock-mode-icon mock-mode-icon--song">
+              <Mic size={27} aria-hidden="true" />
+            </span>
+            <span className="mock-mode-copy">
+              <strong>Sing a Song</strong>
+              <span>Upload a track · sing the real vocal</span>
+            </span>
+            <ArrowUpRight size={27} aria-hidden="true" />
+          </div>
+          <div className="mock-song-dropzone">
+            <span className="mock-upload-icon">
+              <Upload size={28} aria-hidden="true" />
+            </span>
+            <strong>Drop a song to begin</strong>
+            <span>We split the vocal & map it to pitch targets — locally, in under a minute.</span>
+          </div>
+        </Card>
+      </section>
+
+      <section className="mock-stat-grid" aria-label="Practice stats">
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<Flame size={19} />}
+          label="Day streak"
+          value={formatInteger(practiceSummary.streakDays)}
+          valueClassName="mock-stat-card__value--accent"
+        />
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<LineChart size={19} />}
+          label="Accuracy"
+          value={practiceSummary.noteAccuracy ?? 0}
+          unit="%"
+          trend={<AccuracySparkline buckets={practiceSummary.weekActivity} />}
+        />
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<CheckCircle2 size={18} />}
+          label="Notes in tune"
+          value={formatInteger(practiceSummary.notesInTune)}
+          valueClassName="mock-stat-card__value--green"
+        />
+        <StatCard
+          className="mock-stat-card"
+          variant="mock"
+          padding="none"
+          icon={<Clock3 size={18} />}
+          label="Practiced"
+          value={formatInteger(practiceSummary.practiceMinutes)}
+          unit="min"
+        />
+      </section>
+    </main>
+  );
+}
+
+function countExercisesTried(
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"],
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"]
+) {
+  return exercises.filter((exercise) => exerciseProgress[exercise.id].attemptCount > 0).length;
+}
+
+function createHomeIntroCopy(
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"]
+) {
+  if (practiceSummary.streakDays > 0) {
+    return `You’re on a ${practiceSummary.streakDays}-day roll — a few minutes keeps it alive.`;
+  }
+
+  if (practiceSummary.attemptCount > 0) {
+    return `${formatAttemptCount(practiceSummary.attemptCount)} logged on this device.`;
+  }
+
+  return "Your local practice stats will build as you sing.";
+}
+
+function createRecommendationMeta(exercise: ExerciseDefinition) {
+  return `${formatCategoryLabel(exercise.category)} · ${exercise.focus}`;
+}
+
+function createRecommendationCopy(
+  fallbackReason: string,
+  progress: ExerciseProgressSummary
+) {
+  if (progress.attemptCount === 0) {
+    return fallbackReason;
+  }
+
+  if (progress.commonIssue) {
+    return `${capitalizeFirst(describeIssue(progress.commonIssue))} showed up in recent attempts — let’s clean it up.`;
+  }
+
+  if (progress.recentPassRate !== undefined) {
+    return `Recent pass rate is ${progress.recentPassRate}% — keep this drill in rotation.`;
+  }
+
+  return `${formatAttemptCount(progress.attemptCount)} logged — keep building the baseline.`;
+}
+
+function formatDayCount(days: number) {
+  return `${formatInteger(days)} ${days === 1 ? "day" : "days"}`;
+}
+
+function formatAttemptCount(count: number) {
+  return `${formatInteger(count)} ${count === 1 ? "attempt" : "attempts"}`;
+}
+
+function formatInteger(value: number) {
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
+function capitalizeFirst(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function WeeklyStreakSummary({
+  buckets
+}: {
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
+}) {
+  return (
+    <div className="mock-week-streak" aria-label="Weekly streak">
+      {buckets.map((bucket) => {
+        const done = bucket.attemptCount > 0;
+        return (
+        <span key={bucket.date} className="mock-week-streak__day">
+          <span className={done ? "mock-week-streak__box is-done" : "mock-week-streak__box"}>
+            {done ? <CheckIcon /> : null}
+          </span>
+          <span>{formatWeekday(bucket.date).slice(0, 1)}</span>
+        </span>
         );
       })}
     </div>
   );
 }
 
-function themePreferenceKey(themePreference: ThemePreference) {
-  return themePreference.mode === "system" ? "system" : `theme:${themePreference.themeName}`;
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
+      <path d="m7 12 3 3 7-7" />
+    </svg>
+  );
+}
+
+function ExercisePitchPreview({ exercise }: { exercise: ExerciseDefinition }) {
+  const offsets = exercise.patternDegrees.map(degreeToSemitones);
+  const minOffset = Math.min(...offsets);
+  const maxOffset = Math.max(...offsets);
+  const range = Math.max(1, maxOffset - minOffset);
+  const points = offsets.map((offset, index) => {
+    const x = 40 + (index / Math.max(1, offsets.length - 1)) * 340;
+    const y = 170 - ((offset - minOffset) / range) * 112;
+    return { x, y };
+  });
+  const path = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .join(" ");
+  const guide = points
+    .map((point) => `M${Math.max(20, point.x - 24).toFixed(1)} ${point.y.toFixed(1)}H${Math.min(400, point.x + 24).toFixed(1)}`)
+    .join(" ");
+
+  return (
+    <div className="mock-pitch-preview" aria-hidden="true">
+      <svg viewBox="0 0 420 230" preserveAspectRatio="none">
+        <path className="mock-pitch-preview__grid" d="M20 34H400M20 81H400M20 128H400M20 175H400" />
+        <path className="mock-pitch-preview__guide" d={guide} />
+        <path className="mock-pitch-preview__line" d={path} />
+        {points.map((point, index) => (
+          <circle
+            key={`${point.x}-${index}`}
+            className="mock-pitch-preview__dot"
+            cx={point.x}
+            cy={point.y}
+            r="5"
+          />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function AccuracySparkline({
+  buckets
+}: {
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
+}) {
+  const points = buckets.flatMap((bucket, index) => {
+    if (bucket.noteCount === 0) {
+      return [];
+    }
+
+    const accuracy = bucket.notesInTune / bucket.noteCount;
+    const x = 5 + (index / Math.max(1, buckets.length - 1)) * 140;
+    const y = 4 + (1 - accuracy) * 40;
+    return [{ x, y }];
+  });
+  const path =
+    points.length === 0
+      ? "M5 35H145"
+      : points
+          .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+          .join(" ");
+
+  return (
+    <svg
+      className={`mock-accuracy-sparkline ${points.length === 0 ? "is-empty" : ""}`.trim()}
+      viewBox="0 0 150 48"
+      aria-hidden="true"
+    >
+      <path d={path} />
+    </svg>
+  );
+}
+
+function PracticeLibraryScreen(props: LibraryScreenProps) {
+  return (
+    <main className="mock-practice-page" aria-label="Pitch coach exercises">
+      <ExerciseLibrary {...props} />
+    </main>
+  );
+}
+
+type ProgressScreenProps = {
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"];
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+  recentSessions: ReturnType<typeof usePitchCoachController>["recentSessions"];
+  onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
+};
+
+function ProgressScreen({
+  exercises,
+  exerciseProgress,
+  practiceSummary,
+  recentSessions,
+  onSelectExercise
+}: ProgressScreenProps) {
+  const exercisesDone = countExercisesTried(exercises, exerciseProgress);
+  const accuracyTrend = createAccuracyTrend(recentSessions);
+  const sessionItems = createProgressSessionItems(recentSessions, exercises);
+
+  return (
+    <main className="mock-progress-page" aria-label="Pitch coach progress">
+      <header className="mock-progress-page__header">
+        <h1>Your Progress</h1>
+        <p>Saved on this device — keep the streak alive.</p>
+      </header>
+
+      <section className="progress-metric-grid" aria-label="Progress summary">
+        <ProgressMetricCard
+          icon={<Flame size={17} aria-hidden="true" />}
+          label="Day streak"
+          value={formatInteger(practiceSummary.streakDays)}
+          valueTone="accent"
+        />
+        <ProgressMetricCard
+          icon={<Check size={17} aria-hidden="true" />}
+          label="Notes in tune"
+          value={formatInteger(practiceSummary.notesInTune)}
+          valueTone="green"
+        />
+        <ProgressMetricCard
+          icon={<Target size={17} aria-hidden="true" />}
+          label="Exercises done"
+          value={formatInteger(exercisesDone)}
+        />
+        <ProgressMetricCard
+          icon={<Clock3 size={17} aria-hidden="true" />}
+          label="Time practiced"
+          value={formatInteger(practiceSummary.practiceMinutes)}
+          unit="min"
+        />
+      </section>
+
+      <section className="progress-main-grid" aria-label="Progress details">
+        <div className="progress-left-stack">
+          <ProgressAccuracyCard
+            accuracy={practiceSummary.noteAccuracy}
+            trend={accuracyTrend}
+          />
+          <ProgressWeekCard
+            buckets={practiceSummary.weekActivity}
+            streakDays={practiceSummary.streakDays}
+          />
+        </div>
+
+        <ProgressRecentSessionsCard items={sessionItems} onSelectExercise={onSelectExercise} />
+      </section>
+    </main>
+  );
+}
+
+function ProgressMetricCard({
+  icon,
+  label,
+  value,
+  unit,
+  valueTone = "default"
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  unit?: ReactNode;
+  valueTone?: "default" | "accent" | "green";
+}) {
+  return (
+    <StatCard
+      className="mock-stat-card progress-metric-card"
+      variant="mock"
+      padding="none"
+      icon={icon}
+      label={label}
+      value={value}
+      unit={unit}
+      valueClassName={
+        valueTone === "accent"
+          ? "mock-stat-card__value--accent"
+          : valueTone === "green"
+            ? "mock-stat-card__value--green"
+            : ""
+      }
+    />
+  );
+}
+
+function ProgressAccuracyCard({
+  accuracy,
+  trend
+}: {
+  accuracy?: number;
+  trend: number[];
+}) {
+  return (
+    <Card className="progress-panel progress-accuracy-panel" variant="mock" padding="none">
+      <div className="progress-accuracy-panel__header">
+        <div>
+          <h2>Accuracy over time</h2>
+          <p>last 10 sessions</p>
+        </div>
+        <div className="progress-accuracy-summary">
+          <strong>{accuracy === undefined ? "New" : `${accuracy}%`}</strong>
+          <span className={getAccuracyDeltaClassName(trend)}>{formatAccuracyDelta(trend)}</span>
+        </div>
+      </div>
+      <ProgressAccuracyChart data={trend} />
+    </Card>
+  );
+}
+
+function ProgressAccuracyChart({ data }: { data: number[] }) {
+  const width = 560;
+  const height = 150;
+  const chartData =
+    data.length === 0
+      ? []
+      : data.length === 1
+        ? [data[0], data[0]]
+        : data;
+  const minValue = chartData.length === 0 ? 0 : Math.max(0, Math.min(...chartData) - 3);
+  const maxValue = chartData.length === 0 ? 100 : Math.min(100, Math.max(...chartData) + 2);
+  const range = Math.max(1, maxValue - minValue);
+  const points = chartData.map((value, index) => ({
+    x: (index / Math.max(1, chartData.length - 1)) * width,
+    y: height - 14 - ((value - minValue) / range) * (height - 28)
+  }));
+  const linePath =
+    points.length === 0
+      ? `M0 ${height - 42}H${width}`
+      : createSmoothPath(points);
+  const areaPath =
+    points.length === 0
+      ? ""
+      : `${linePath} L ${width} ${height} L 0 ${height} Z`;
+
+  return (
+    <div className="progress-accuracy-chart" aria-label="Accuracy trend">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="progressAccuracyFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--mock-green)" stopOpacity="0.22" />
+            <stop offset="1" stopColor="var(--mock-green)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[25, 50, 75].map((percent) => {
+          const y = height - 14 - (percent / 100) * (height - 28);
+          return <line key={percent} x1="0" x2={width} y1={y} y2={y} />;
+        })}
+        {areaPath ? <path className="progress-accuracy-chart__area" d={areaPath} /> : null}
+        <path
+          className={`progress-accuracy-chart__line ${points.length === 0 ? "is-empty" : ""}`.trim()}
+          d={linePath}
+        />
+        {points.map((point, index) => (
+          <circle
+            key={`${point.x}-${point.y}`}
+            cx={point.x}
+            cy={point.y}
+            r={index === points.length - 1 ? 5 : 3}
+          />
+        ))}
+      </svg>
+      {data.length === 0 ? <span>No accuracy yet</span> : null}
+    </div>
+  );
+}
+
+function ProgressWeekCard({
+  buckets,
+  streakDays
+}: {
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
+  streakDays: number;
+}) {
+  return (
+    <Card className="progress-panel progress-week-panel" variant="mock" padding="none">
+      <h2>This week</h2>
+      <div className="progress-week-content">
+        <div className="progress-week-strip" aria-label="This week">
+          {buckets.map((bucket) => {
+            const done = bucket.attemptCount > 0;
+            return (
+              <span key={bucket.date} className="progress-week-day">
+                <span className={`progress-week-box ${done ? "is-done" : ""}`.trim()}>
+                  {done ? <CheckIcon /> : null}
+                </span>
+                <span>{formatWeekday(bucket.date).slice(0, 1)}</span>
+              </span>
+            );
+          })}
+        </div>
+        <div className="progress-week-streak">
+          <Flame size={24} aria-hidden="true" />
+          <strong>{formatDayCount(streakDays)} streak</strong>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+type ProgressSessionItemView = {
+  id: string;
+  exerciseId: ExerciseId;
+  href: string;
+  title: string;
+  meta: string;
+  score: number;
+  tone: "good" | "needs-work";
+};
+
+function ProgressRecentSessionsCard({
+  items,
+  onSelectExercise
+}: {
+  items: ProgressSessionItemView[];
+  onSelectExercise: (exerciseId: ExerciseId) => void;
+}) {
+  return (
+    <Card className="progress-panel progress-recent-panel" variant="mock" padding="none">
+      <h2>Recent sessions</h2>
+      {items.length === 0 ? (
+        <p className="progress-empty-copy">Complete a guided exercise and recent sessions will appear here.</p>
+      ) : (
+        <ol className="progress-session-list">
+          {items.map((item) => (
+            <ProgressSessionItem key={item.id} item={item} onSelectExercise={onSelectExercise} />
+          ))}
+        </ol>
+      )}
+    </Card>
+  );
+}
+
+function ProgressSessionItem({
+  item,
+  onSelectExercise
+}: {
+  item: ProgressSessionItemView;
+  onSelectExercise: (exerciseId: ExerciseId) => void;
+}) {
+  return (
+    <li className="progress-session-item">
+      <a
+        className="progress-session-link"
+        href={item.href}
+        onClick={(event) => {
+          event.preventDefault();
+          onSelectExercise(item.exerciseId);
+        }}
+      >
+        <span className={`progress-session-item__icon is-${item.tone}`} aria-hidden="true">
+          <Target size={18} />
+        </span>
+        <span className="progress-session-item__copy">
+          <strong>{item.title}</strong>
+          <span>{item.meta}</span>
+        </span>
+        <strong className={`progress-session-item__score is-${item.tone}`}>{item.score}%</strong>
+      </a>
+    </li>
+  );
+}
+
+function createProgressSessionItems(
+  sessions: ReturnType<typeof usePitchCoachController>["recentSessions"],
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"]
+): ProgressSessionItemView[] {
+  return sessions.slice(0, 5).map((session) => {
+    const exercise = exercises.find((candidate) => candidate.id === session.exerciseId);
+    const score = session.noteAccuracy;
+    return {
+      id: session.id,
+      exerciseId: session.exerciseId,
+      href: routePath({ screen: "practice", exerciseId: session.exerciseId }),
+      title: exercise?.title ?? getExerciseTitle(exercises, session.exerciseId),
+      meta: `${exercise ? formatCategoryLabel(exercise.category) : "Exercise"} · ${formatAttemptCount(
+        session.attemptCount
+      )} · ${formatProgressSessionDate(session.lastAttemptAt)}`,
+      score,
+      tone: score >= 80 ? "good" : "needs-work"
+    };
+  });
+}
+
+function createAccuracyTrend(sessions: ReturnType<typeof usePitchCoachController>["recentSessions"]) {
+  return sessions
+    .slice(0, 10)
+    .reverse()
+    .map((session) => session.noteAccuracy);
+}
+
+function formatAccuracyDelta(trend: number[]) {
+  if (trend.length === 0) {
+    return "No sessions yet";
+  }
+
+  const delta = trend.at(-1)! - trend[0];
+  if (delta > 0) {
+    return `▲ ${delta} since you started`;
+  }
+  if (delta < 0) {
+    return `▼ ${Math.abs(delta)} since you started`;
+  }
+  return "0 since you started";
+}
+
+function getAccuracyDeltaClassName(trend: number[]) {
+  if (trend.length < 2) {
+    return "is-neutral";
+  }
+
+  return trend.at(-1)! >= trend[0] ? "is-positive" : "is-negative";
+}
+
+function createSmoothPath(points: { x: number; y: number }[]) {
+  if (points.length === 0) {
+    return "";
+  }
+
+  return points.reduce((path, point, index) => {
+    if (index === 0) {
+      return `M${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+    }
+
+    const previous = points[index - 1];
+    const controlX = previous.x + (point.x - previous.x) / 2;
+    return `${path} C${controlX.toFixed(1)} ${previous.y.toFixed(1)}, ${controlX.toFixed(1)} ${point.y.toFixed(
+      1
+    )}, ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+  }, "");
 }
 
 function formatClipDuration(durationMs: number) {
@@ -564,6 +1594,10 @@ function formatClipDuration(durationMs: number) {
 
 type AppRoute =
   | {
+      screen: "home";
+      fromAppNavigation: boolean;
+    }
+  | {
       screen: "library";
       fromAppNavigation: boolean;
     }
@@ -574,11 +1608,18 @@ type AppRoute =
     }
   | {
       screen: "songs";
+      fromAppNavigation: boolean;
+    }
+  | {
+      screen: "progress";
       fromAppNavigation: boolean;
     };
 
 type RouteLocation =
   | {
+      screen: "home";
+    }
+  | {
       screen: "library";
     }
   | {
@@ -587,6 +1628,9 @@ type RouteLocation =
     }
   | {
       screen: "songs";
+    }
+  | {
+      screen: "progress";
     };
 
 type ParsedRoute = {
@@ -607,9 +1651,9 @@ function usePitchCoachRouter() {
     const syncRoute = () => {
       const parsed = parsePathname(window.location.pathname);
       if (parsed.invalid) {
-        window.history.replaceState(createHistoryState(false), "", routePath({ screen: "library" }));
+        window.history.replaceState(createHistoryState(false), "", routePath({ screen: "home" }));
         setRoute({
-          screen: "library",
+          screen: "home",
           fromAppNavigation: false
         });
         return;
@@ -629,6 +1673,20 @@ function usePitchCoachRouter() {
     syncRoute();
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  const navigateToHome = useCallback((options: { replace?: boolean } = {}) => {
+    const nextRoute = {
+      screen: "home" as const,
+      fromAppNavigation: true
+    };
+    const state = createHistoryState(true);
+    if (options.replace) {
+      window.history.replaceState(state, "", routePath({ screen: "home" }));
+    } else {
+      window.history.pushState(state, "", routePath({ screen: "home" }));
+    }
+    setRoute(nextRoute);
   }, []);
 
   const navigateToLibrary = useCallback((options: { replace?: boolean } = {}) => {
@@ -678,6 +1736,20 @@ function usePitchCoachRouter() {
     setRoute(nextRoute);
   }, []);
 
+  const navigateToProgress = useCallback((options: { replace?: boolean } = {}) => {
+    const nextRoute = {
+      screen: "progress" as const,
+      fromAppNavigation: true
+    };
+    const state = createHistoryState(true);
+    if (options.replace) {
+      window.history.replaceState(state, "", routePath({ screen: "progress" }));
+    } else {
+      window.history.pushState(state, "", routePath({ screen: "progress" }));
+    }
+    setRoute(nextRoute);
+  }, []);
+
   const goBackToLibraryFallback = useCallback(() => {
     if ((route.screen === "practice" || route.screen === "songs") && route.fromAppNavigation) {
       window.history.back();
@@ -689,9 +1761,11 @@ function usePitchCoachRouter() {
 
   return {
     route,
+    navigateToHome,
     navigateToLibrary,
     navigateToExercise,
     navigateToSongs,
+    navigateToProgress,
     goBackToLibraryFallback
   };
 }
@@ -700,7 +1774,7 @@ function readCurrentRoute(): AppRoute {
   const parsed = parsePathname(window.location.pathname);
   if (parsed.invalid) {
     return {
-      screen: "library",
+      screen: "home",
       fromAppNavigation: false
     };
   }
@@ -718,6 +1792,13 @@ function parsePathname(pathname: string): ParsedRoute {
 
   if (appPathname === "/" || appPathname === "") {
     return {
+      route: { screen: "home" },
+      invalid: false
+    };
+  }
+
+  if (appPathname === "/practice" || appPathname === "/practice/") {
+    return {
       route: { screen: "library" },
       invalid: false
     };
@@ -730,10 +1811,24 @@ function parsePathname(pathname: string): ParsedRoute {
     };
   }
 
+  if (appPathname === "/sing" || appPathname === "/sing/") {
+    return {
+      route: { screen: "songs" },
+      invalid: false
+    };
+  }
+
+  if (appPathname === "/progress" || appPathname === "/progress/") {
+    return {
+      route: { screen: "progress" },
+      invalid: false
+    };
+  }
+
   const exerciseMatch = appPathname.match(/^\/exercises\/([^/]+)\/?$/);
   if (!exerciseMatch) {
     return {
-      route: { screen: "library" },
+      route: { screen: "home" },
       invalid: true
     };
   }
@@ -743,14 +1838,14 @@ function parsePathname(pathname: string): ParsedRoute {
     exerciseId = decodeURIComponent(exerciseMatch[1]);
   } catch {
     return {
-      route: { screen: "library" },
+      route: { screen: "home" },
       invalid: true
     };
   }
 
   if (!isExerciseId(exerciseId)) {
     return {
-      route: { screen: "library" },
+      route: { screen: "home" },
       invalid: true
     };
   }
@@ -766,7 +1861,15 @@ function parsePathname(pathname: string): ParsedRoute {
 
 function routePath(route: RouteLocation) {
   const pathname =
-    route.screen === "library" ? "/" : route.screen === "songs" ? "/songs" : `/exercises/${route.exerciseId}`;
+    route.screen === "home"
+      ? "/"
+      : route.screen === "library"
+        ? "/practice"
+        : route.screen === "songs"
+          ? "/songs"
+          : route.screen === "progress"
+            ? "/progress"
+            : `/exercises/${route.exerciseId}`;
   return withAppBase(pathname);
 }
 
@@ -829,65 +1932,232 @@ type ExerciseLibraryProps = {
   exercises: ReturnType<typeof usePitchCoachController>["exercises"];
   selectedExerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"];
   exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
   disabled: boolean;
+};
+
+type ExerciseCategoryFilter = "all" | ExerciseCategory;
+
+const exerciseCategoryFilters: readonly ExerciseCategoryFilter[] = [
+  "all",
+  "pitch",
+  "interval",
+  "arpeggio",
+  "scale"
+];
+
+type PracticeExerciseDisplay = {
+  keyLabel: string;
+  completedCount: number;
+  accuracy: number | null;
+  difficulty: 1 | 2 | 3;
 };
 
 function ExerciseLibrary({
   exercises,
   selectedExerciseId,
   exerciseProgress,
+  practiceSummary,
   onSelectExercise,
   disabled
 }: ExerciseLibraryProps) {
+  const [activeCategory, setActiveCategory] = useState<ExerciseCategoryFilter>("all");
+  const categoryItems = useMemo(
+    () =>
+      exerciseCategoryFilters.map((category): SidebarTabItem<ExerciseCategoryFilter> => {
+        return {
+          value: category,
+          label: formatPracticeFilterLabel(category)
+        };
+      }),
+    []
+  );
+  const completedExerciseCount = useMemo(
+    () =>
+      exercises.filter((exercise) => {
+        const progress = exerciseProgress[exercise.id];
+        return progress.attemptCount > 0;
+      }).length,
+    [exerciseProgress, exercises]
+  );
+  const visibleExercises = useMemo(
+    () =>
+      activeCategory === "all"
+        ? exercises
+        : exercises.filter((exercise) => exercise.category === activeCategory),
+    [activeCategory, exercises]
+  );
+  const groupedExercises = useMemo(
+    () =>
+      exerciseCategoryFilters
+        .filter((category): category is ExerciseCategory => category !== "all")
+        .map((category) => ({
+          category,
+          exercises: visibleExercises.filter((exercise) => exercise.category === category)
+        }))
+        .filter((group) => group.exercises.length > 0),
+    [visibleExercises]
+  );
+
   return (
     <section className="exercise-library" aria-label="Exercise library">
       <div className="library-heading">
         <div>
-          <span className="readout-label">Exercises</span>
-          <h2>Practice Library</h2>
+          <h1>Practice Library</h1>
+          <p>
+            <b>{completedExerciseCount}</b> / {exercises.length} exercises tried · keep your ear &amp; voice sharp
+          </p>
         </div>
-        <span>{exercises.length} drills</span>
+        <div
+          className="library-heading__stat"
+          aria-label={
+            practiceSummary.noteAccuracy === undefined
+              ? "No accuracy yet"
+              : `${practiceSummary.noteAccuracy}% accuracy`
+          }
+        >
+          <LineChart size={16} aria-hidden="true" />
+          <strong>{practiceSummary.noteAccuracy === undefined ? "New" : `${practiceSummary.noteAccuracy}%`}</strong>
+          <span className="library-heading__spark">
+            <AccuracySparkline buckets={practiceSummary.weekActivity} />
+          </span>
+        </div>
       </div>
-      <div className="exercise-list">
-        {exercises.map((exercise) => {
-          const isSelected = exercise.id === selectedExerciseId;
-          return (
-            <button
-              key={exercise.id}
-              className={`exercise-option ${isSelected ? "exercise-option-active" : ""}`}
-              type="button"
-              onClick={() => onSelectExercise(exercise.id)}
-              aria-pressed={isSelected}
-              disabled={disabled}
-            >
-              <span className="difficulty-meter" aria-label={`Difficulty ${exercise.difficulty} of 5`}>
-                {Array.from({ length: 5 }, (_, index) => (
-                  <span key={index} className={index < exercise.difficulty ? "difficulty-on" : ""} />
-                ))}
+      <div className="library-filters">
+        <SidebarTabs
+          value={activeCategory}
+          items={categoryItems}
+          onValueChange={setActiveCategory}
+          ariaLabel="Exercise categories"
+          orientation="horizontal"
+          className="library-filter-tabs"
+        />
+      </div>
+      <div className="exercise-groups">
+        {groupedExercises.map((group) => (
+          <section
+            key={group.category}
+            className="exercise-group"
+            aria-labelledby={`exercise-group-${group.category}`}
+          >
+            <div className="exercise-group__header">
+              <span className="exercise-group__icon" aria-hidden="true">
+                {getPracticeCategoryIcon(group.category)}
               </span>
-              <span className="exercise-copy">
-                <strong>{exercise.title}</strong>
-                <span>{exercise.description}</span>
-                <span className="exercise-progress">
-                  {formatProgressSummary(exerciseProgress[exercise.id])}
-                </span>
-              </span>
-              <span className="exercise-meta">
-                <span>{exercise.focus}</span>
-                <span>{formatExercisePatternText(exercise.patternDegrees)}</span>
-              </span>
-              <span className="exercise-start">Start</span>
-            </button>
-          );
-        })}
+              <h3 id={`exercise-group-${group.category}`}>{formatCategoryLabel(group.category)}</h3>
+              <span>{group.exercises.length}</span>
+              <span className="exercise-group__line" aria-hidden="true" />
+            </div>
+            <div className="exercise-list">
+              {group.exercises.map((exercise, exerciseIndex) => {
+                const isSelected = exercise.id === selectedExerciseId;
+                const progress = exerciseProgress[exercise.id];
+                const display = getPracticeExerciseDisplay(exercise, progress);
+                const isComplete = display.completedCount > 0;
+                return (
+                  <button
+                    key={exercise.id}
+                    className={`exercise-option ${isSelected ? "exercise-option-active" : ""}`}
+                    type="button"
+                    onClick={() => onSelectExercise(exercise.id)}
+                    aria-pressed={isSelected}
+                    disabled={disabled}
+                  >
+                    <span className={`exercise-status-tile ${isComplete ? "is-complete" : ""}`}>
+                      {isComplete ? (
+                        <Check size={15} strokeWidth={2.4} aria-hidden="true" />
+                      ) : (
+                        <span aria-hidden="true">{exerciseIndex + 1}</span>
+                      )}
+                    </span>
+                    <span className="exercise-copy">
+                      <strong>{exercise.title}</strong>
+                      <span className="exercise-key">{display.keyLabel}</span>
+                    </span>
+                    <span
+                      className="exercise-difficulty-dots"
+                      aria-label={`Difficulty ${display.difficulty} of 3`}
+                    >
+                      {[1, 2, 3].map((dot) => (
+                        <span
+                          key={dot}
+                          className={`exercise-difficulty-dot ${
+                            dot <= display.difficulty ? "is-active" : ""
+                          }`}
+                        />
+                      ))}
+                    </span>
+                    <span
+                      className={`exercise-score ${
+                        display.accuracy === null ? "exercise-score--new" : ""
+                      }`}
+                    >
+                      {display.accuracy === null ? "New" : `${display.accuracy}%`}
+                    </span>
+                    <span className="exercise-progress-detail">{formatProgressSummary(progress)}</span>
+                    <span className="exercise-start" aria-hidden="true">
+                      <Play size={13} fill="currentColor" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     </section>
   );
 }
 
-function formatExercisePatternText(patternDegrees: readonly number[]) {
-  return patternDegrees.join("-");
+function getPracticeExerciseDisplay(
+  exercise: ExerciseDefinition,
+  progress: ExerciseProgressSummary
+): PracticeExerciseDisplay {
+  const recentAccuracy = progress.recentPassRate ?? null;
+  const difficulty = Math.min(3, Math.max(1, Math.ceil(exercise.difficulty / 2))) as 1 | 2 | 3;
+
+  return {
+    keyLabel: exercise.focus,
+    completedCount: progress.attemptCount,
+    accuracy: recentAccuracy,
+    difficulty
+  };
+}
+
+function getPracticeCategoryIcon(category: ExerciseCategory) {
+  switch (category) {
+    case "pitch":
+      return <Activity size={17} strokeWidth={1.7} />;
+    case "interval":
+    case "arpeggio":
+      return <Target size={17} strokeWidth={1.7} />;
+    case "scale":
+      return <LineChart size={17} strokeWidth={1.7} />;
+  }
+}
+
+function formatCategoryLabel(category: ExerciseCategoryFilter) {
+  switch (category) {
+    case "all":
+      return "All";
+    case "pitch":
+      return "Warm-ups";
+    case "interval":
+      return "Intervals";
+    case "arpeggio":
+      return "Triads & Chords";
+    case "scale":
+      return "Scales";
+  }
+}
+
+function formatPracticeFilterLabel(category: ExerciseCategoryFilter) {
+  if (category === "arpeggio") {
+    return "Triads";
+  }
+
+  return formatCategoryLabel(category);
 }
 
 function formatProgressSummary(progress: ExerciseProgressSummary) {
@@ -896,9 +2166,24 @@ function formatProgressSummary(progress: ExerciseProgressSummary) {
   }
 
   const issue = progress.commonIssue ? ` · Issue: ${describeIssue(progress.commonIssue)}` : "";
-  return `${progress.recentPassRate}% recent pass · ${formatLastPracticed(
+  return `${formatAttemptCount(progress.attemptCount)} logged · ${progress.recentPassRate}% recent pass · ${formatLastPracticed(
     progress.lastPracticedAt
   )}${issue}`;
+}
+
+function getExerciseTitle(
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"],
+  exerciseId: ExerciseId
+) {
+  return exercises.find((exercise) => exercise.id === exerciseId)?.title ?? "Exercise";
+}
+
+function formatWeekday(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString([], {
+    weekday: "short"
+  });
 }
 
 function formatLastPracticed(createdAt: string | undefined) {
@@ -940,6 +2225,38 @@ function formatHistoryDate(createdAt: string) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit"
+  });
+}
+
+function formatProgressSessionDate(createdAt: string) {
+  const timestamp = Date.parse(createdAt);
+  if (!Number.isFinite(timestamp)) {
+    return "Unknown time";
+  }
+
+  const date = new Date(timestamp);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const elapsedDays = Math.round((todayStart - dateStart) / 86400000);
+  const time = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+
+  if (elapsedDays === 0) {
+    return `Today · ${time}`;
+  }
+  if (elapsedDays === 1) {
+    return "Yesterday";
+  }
+  if (elapsedDays > 1 && elapsedDays < 7) {
+    return `${elapsedDays} days ago`;
+  }
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric"
   });
 }
 

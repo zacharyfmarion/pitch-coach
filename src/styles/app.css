@@ -3,6 +3,270 @@
   background: var(--bg-primary);
 }
 
+.pitch-shell {
+  background: var(--bg-primary);
+}
+
+.shell-brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: 4px 8px 0;
+}
+
+.shell-brand__mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--text-inverse);
+  background: linear-gradient(145deg, #ff9f6b, var(--accent-primary));
+  box-shadow: 0 6px 16px var(--shadow-accent);
+}
+
+.shell-brand__name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 720;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-local-save {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-tertiary);
+}
+
+.shell-local-save__mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--accent-primary);
+  background: var(--surface-accent);
+}
+
+.shell-local-save > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.shell-local-save strong,
+.shell-local-save span span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-local-save strong {
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.shell-local-save span span {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 640;
+}
+
+.shell-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.shell-topbar__copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.shell-topbar__copy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.96rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-page {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 100%;
+  padding: var(--space-5);
+}
+
+.home-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.home-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.home-spotlight-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+  gap: var(--space-3);
+}
+
+.home-recommendation-card,
+.home-week-card {
+  display: grid;
+  align-content: start;
+}
+
+.home-card-kicker,
+.home-recommendation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.home-card-kicker {
+  align-items: center;
+}
+
+.home-recommendation-meta span {
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  font-size: 0.72rem;
+  font-weight: 720;
+  line-height: 1;
+}
+
+.week-activity-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--space-2);
+  min-height: 94px;
+}
+
+.week-activity-strip__day {
+  display: grid;
+  justify-items: center;
+  align-items: end;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+  font-weight: 760;
+}
+
+.week-activity-strip__bar {
+  display: block;
+  width: 100%;
+  max-width: 24px;
+  min-height: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, var(--border-subtle));
+  border-radius: var(--radius-full) var(--radius-full) 3px 3px;
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-tertiary));
+}
+
+.progress-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.progress-exercises-card {
+  grid-row: span 2;
+}
+
+.progress-exercise-list,
+.progress-session-list {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.progress-exercise-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(82px, auto) minmax(120px, auto);
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.progress-exercise-list li > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.progress-exercise-list strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-exercise-list span span,
+.progress-exercise-list li > span:nth-child(2),
+.progress-exercise-list li > span:nth-child(3) {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.progress-session-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.shell-page .exercise-library {
+  margin: 0;
+}
+
 .coach-workspace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -110,7 +374,7 @@
 
 .exercise-library {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
   margin: var(--space-3);
   overflow: hidden;
@@ -143,13 +407,72 @@
   font-weight: 720;
 }
 
+.library-filters {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+}
+
+.library-filter-tabs .sidebar-tabs__list {
+  gap: var(--space-2);
+}
+
+.library-filter-tabs .sidebar-tabs__trigger {
+  min-height: 32px;
+  padding: 0 10px;
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--bg-primary);
+  font-size: 0.75rem;
+}
+
+.library-filter-tabs .sidebar-tabs__trigger[data-state="active"] {
+  border-color: color-mix(in srgb, var(--accent-primary) 36%, var(--border-default));
+}
+
+.exercise-groups {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-3);
+  overflow: auto;
+}
+
+.exercise-group {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.exercise-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.exercise-group__header h3 {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 780;
+  line-height: 1.2;
+}
+
+.exercise-group__header span {
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 720;
+}
+
 .exercise-list {
   display: grid;
   align-content: start;
   gap: var(--space-2);
-  min-height: 0;
-  padding: var(--space-3);
-  overflow: auto;
 }
 
 .exercise-option {
@@ -282,7 +605,7 @@
 
 .lesson-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
 }
 
 .side-panel {
@@ -358,6 +681,155 @@
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
+.practice-guidance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+}
+
+.practice-guidance .coach-bubble__message {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  background: var(--bg-secondary);
+}
+
+.practice-guidance .coach-bubble__message strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 780;
+  line-height: 1.15;
+}
+
+.practice-guidance .coach-bubble__message span {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 620;
+}
+
+.practice-status-stack {
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.practice-status-stack > span:last-child {
+  max-width: 220px;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.note-checkpoint-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  list-style: none;
+}
+
+.note-checkpoint {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3px var(--space-2);
+  min-width: 0;
+  min-height: 50px;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.note-checkpoint__degree {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  grid-row: span 2;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--text-inverse);
+  background: var(--accent-tertiary);
+  font-size: 0.72rem;
+  font-weight: 820;
+}
+
+.note-checkpoint strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-checkpoint > span:last-child {
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.note-checkpoint--pass,
+.note-checkpoint--passWithWarning {
+  border-color: color-mix(in srgb, var(--status-success) 42%, var(--border-subtle));
+  background: var(--surface-success);
+}
+
+.note-checkpoint--pass .note-checkpoint__degree,
+.note-checkpoint--passWithWarning .note-checkpoint__degree {
+  background: var(--status-success);
+}
+
+.note-checkpoint--passWithWarning {
+  border-color: color-mix(in srgb, var(--status-warning) 46%, var(--border-subtle));
+  background: var(--surface-warning);
+}
+
+.note-checkpoint--passWithWarning .note-checkpoint__degree {
+  background: var(--status-warning);
+}
+
+.note-checkpoint--flat,
+.note-checkpoint--sharp,
+.note-checkpoint--wrongNote,
+.note-checkpoint--unstable,
+.note-checkpoint--unclear,
+.note-checkpoint--missed {
+  border-color: color-mix(in srgb, var(--status-danger) 40%, var(--border-subtle));
+  background: var(--surface-danger);
+}
+
+.note-checkpoint--flat .note-checkpoint__degree,
+.note-checkpoint--sharp .note-checkpoint__degree,
+.note-checkpoint--wrongNote .note-checkpoint__degree,
+.note-checkpoint--unstable .note-checkpoint__degree,
+.note-checkpoint--unclear .note-checkpoint__degree,
+.note-checkpoint--missed .note-checkpoint__degree {
+  background: var(--status-danger);
+}
+
 .timeline-frame {
   width: 100%;
   height: 100%;
@@ -371,11 +843,130 @@
 }
 
 .song-workbench {
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
 }
 
 .song-timeline-frame {
   min-height: 420px;
+}
+
+.song-stage-panel {
+  min-width: 0;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+}
+
+.song-stage-panel .dropzone {
+  min-height: 184px;
+}
+
+.song-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.song-upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  font-size: 0.82rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.song-upload-button:hover {
+  background: var(--bg-surface);
+}
+
+.song-upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.song-upload-button:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.song-pipeline-card,
+.song-ready-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.song-stage-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.song-stage-heading > span:last-child {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.song-pipeline-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.song-pipeline-step {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.song-pipeline-step div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.song-pipeline-step strong,
+.song-pipeline-step span {
+  overflow-wrap: anywhere;
+}
+
+.song-pipeline-step strong {
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 780;
+}
+
+.song-pipeline-step span {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.song-ready-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .pitch-timeline {
@@ -765,11 +1356,68 @@
 }
 
 @media (max-width: 980px) {
+  .home-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-spotlight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-exercises-card {
+    grid-row: auto;
+  }
+
+  .song-pipeline-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pitch-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .pitch-shell .pc-app-shell__sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .pitch-shell .sidebar-nav {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: var(--space-2);
+    padding: var(--space-2);
+  }
+
+  .pitch-shell .sidebar-nav__brand,
+  .pitch-shell .sidebar-nav__footer {
+    display: none;
+  }
+
+  .pitch-shell .sidebar-tabs__list {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .pitch-shell .sidebar-tabs__trigger {
+    flex: 1 0 auto;
+    min-width: 92px;
+  }
+
+  .shell-page {
+    padding: var(--space-3);
+  }
+
   .coach-workspace {
     min-height: auto;
   }
 
   .top-bar,
+  .practice-guidance,
   .practice-layout {
     grid-template-columns: 1fr;
   }
@@ -801,6 +1449,28 @@
 }
 
 @media (max-width: 680px) {
+  .shell-topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .home-summary-grid,
+  .home-mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header__actions {
+    justify-content: stretch;
+  }
+
+  .page-header__actions .ui-button {
+    flex: 1 1 auto;
+  }
+
   .theme-picker {
     width: 100%;
   }
@@ -827,9 +1497,31 @@
     padding: 0;
   }
 
+  .practice-status-stack {
+    justify-items: start;
+  }
+
+  .practice-status-stack > span:last-child {
+    max-width: none;
+    text-align: left;
+  }
+
   .library-heading {
     align-items: start;
     flex-direction: column;
+  }
+
+  .progress-exercise-list li {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .library-filter-tabs .sidebar-tabs__trigger {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .library-filter-tabs .sidebar-tabs__meta {
+    display: none;
   }
 
   .exercise-strip {
@@ -860,6 +1552,21 @@
 
   .song-timeline-frame {
     min-height: 300px;
+  }
+
+  .song-stage-actions,
+  .song-pipeline-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .song-stage-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .song-stage-actions .ui-button,
+  .song-upload-button {
+    width: 100%;
   }
 
   .transport-row {

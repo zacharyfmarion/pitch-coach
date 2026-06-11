@@ -8,6 +8,8 @@ const iconButton = cva(["ui-button", "ui-button--icon", CONTROL_RADIUS_CLASS].jo
     variant: {
       default: "ui-button--ghost",
       toolbar: "ui-button--secondary",
+      primary: "ui-button--primary",
+      song: "ui-button--song",
       danger: "ui-button--danger"
     },
     size: ICON_CONTROL_SIZE_CLASSES

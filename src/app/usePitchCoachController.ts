@@ -4,7 +4,8 @@ import type {
   AttemptScore,
   CoachSettings,
   ExerciseId,
-  PitchFrame
+  PitchFrame,
+  PracticeSessionRecord
 } from "../domain/contracts";
 import {
   buildTargetNotes,
@@ -27,9 +28,15 @@ import {
 import { midiToFrequency, midiToNoteName } from "../domain/music";
 import {
   createAttemptHistoryRecord,
+  createPracticeSessionRecord,
   getRecentAttemptsForExercise,
+  getRecentPracticeAttempts,
+  getRecentPracticeSessions,
+  recommendPracticeExercise,
   pruneAttemptHistory,
-  summarizeExerciseProgress
+  summarizePracticeHistory,
+  summarizeExerciseProgress,
+  updatePracticeSessionAfterAttempt
 } from "../domain/progress";
 import { isPitchFirstAttemptComplete, scoreAttempt } from "../domain/scoring";
 import type { CapturedAudioClip } from "../audio/types";
@@ -37,6 +44,8 @@ import { createPitchCoachServices, type PitchCoachServices } from "../audio/serv
 import {
   clearAttemptHistory,
   loadAttemptHistory,
+  loadPracticeSessions,
+  savePracticeSessionRecord,
   saveAttemptHistoryRecord
 } from "../storage/attemptHistoryStorage";
 import {
@@ -88,8 +97,10 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const [localClip, setLocalClip] = useState<LocalClipView | null>(null);
   const [clipErrorMessage, setClipErrorMessage] = useState<string | null>(null);
   const [attemptHistory, setAttemptHistory] = useState<AttemptHistoryRecord[]>([]);
+  const [practiceSessions, setPracticeSessions] = useState<PracticeSessionRecord[]>([]);
 
   const runIdRef = useRef(0);
+  const activeSessionRef = useRef<PracticeSessionRecord | null>(null);
   const framesRef = useRef<PitchFrame[]>([]);
   const voiceStartMsRef = useRef<number | null>(null);
   const lastCompletionCheckMsRef = useRef(0);
@@ -111,9 +122,25 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     () => summarizeExerciseProgress(attemptHistory, EXERCISES),
     [attemptHistory]
   );
+  const practiceSummary = useMemo(
+    () => summarizePracticeHistory(attemptHistory, EXERCISES),
+    [attemptHistory]
+  );
+  const recommendedExercise = useMemo(
+    () => recommendPracticeExercise(attemptHistory, EXERCISES, selectedExercise.id),
+    [attemptHistory, selectedExercise.id]
+  );
   const selectedExerciseHistory = useMemo(
     () => getRecentAttemptsForExercise(attemptHistory, selectedExercise.id),
     [attemptHistory, selectedExercise.id]
+  );
+  const recentAttempts = useMemo(
+    () => getRecentPracticeAttempts(attemptHistory),
+    [attemptHistory]
+  );
+  const recentSessions = useMemo(
+    () => getRecentPracticeSessions(practiceSessions, attemptHistory),
+    [attemptHistory, practiceSessions]
   );
   const timelineDurationMs = useMemo(() => {
     const latestFrameMs = pitchFrames.at(-1)?.timeMs ?? 0;
@@ -150,10 +177,13 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
   useEffect(() => {
     let cancelled = false;
-    void loadAttemptHistory().then((history) => {
-      if (!cancelled) {
-        setAttemptHistory((current) => mergeAttemptHistory(current, history));
+    void Promise.all([loadAttemptHistory(), loadPracticeSessions()]).then(([history, sessions]) => {
+      if (cancelled) {
+        return;
       }
+
+      setAttemptHistory((current) => mergeAttemptHistory(current, history));
+      setPracticeSessions((current) => mergePracticeSessions(current, sessions));
     });
 
     return () => {
@@ -201,6 +231,20 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     );
   }, []);
 
+  const startPracticeSession = useCallback((exerciseId: ExerciseId) => {
+    if (activeSessionRef.current?.exerciseId === exerciseId) {
+      return;
+    }
+
+    activeSessionRef.current = createPracticeSessionRecord({ exerciseId });
+  }, []);
+
+  const endPracticeSession = useCallback((exerciseId?: ExerciseId) => {
+    if (!exerciseId || activeSessionRef.current?.exerciseId === exerciseId) {
+      activeSessionRef.current = null;
+    }
+  }, []);
+
   const finishAttempt = useCallback(
     async (runId: number, attemptTargets = targetNotes, attemptRootMidi = currentRootMidi) => {
       if (runId !== runIdRef.current || finishStartedRef.current) {
@@ -214,13 +258,16 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
       const score = scoreAttempt(framesRef.current, attemptTargets, scoringPolicy, settings.range);
       setAttemptScore(score);
+      const practiceSession = getOrCreateActivePracticeSession(selectedExercise.id);
       const historyRecord = createAttemptHistoryRecord({
+        sessionId: practiceSession.id,
         exerciseId: selectedExercise.id,
         rootMidi: attemptRootMidi,
         tempoBpm: settings.tempoBpm,
         toleranceCents: settings.toleranceCents,
         score
       });
+      await persistPracticeSession(updatePracticeSessionAfterAttempt(practiceSession, historyRecord));
       await persistAttemptHistory(historyRecord);
       await persistPendingClip(score);
       setLessonState((current) => resolveAttempt(current, score));
@@ -410,6 +457,8 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
   const clearLocalAttemptHistory = useCallback(async () => {
     setAttemptHistory([]);
+    setPracticeSessions([]);
+    activeSessionRef.current = null;
     await clearAttemptHistory();
   }, []);
 
@@ -430,12 +479,18 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     listeningDurationMs: timelineDurationMs,
     errorMessage,
     exerciseProgress,
+    practiceSummary,
+    recommendedExercise,
+    recentAttempts,
+    recentSessions,
     attemptHistoryCount: attemptHistory.length,
     selectedExerciseHistory,
     localClip,
     clipErrorMessage,
     clearLocalAttemptHistory,
     deleteLocalClip,
+    startPracticeSession,
+    endPracticeSession,
     startAttempt,
     stopAttempt,
     resetLesson,
@@ -469,6 +524,22 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   async function persistAttemptHistory(record: AttemptHistoryRecord) {
     setAttemptHistory((current) => mergeAttemptHistory([record], current));
     await saveAttemptHistoryRecord(record);
+  }
+
+  async function persistPracticeSession(record: PracticeSessionRecord) {
+    activeSessionRef.current = record;
+    setPracticeSessions((current) => mergePracticeSessions([record], current));
+    await savePracticeSessionRecord(record);
+  }
+
+  function getOrCreateActivePracticeSession(exerciseId: ExerciseId) {
+    if (activeSessionRef.current?.exerciseId === exerciseId) {
+      return activeSessionRef.current;
+    }
+
+    const session = createPracticeSessionRecord({ exerciseId });
+    activeSessionRef.current = session;
+    return session;
   }
 
   function setLocalClipFromBlob(clip: CapturedAudioClip) {
@@ -515,4 +586,17 @@ function mergeAttemptHistory(
     recordsById.set(record.id, record);
   });
   return pruneAttemptHistory([...recordsById.values()]);
+}
+
+function mergePracticeSessions(
+  primary: PracticeSessionRecord[],
+  secondary: PracticeSessionRecord[]
+) {
+  const recordsById = new Map<string, PracticeSessionRecord>();
+  [...primary, ...secondary].forEach((record) => {
+    recordsById.set(record.id, record);
+  });
+  return [...recordsById.values()].sort(
+    (a, b) => Date.parse(b.lastAttemptAt) - Date.parse(a.lastAttemptAt)
+  );
 }

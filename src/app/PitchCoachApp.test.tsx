@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AudioCaptureConfig, AudioInputEngine, PitchDetectorAdapter, PromptPlayer } from "../audio/types";
-import type { CoachSettings, PitchFrame } from "../domain/contracts";
+import type { CoachSettings, PitchFrame, PracticeSessionRecord } from "../domain/contracts";
 import {
   buildTargetNotes,
   DEFAULT_SCORING_POLICY,
@@ -14,9 +14,13 @@ import { createStereoBuffer } from "../song/audioData";
 import { SONG_REFERENCE_ANALYSIS_VERSION } from "../song/referenceVersion";
 import type { SongModeServices, SongPracticeConfig, SongReference, SongStereoBuffer } from "../song/types";
 import type { AttemptHistoryRecord } from "../domain/contracts";
-import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
+import {
+  loadAttemptHistory,
+  saveAttemptHistoryRecord,
+  savePracticeSessionRecord
+} from "../storage/attemptHistoryStorage";
 import { installFakeIndexedDB } from "../test/fakeIndexedDB";
-import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME } from "../themes";
+import { DEFAULT_THEME } from "../themes";
 import { PitchCoachApp } from "./PitchCoachApp";
 
 describe("PitchCoachApp", () => {
@@ -41,14 +45,163 @@ describe("PitchCoachApp", () => {
   it("renders the initial exercise screen", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    expect(screen.getByRole("heading", { name: "Pitch Coach" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Song mode" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Single Note Match/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
+    expect(screen.getByText("Your local practice stats will build as you sing.")).toBeTruthy();
+    expect(screen.getByText("Local practice")).toBeTruthy();
+    expect(screen.queryByText("Robin")).toBeNull();
+    expect(screen.getByRole("button", { name: /Start practice/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Interval Training/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Sing a Song/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("0 attempts logged");
+    expect(screen.queryByText("1,284")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Practice Library" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 
-  it("opens song mode and shows runtime requirements when unsupported", async () => {
+  it("renders home stats from local attempt history", async () => {
+    await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
+    await saveAttemptHistoryRecord(historyRecord("five-note-scale", 1, true));
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("2 attempts logged")
+    );
+    const stats = screen.getByLabelText("Practice stats").textContent ?? "";
+    expect(stats).toContain("Accuracy50%");
+    expect(stats).toContain("Notes in tune1");
+    expect(stats).toContain("Practiced1min");
+  });
+
+  it("navigates top-level shell tabs without leaving the app shell", async () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getByRole("tab", { name: "Home" }).getAttribute("data-state")).toBe("active");
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Practice" }), {
+        button: 0,
+        ctrlKey: false
+      });
+    });
+    expect(window.location.pathname).toBe("/practice");
+    expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Progress" }), {
+        button: 0,
+        ctrlKey: false
+      });
+    });
+    expect(window.location.pathname).toBe("/progress");
+    expect(screen.getByRole("heading", { name: "Your Progress" })).toBeTruthy();
+  });
+
+  it("opens the practice library route directly", () => {
+    window.history.replaceState(null, "", "/practice");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getByRole("tab", { name: "Practice" }).getAttribute("data-state")).toBe("active");
+    expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
+    expect(document.querySelector(".library-heading")?.textContent).toContain("0 / 8 exercises tried");
+    expect(screen.getByLabelText("No accuracy yet").textContent).toContain("New");
+    expect(screen.getByRole("button", { name: /Major Triad/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("New");
+    expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("No attempts yet");
+  });
+
+  it("renders the progress route from local attempt history", async () => {
+    const triadAttempt = historyRecord("major-triad", 0, false);
+    const scaleAttempt = historyRecord("five-note-scale", 1, true);
+    await savePracticeSessionRecord(sessionRecord(triadAttempt.sessionId, triadAttempt.exerciseId, 0));
+    await saveAttemptHistoryRecord(triadAttempt);
+    await savePracticeSessionRecord(sessionRecord(scaleAttempt.sessionId, scaleAttempt.exerciseId, 1));
+    await saveAttemptHistoryRecord(scaleAttempt);
+    window.history.replaceState(null, "", "/progress");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getByRole("heading", { name: "Recent sessions" })).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getAllByText(/Five-Note Major Scale/).length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText("Local stats")).toBeNull();
+    expect(screen.getByText("Day streak")).toBeTruthy();
+    expect(screen.getByText("Accuracy over time")).toBeTruthy();
+    expect(screen.getByText("Notes in tune")).toBeTruthy();
+    expect(screen.getByText("Exercises done")).toBeTruthy();
+    expect(screen.getByText("Time practiced")).toBeTruthy();
+    expect(screen.getByText("This week")).toBeTruthy();
+    expect(screen.getByText(/Scales/)).toBeTruthy();
+    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getAllByText(/1 attempt/).length).toBeGreaterThan(0);
+    const recentScaleLink = screen.getByRole("link", { name: /Five-Note Major Scale/ });
+    expect(recentScaleLink.getAttribute("href")).toBe("/exercises/five-note-scale");
+    fireEvent.click(recentScaleLink);
+    expect(window.location.pathname).toBe("/exercises/five-note-scale");
+  });
+
+  it("groups progress recent activity by practice session", async () => {
+    const session = sessionRecord("step-session", "step-up-back", 3);
+    await savePracticeSessionRecord(session);
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 0, true, session.id));
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 1, true, session.id));
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 2, false, session.id));
+    window.history.replaceState(null, "", "/progress");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("link", { name: /Step Up and Back/ })).toHaveLength(1);
+    });
+    const stepSession = screen.getByRole("link", { name: /Step Up and Back/ });
+    expect(stepSession.textContent).toContain("3 attempts");
+    expect(stepSession.textContent).toContain("67%");
+  });
+
+  it("renders separate progress rows for separate visits to the same exercise", async () => {
+    const firstSession = sessionRecord("first-step-session", "step-up-back", 0);
+    const secondSession = sessionRecord("second-step-session", "step-up-back", 1);
+    await savePracticeSessionRecord(firstSession);
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 0, true, firstSession.id));
+    await savePracticeSessionRecord(secondSession);
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 1, true, secondSession.id));
+    window.history.replaceState(null, "", "/progress");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("link", { name: /Step Up and Back/ })).toHaveLength(2);
+    });
+  });
+
+  it("opens the recommendation card into the matching exercise route", () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
+
+    expect(window.location.pathname).toBe("/exercises/major-triad");
+    expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
+  });
+
+  it("filters the practice library by exercise category", async () => {
+    window.history.replaceState(null, "", "/practice");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByRole("tab", { name: /Scales/i }), {
+        button: 0,
+        ctrlKey: false
+      });
+    });
+
+    expect(screen.getByRole("button", { name: /Five-Note Major Scale/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Major Triad/i })).toBeNull();
+  });
+
+  it("opens song mode in the mock empty state when unsupported", async () => {
     render(
       <PitchCoachApp
         services={createServices([])}
@@ -57,14 +210,44 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/songs"));
-    expect(screen.getByRole("heading", { name: "Song Practice" })).toBeTruthy();
-    expect(screen.getByLabelText("Song mode unavailable").textContent).toMatch(/WebGPU/i);
+    expect(screen.getByRole("tab", { name: "Sing" }).getAttribute("data-state")).toBe("active");
+    expect(screen.getByRole("heading", { name: "Sing a Song" })).toBeTruthy();
+    expect(screen.getByText("Drop a song here")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Choose a file" })).toBeTruthy();
+    expect(screen.getByText(/How it works/i)).toBeTruthy();
+    expect(screen.queryByLabelText("Song pitch timeline")).toBeNull();
+    expect(screen.queryByLabelText("Song controls and feedback")).toBeNull();
   });
 
-  it("applies the resolved theme on direct song mode navigation", async () => {
+  it("keeps long uploaded song names available while the processing title can truncate", async () => {
+    const longFileName =
+      "YTDown_YouTube_Green-Day-Good-Riddance-Time-Of-Your-Life_Media_fhrK0i-2Nes_009_128K.mp3";
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={createSongServices({ supported: false })}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], longFileName, { type: "audio/mpeg" })]
+      }
+    });
+
+    await screen.findByLabelText("Song processing");
+    const titledFilenameNodes = screen.getAllByTitle(longFileName);
+    expect(titledFilenameNodes[0].tagName).toBe("H2");
+    expect(titledFilenameNodes.length).toBeGreaterThan(1);
+  });
+
+  it("applies the locked mock theme on direct song mode navigation", async () => {
     mockPreferredColorScheme(true);
     window.history.replaceState(null, "", "/songs");
 
@@ -75,8 +258,10 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    await screen.findByRole("heading", { name: "Song Practice" });
-    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+    await screen.findByRole("heading", { name: "Sing a Song" });
+    expect(screen.getByRole("tab", { name: "Sing" }).getAttribute("data-state")).toBe("active");
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_THEME.name);
   });
 
   it("uploads, analyzes, and scores a song practice attempt with fake local services", async () => {
@@ -89,7 +274,9 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
+    expect(await screen.findByRole("heading", { name: "Sing a Song" })).toBeTruthy();
+    expect(screen.getByText("Drop a song here")).toBeTruthy();
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -97,12 +284,11 @@ describe("PitchCoachApp", () => {
       }
     });
 
-    await screen.findByText(/0:01 selected/);
-    expect(screen.getByRole("button", { name: "Balanced" }).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "Sensitive" }));
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
+    await screen.findByLabelText("Song processing");
+    expect(screen.getAllByText("practice.wav").length).toBeGreaterThan(0);
 
     await screen.findByText(/1 note/i);
+    expect(screen.getByText(/Follow the mapped vocal contour/i)).toBeTruthy();
     expect(screen.getByRole("group", { name: "Reference detail" })).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Debug note timing"));
     expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/C4 MIDI 60/);
@@ -113,7 +299,7 @@ describe("PitchCoachApp", () => {
     expect(songServices.separator.separate).toHaveBeenCalled();
     expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ detail: "sensitive" })
+      expect.objectContaining({ detail: "balanced" })
     );
   });
 
@@ -127,7 +313,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -135,19 +321,17 @@ describe("PitchCoachApp", () => {
       }
     });
 
-    await screen.findByText(/0:01 selected/);
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
     await screen.findByText(/1 note/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
-    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Singing").length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
-    await waitFor(() => expect(screen.getByText("Paused")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("On pause").length).toBeGreaterThan(0));
     expect(songServices.practiceEngine.pause).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
-    await waitFor(() => expect(screen.getByText("Listening")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Singing").length).toBeGreaterThan(0));
     expect(songServices.practiceEngine.resume).toHaveBeenCalled();
   });
 
@@ -164,7 +348,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
@@ -172,11 +356,8 @@ describe("PitchCoachApp", () => {
       }
     });
 
-    await screen.findByText(/0:01 selected/);
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
-
     await screen.findByText(/Transcription engine updated\. Analyze song again\./i);
-    expect(screen.getByLabelText("Debug note timing")).toHaveProperty("disabled", true);
+    expect(screen.queryByLabelText("Debug note timing")).toBeNull();
     expect(songServices.separator.separate).toHaveBeenCalledTimes(1);
   });
 
@@ -196,16 +377,13 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Song mode" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
     const fileInput = await screen.findByLabelText("Audio");
     fireEvent.change(fileInput, {
       target: {
         files: [new File(["audio"], "practice.wav", { type: "audio/wav" })]
       }
     });
-
-    await screen.findByText(/0:01 selected/);
-    fireEvent.click(screen.getByRole("button", { name: "Analyze song" }));
 
     await screen.findByText(/range C3-C5/i);
     expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
@@ -378,54 +556,14 @@ describe("PitchCoachApp", () => {
     expect(switchControl.getAttribute("aria-checked")).toBe("true");
   });
 
-  it("defaults the system theme to the current color scheme", () => {
+  it("locks the app to the mock theme and hides theme controls", () => {
     mockPreferredColorScheme(true);
 
     render(<PitchCoachApp services={createServices([])} />);
 
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
-    expect(screen.getByRole("radio", { name: "System theme" }).getAttribute("aria-checked")).toBe("true");
-  });
-
-  it("persists manual theme preferences in settings", () => {
-    mockPreferredColorScheme(false);
-
-    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
-
-    fireEvent.click(screen.getByRole("radio", { name: `${DEFAULT_DARK_THEME.name} theme` }));
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
-    expect(readStoredSettings().themePreference).toEqual({
-      mode: "theme",
-      themeName: DEFAULT_DARK_THEME.name
-    });
-    expect(
-      screen.getByRole("radio", { name: `${DEFAULT_DARK_THEME.name} theme` }).getAttribute("aria-checked")
-    ).toBe("true");
-
-    fireEvent.click(screen.getByRole("radio", { name: `${DEFAULT_LIGHT_THEME.name} theme` }));
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_LIGHT_THEME.name);
-    expect(readStoredSettings().themePreference).toEqual({
-      mode: "theme",
-      themeName: DEFAULT_LIGHT_THEME.name
-    });
-  });
-
-  it("updates system theme when the preferred color scheme changes", async () => {
-    const media = mockPreferredColorScheme(false);
-
-    render(<PitchCoachApp services={createServices([])} />);
-    expect(document.documentElement.dataset.theme).toBe("light");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_LIGHT_THEME.name);
-
-    await act(async () => {
-      media.setMatches(true);
-    });
-
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_DARK_THEME.name);
+    expect(document.documentElement.dataset.themeName).toBe(DEFAULT_THEME.name);
+    expect(screen.queryByRole("radiogroup", { name: "Theme" })).toBeNull();
   });
 
   it("opens a selected exercise detail screen from the library", async () => {
@@ -439,7 +577,7 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+    openSingleNoteMatch();
     expect(screen.getByText("72 BPM")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
     expect(window.location.pathname).toBe("/exercises/single-note-match");
@@ -449,6 +587,24 @@ describe("PitchCoachApp", () => {
     await flushReact();
 
     expect(screen.getAllByText(/Nice work/).length).toBeGreaterThan(0);
+  });
+
+  it("shows guided practice status and updates note checkpoints after scoring", async () => {
+    render(<PitchCoachApp services={createServices(stableFrames(0))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    expect(screen.getByLabelText("Practice guidance").textContent).toContain("Listen to the guide");
+    expect(screen.getByLabelText("Target notes").textContent).toContain("Target");
+    expect(screen.getByLabelText("Target notes").textContent).toContain("A3");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Practice guidance").textContent).toContain("Nice pass");
+      expect(screen.getByLabelText("Target notes").textContent).toContain("Pass");
+    });
   });
 
   it("records attempt history and updates exercise progress", async () => {
@@ -465,8 +621,43 @@ describe("PitchCoachApp", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Back to exercises" }));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy());
     expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("100% recent pass");
+  });
+
+  it("keeps repeated attempts in one session until leaving the exercise route", async () => {
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+    fireEvent.click(screen.getByRole("button", { name: "Retry triad" }));
+    await flushReact();
+    await flushReact();
+
+    const records = await loadAttemptHistory();
+    expect(records).toHaveLength(2);
+    expect(new Set(records.map((record) => record.sessionId)).size).toBe(1);
+  });
+
+  it("starts a new session after leaving and reopening an exercise route", async () => {
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+    fireEvent.click(screen.getByRole("button", { name: "Back to exercises" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Major Triad/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+
+    const records = await loadAttemptHistory();
+    expect(records).toHaveLength(2);
+    expect(new Set(records.map((record) => record.sessionId)).size).toBe(2);
   });
 
   it("loads selected exercise history on a direct exercise route", async () => {
@@ -512,8 +703,8 @@ describe("PitchCoachApp", () => {
     });
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe("/");
-      expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+      expect(window.location.pathname).toBe("/practice");
+      expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
     });
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
@@ -531,7 +722,7 @@ describe("PitchCoachApp", () => {
   it("changes lessons from the exercise dropdown", async () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+    openSingleNoteMatch();
     expect(window.location.pathname).toBe("/exercises/single-note-match");
 
     const exerciseDropdown = screen.getByRole("combobox", { name: "Exercise" });
@@ -547,7 +738,7 @@ describe("PitchCoachApp", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    await waitFor(() => expect(window.location.pathname).toBe("/practice"));
   });
 
   it("uses shared dropdown controls instead of native selects", () => {
@@ -561,13 +752,13 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("combobox", { name: "High" }).tagName).toBe("BUTTON");
   });
 
-  it("replaces invalid exercise routes with the library route", async () => {
+  it("replaces invalid exercise routes with the home route", async () => {
     window.history.replaceState(null, "", "/exercises/not-real");
 
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
-    expect(screen.getByRole("heading", { name: "Practice Library" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 
@@ -594,7 +785,7 @@ describe("PitchCoachApp", () => {
     const services = createServices(stableFramesForTargets(targets, 0));
     render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Five-Note Major Scale/i }));
+    openFiveNoteScale();
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
 
@@ -666,10 +857,12 @@ function stableFramesForTargets(targets: ReturnType<typeof buildTargetNotes>, of
 function historyRecord(
   exerciseId: AttemptHistoryRecord["exerciseId"],
   index: number,
-  passed: boolean
+  passed: boolean,
+  sessionId = `${exerciseId}-session-${index}`
 ): AttemptHistoryRecord {
   return {
     id: `${exerciseId}-${index}`,
+    sessionId,
     exerciseId,
     createdAt: new Date(Date.UTC(2026, 4, 13, 18, index)).toISOString(),
     rootMidi: parseNoteName("A3"),
@@ -688,6 +881,20 @@ function historyRecord(
         warnings: []
       }
     ]
+  };
+}
+
+function sessionRecord(
+  id: string,
+  exerciseId: PracticeSessionRecord["exerciseId"],
+  index: number
+): PracticeSessionRecord {
+  const timestamp = new Date(Date.UTC(2026, 4, 13, 18, index)).toISOString();
+  return {
+    id,
+    exerciseId,
+    startedAt: timestamp,
+    lastAttemptAt: timestamp
   };
 }
 
@@ -737,15 +944,6 @@ function createServices(frames: PitchFrame[], rejection?: Error): {
       cancel: vi.fn()
     }
   };
-}
-
-function readStoredSettings() {
-  const rawSettings = localStorage.getItem("pitch-coach-settings-v1");
-  if (!rawSettings) {
-    throw new Error("Expected stored settings");
-  }
-
-  return JSON.parse(rawSettings) as CoachSettings;
 }
 
 function mockPreferredColorScheme(initialMatches: boolean) {
@@ -972,7 +1170,29 @@ const _settingsCheck: CoachSettings = DEFAULT_SETTINGS;
 void _settingsCheck;
 
 function openMajorTriad() {
+  openPracticeLibrary();
   fireEvent.click(screen.getByRole("button", { name: /Major Triad/i }));
+}
+
+function openSingleNoteMatch() {
+  openPracticeLibrary();
+  fireEvent.click(screen.getByRole("button", { name: /Single Note Match/i }));
+}
+
+function openFiveNoteScale() {
+  openPracticeLibrary();
+  fireEvent.click(screen.getByRole("button", { name: /Five-Note Major Scale/i }));
+}
+
+function openPracticeLibrary() {
+  if (screen.queryByRole("heading", { name: "Practice Library", level: 1 })) {
+    return;
+  }
+
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Practice" }), {
+    button: 0,
+    ctrlKey: false
+  });
 }
 
 async function chooseDropdownOption(trigger: HTMLElement, optionName: string) {

@@ -7,6 +7,8 @@ const button = cva(["ui-button", CONTROL_RADIUS_CLASS].join(" "), {
     variant: {
       primary: "ui-button--primary",
       secondary: "ui-button--secondary",
+      success: "ui-button--success",
+      song: "ui-button--song",
       danger: "ui-button--danger",
       ghost: "ui-button--ghost"
     },
