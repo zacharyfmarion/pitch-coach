@@ -736,7 +736,7 @@
   text-align: right;
 }
 
-.note-checkpoint-strip {
+.target-checkpoint-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
   gap: var(--space-2);
@@ -748,7 +748,7 @@
   list-style: none;
 }
 
-.note-checkpoint {
+.target-checkpoint {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -761,7 +761,7 @@
   background: var(--bg-primary);
 }
 
-.note-checkpoint__degree {
+.target-checkpoint__chip {
   display: grid;
   width: 24px;
   height: 24px;
@@ -774,7 +774,7 @@
   font-weight: 820;
 }
 
-.note-checkpoint strong {
+.target-checkpoint strong {
   overflow: hidden;
   color: var(--text-primary);
   font-size: 0.82rem;
@@ -784,49 +784,53 @@
   white-space: nowrap;
 }
 
-.note-checkpoint > span:last-child {
+.target-checkpoint > span:last-child {
   color: var(--text-tertiary);
   font-size: 0.68rem;
   font-weight: 760;
   line-height: 1.1;
 }
 
-.note-checkpoint--pass,
-.note-checkpoint--passWithWarning {
+.target-checkpoint--pass,
+.target-checkpoint--passWithWarning {
   border-color: color-mix(in srgb, var(--status-success) 42%, var(--border-subtle));
   background: var(--surface-success);
 }
 
-.note-checkpoint--pass .note-checkpoint__degree,
-.note-checkpoint--passWithWarning .note-checkpoint__degree {
+.target-checkpoint--pass .target-checkpoint__chip,
+.target-checkpoint--passWithWarning .target-checkpoint__chip {
   background: var(--status-success);
 }
 
-.note-checkpoint--passWithWarning {
+.target-checkpoint--passWithWarning {
   border-color: color-mix(in srgb, var(--status-warning) 46%, var(--border-subtle));
   background: var(--surface-warning);
 }
 
-.note-checkpoint--passWithWarning .note-checkpoint__degree {
+.target-checkpoint--passWithWarning .target-checkpoint__chip {
   background: var(--status-warning);
 }
 
-.note-checkpoint--flat,
-.note-checkpoint--sharp,
-.note-checkpoint--wrongNote,
-.note-checkpoint--unstable,
-.note-checkpoint--unclear,
-.note-checkpoint--missed {
+.target-checkpoint--flat,
+.target-checkpoint--sharp,
+.target-checkpoint--wrongNote,
+.target-checkpoint--wrongDirection,
+.target-checkpoint--offContour,
+.target-checkpoint--unstable,
+.target-checkpoint--unclear,
+.target-checkpoint--missed {
   border-color: color-mix(in srgb, var(--status-danger) 40%, var(--border-subtle));
   background: var(--surface-danger);
 }
 
-.note-checkpoint--flat .note-checkpoint__degree,
-.note-checkpoint--sharp .note-checkpoint__degree,
-.note-checkpoint--wrongNote .note-checkpoint__degree,
-.note-checkpoint--unstable .note-checkpoint__degree,
-.note-checkpoint--unclear .note-checkpoint__degree,
-.note-checkpoint--missed .note-checkpoint__degree {
+.target-checkpoint--flat .target-checkpoint__chip,
+.target-checkpoint--sharp .target-checkpoint__chip,
+.target-checkpoint--wrongNote .target-checkpoint__chip,
+.target-checkpoint--wrongDirection .target-checkpoint__chip,
+.target-checkpoint--offContour .target-checkpoint__chip,
+.target-checkpoint--unstable .target-checkpoint__chip,
+.target-checkpoint--unclear .target-checkpoint__chip,
+.target-checkpoint--missed .target-checkpoint__chip {
   background: var(--status-danger);
 }
 
@@ -1089,7 +1093,7 @@
   background: var(--bg-secondary);
 }
 
-.degree-pill {
+.segment-pill {
   display: grid;
   width: 24px;
   height: 24px;
@@ -1101,13 +1105,13 @@
   font-weight: 820;
 }
 
-.note-copy {
+.target-copy {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
 
-.note-name {
+.target-name {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--text-primary);
@@ -1115,7 +1119,7 @@
   font-weight: 780;
 }
 
-.note-detail {
+.target-detail {
   color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 620;

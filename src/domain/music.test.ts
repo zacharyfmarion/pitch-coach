@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMajorTriad, centsError, midiToFrequency, midiToNoteName, parseNoteName } from "./music";
+import { centsError, midiToFrequency, midiToNoteName, parseNoteName } from "./music";
 
 describe("music math", () => {
   it("converts MIDI to frequency and note names", () => {
@@ -14,11 +14,4 @@ describe("music math", () => {
     expect(centsError(415.3046976, 440)).toBeCloseTo(-100, 2);
   });
 
-  it("generates major triads by degree", () => {
-    expect(buildMajorTriad(parseNoteName("A3"), [1, 3, 5]).map(midiToNoteName)).toEqual([
-      "A3",
-      "C#4",
-      "E4"
-    ]);
-  });
 });

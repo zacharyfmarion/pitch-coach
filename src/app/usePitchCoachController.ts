@@ -112,7 +112,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const passTimerRef = useRef<number | null>(null);
 
   const currentRootMidi = getCurrentRootMidi(lessonState) ?? selectedExercise.startRootMidi;
-  const targetNotes = useMemo(
+  const targetSegments = useMemo(
     () => buildTargetNotes(currentRootMidi, selectedExercise, settings.tempoBpm),
     [currentRootMidi, selectedExercise, settings.tempoBpm]
   );
@@ -246,7 +246,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   }, []);
 
   const finishAttempt = useCallback(
-    async (runId: number, attemptTargets = targetNotes, attemptRootMidi = currentRootMidi) => {
+    async (runId: number, attemptTargets = targetSegments, attemptRootMidi = currentRootMidi) => {
       if (runId !== runIdRef.current || finishStartedRef.current) {
         return;
       }
@@ -293,7 +293,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       settings.saveLocalClips,
       settings.tempoBpm,
       settings.toleranceCents,
-      targetNotes
+      targetSegments
     ]
   );
 
@@ -471,7 +471,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     lessonState,
     pitchFrames,
     attemptScore,
-    targetNotes,
+    targetSegments,
     currentRootMidi,
     currentKeyLabel: `${midiToNoteName(currentRootMidi)} major`,
     exerciseLabel: formatExercisePattern(selectedExercise),

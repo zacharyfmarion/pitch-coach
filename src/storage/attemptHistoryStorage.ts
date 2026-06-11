@@ -1,6 +1,6 @@
 import type {
   AttemptHistoryRecord,
-  NoteAssessmentStatus,
+  SegmentAssessmentStatus,
   PracticeSessionRecord
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
@@ -14,12 +14,14 @@ const STORE_NAME = "attempts";
 const SESSION_STORE_NAME = "sessions";
 const DB_VERSION = 2;
 
-const NOTE_STATUSES = new Set<NoteAssessmentStatus>([
+const SEGMENT_STATUSES = new Set<SegmentAssessmentStatus>([
   "pass",
   "passWithWarning",
   "flat",
   "sharp",
   "wrongNote",
+  "wrongDirection",
+  "offContour",
   "unstable",
   "unclear",
   "missed"
@@ -204,8 +206,8 @@ function isAttemptHistoryRecord(value: unknown): value is AttemptHistoryRecord {
     typeof record.passed === "boolean" &&
     typeof record.summary === "string" &&
     Number.isFinite(record.durationMs) &&
-    Array.isArray(record.notes) &&
-    record.notes.every(isAttemptHistoryNote)
+    Array.isArray(record.segments) &&
+    record.segments.every(isAttemptHistorySegment)
   );
 }
 
@@ -223,19 +225,34 @@ function isPracticeSessionRecord(value: unknown): value is PracticeSessionRecord
   );
 }
 
-function isAttemptHistoryNote(value: unknown) {
+function isAttemptHistorySegment(value: unknown) {
   if (!isObject(value)) {
     return false;
   }
 
-  const note = value as Partial<AttemptHistoryRecord["notes"][number]>;
+  const segment = value as Partial<AttemptHistoryRecord["segments"][number]>;
+  const hasNoteFields =
+    segment.kind === "note" &&
+    typeof segment.noteName === "string" &&
+    Number.isFinite(segment.midi) &&
+    Number.isFinite(segment.offsetSemitones);
+  const hasGlideFields =
+    segment.kind === "glide" &&
+    typeof segment.fromNoteName === "string" &&
+    typeof segment.toNoteName === "string" &&
+    Number.isFinite(segment.fromMidi) &&
+    Number.isFinite(segment.toMidi) &&
+    Number.isFinite(segment.fromOffsetSemitones) &&
+    Number.isFinite(segment.toOffsetSemitones);
   return (
-    Number.isFinite(note.degree) &&
-    typeof note.label === "string" &&
-    Number.isFinite(note.midi) &&
-    typeof note.status === "string" &&
-    NOTE_STATUSES.has(note.status as NoteAssessmentStatus) &&
-    Array.isArray(note.warnings)
+    typeof segment.id === "string" &&
+    (segment.kind === "note" || segment.kind === "glide") &&
+    typeof segment.label === "string" &&
+    typeof segment.shortLabel === "string" &&
+    typeof segment.status === "string" &&
+    SEGMENT_STATUSES.has(segment.status as SegmentAssessmentStatus) &&
+    Array.isArray(segment.warnings) &&
+    (hasNoteFields || hasGlideFields)
   );
 }
 

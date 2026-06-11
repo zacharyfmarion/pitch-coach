@@ -44,8 +44,9 @@ describe("lesson machine", () => {
 function attemptScore(passed: boolean, summary: string): AttemptScore {
   return {
     passed,
-    notes: [],
+    segments: [],
     events: [],
+    contourEvents: [],
     alignment: [],
     ignoredEventIndices: [],
     durationMs: 0,

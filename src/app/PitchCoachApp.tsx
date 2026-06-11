@@ -49,11 +49,11 @@ import type {
   ExerciseId,
   ExerciseProgressSummary,
   LessonStatus,
-  NoteAssessmentStatus,
-  TargetNote
+  SegmentAssessmentStatus,
+  TargetSegment
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
-import { degreeToSemitones, midiToNoteName } from "../domain/music";
+import { midiToNoteName } from "../domain/music";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
 import { usePitchCoachTheme } from "./theme";
@@ -209,12 +209,12 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const coachGuidance = createCoachGuidance({
     status: coach.lessonState.status,
     exerciseTitle: coach.selectedExercise.title,
-    targetNotes: coach.targetNotes,
+    targetSegments: coach.targetSegments,
     attemptScore: coach.attemptScore
   });
-  const notesInTuneCount =
-    coach.attemptScore?.notes.filter((note) =>
-      note.score ? ["pass", "passWithWarning"].includes(note.score.status) : false
+  const targetsInTuneCount =
+    coach.attemptScore?.segments.filter((segment) =>
+      segment.score ? ["pass", "passWithWarning"].includes(segment.score.status) : false
     ).length ?? 0;
 
   return (
@@ -276,21 +276,21 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
               <div className="practice-main-card">
                 <div className="practice-target-row">
                   <NoteCheckpointStrip
-                    targetNotes={coach.targetNotes}
+                    targetSegments={coach.targetSegments}
                     attemptScore={coach.attemptScore}
                   />
-                  <div className="practice-score-readout" aria-label={`${notesInTuneCount} notes in tune`}>
+                  <div className="practice-score-readout" aria-label={`${targetsInTuneCount} targets in tune`}>
                     <strong>
-                      {notesInTuneCount}
-                      <span>/{coach.targetNotes.length}</span>
+                      {targetsInTuneCount}
+                      <span>/{coach.targetSegments.length}</span>
                     </strong>
-                    <span>notes in tune</span>
+                    <span>targets in tune</span>
                   </div>
                 </div>
 
                 <PitchTimeline
                   frames={coach.pitchFrames}
-                  targetNotes={coach.targetNotes}
+                  targetSegments={coach.targetSegments}
                   attemptScore={coach.attemptScore}
                   totalDurationMs={coach.listeningDurationMs}
                   toleranceCents={coach.settings.toleranceCents}
@@ -492,9 +492,9 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
                 <CardContent>
                   <p className="coach-summary">
                     {coach.attemptScore?.summary ??
-                      `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`}
+                      `Sing ${formatTargetSegmentPattern(coach.targetSegments)} after the guide.`}
                   </p>
-                  <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
+                  <FeedbackList targetSegments={coach.targetSegments} attemptScore={coach.attemptScore} />
                 </CardContent>
               </Card>
 
@@ -641,21 +641,21 @@ function createPracticeStatusView(
 function createCoachGuidance({
   status,
   exerciseTitle,
-  targetNotes,
+  targetSegments,
   attemptScore
 }: {
   status: LessonStatus;
   exerciseTitle: string;
-  targetNotes: TargetNote[];
+  targetSegments: TargetSegment[];
   attemptScore: AttemptScore | null;
 }): CoachGuidanceView {
-  const notePattern = targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ");
+  const targetPattern = formatTargetSegmentPattern(targetSegments);
 
   switch (status) {
     case "idle":
       return {
         title: exerciseTitle,
-        message: `Listen to the guide, then sing ${notePattern}.`,
+        message: `Listen to the guide, then sing ${targetPattern}.`,
         tone: "accent",
         icon: <Music2 size={18} />
       };
@@ -676,14 +676,14 @@ function createCoachGuidance({
     case "listening":
       return {
         title: "Keep it steady",
-        message: "Aim for clean centers and smooth motion between notes.",
+        message: "Aim for clean centers and smooth motion between targets.",
         tone: "accent",
         icon: <Activity size={18} />
       };
     case "scoring":
       return {
         title: "Checking your take",
-        message: "Pitch centers, stability, and missed notes are being scored locally.",
+        message: "Pitch centers, contours, stability, and missed targets are being scored locally.",
         tone: "info",
         icon: <Gauge size={18} />
       };
@@ -712,26 +712,26 @@ function createCoachGuidance({
 }
 
 function NoteCheckpointStrip({
-  targetNotes,
+  targetSegments,
   attemptScore
 }: {
-  targetNotes: TargetNote[];
+  targetSegments: TargetSegment[];
   attemptScore: AttemptScore | null;
 }) {
-  const notes = attemptScore?.notes ?? targetNotes.map((note) => ({ ...note, score: null }));
+  const segments = attemptScore?.segments ?? targetSegments.map((segment) => ({ ...segment, score: null }));
 
   return (
-    <ol className="note-checkpoint-strip" aria-label="Target notes">
-      {notes.map((note, index) => {
-        const status = note.score?.status ?? "target";
+    <ol className="target-checkpoint-strip" aria-label="Target segments">
+      {segments.map((segment, index) => {
+        const status = segment.score?.status ?? "target";
         return (
           <li
-            key={`${index}-${note.degree}-${note.midi}`}
-            className={`note-checkpoint note-checkpoint--${status}`}
+            key={`${index}-${segment.id}`}
+            className={`target-checkpoint target-checkpoint--${status}`}
           >
-            <span className="note-checkpoint__degree">{note.degree}</span>
-            <strong>{note.label}</strong>
-            <span className="note-checkpoint__label">{describeCheckpointLabel(note, status, index)}</span>
+            <span className="target-checkpoint__chip">{segment.shortLabel}</span>
+            <strong>{describeTargetSegmentPitch(segment)}</strong>
+            <span className="target-checkpoint__label">{describeCheckpointLabel(segment, status, index)}</span>
             <span className="checkpoint-status-legacy">{describeCheckpointStatus(status)}</span>
           </li>
         );
@@ -740,34 +740,29 @@ function NoteCheckpointStrip({
   );
 }
 
+function formatTargetSegmentPattern(targetSegments: TargetSegment[]) {
+  return targetSegments.map(describeTargetSegmentPitch).join(" - ");
+}
+
+function describeTargetSegmentPitch(segment: TargetSegment) {
+  return segment.kind === "note"
+    ? segment.noteName
+    : `${segment.fromNoteName} to ${segment.toNoteName}`;
+}
+
 function describeCheckpointLabel(
-  note: TargetNote,
-  status: NoteAssessmentStatus | "target",
+  segment: TargetSegment,
+  status: SegmentAssessmentStatus | "target",
   index: number
 ) {
   if (status !== "target") {
     return describeCheckpointStatus(status);
   }
 
-  switch (note.degree) {
-    case 1:
-      return "Root";
-    case 2:
-      return "Second";
-    case 3:
-      return "Third";
-    case 4:
-      return "Fourth";
-    case 5:
-      return "Fifth";
-    case 8:
-      return "Octave";
-    default:
-      return `Note ${index + 1}`;
-  }
+  return segment.label || `Target ${index + 1}`;
 }
 
-function describeCheckpointStatus(status: NoteAssessmentStatus | "target") {
+function describeCheckpointStatus(status: SegmentAssessmentStatus | "target") {
   switch (status) {
     case "target":
       return "Target";
@@ -781,6 +776,10 @@ function describeCheckpointStatus(status: NoteAssessmentStatus | "target") {
       return "Sharp";
     case "wrongNote":
       return "Wrong";
+    case "wrongDirection":
+      return "Wrong way";
+    case "offContour":
+      return "Off line";
     case "unstable":
       return "Unstable";
     case "unclear":
@@ -1042,7 +1041,7 @@ function HomeScreen({
           padding="none"
           icon={<LineChart size={19} />}
           label="Accuracy"
-          value={practiceSummary.noteAccuracy ?? 0}
+          value={practiceSummary.segmentAccuracy ?? 0}
           unit="%"
           trend={<AccuracySparkline buckets={practiceSummary.weekActivity} />}
         />
@@ -1051,8 +1050,8 @@ function HomeScreen({
           variant="mock"
           padding="none"
           icon={<CheckCircle2 size={18} />}
-          label="Notes in tune"
-          value={formatInteger(practiceSummary.notesInTune)}
+          label="Targets in tune"
+          value={formatInteger(practiceSummary.segmentsInTune)}
           valueClassName="mock-stat-card__value--green"
         />
         <StatCard
@@ -1162,7 +1161,11 @@ function CheckIcon() {
 }
 
 function ExercisePitchPreview({ exercise }: { exercise: ExerciseDefinition }) {
-  const offsets = exercise.patternDegrees.map(degreeToSemitones);
+  const offsets = exercise.patternSegments.flatMap((segment) =>
+    segment.kind === "note"
+      ? [segment.offsetSemitones]
+      : [segment.fromOffsetSemitones, segment.toOffsetSemitones]
+  );
   const minOffset = Math.min(...offsets);
   const maxOffset = Math.max(...offsets);
   const range = Math.max(1, maxOffset - minOffset);
@@ -1204,11 +1207,11 @@ function AccuracySparkline({
   buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
 }) {
   const points = buckets.flatMap((bucket, index) => {
-    if (bucket.noteCount === 0) {
+    if (bucket.segmentCount === 0) {
       return [];
     }
 
-    const accuracy = bucket.notesInTune / bucket.noteCount;
+    const accuracy = bucket.segmentsInTune / bucket.segmentCount;
     const x = 5 + (index / Math.max(1, buckets.length - 1)) * 140;
     const y = 4 + (1 - accuracy) * 40;
     return [{ x, y }];
@@ -1274,8 +1277,8 @@ function ProgressScreen({
         />
         <ProgressMetricCard
           icon={<Check size={17} aria-hidden="true" />}
-          label="Notes in tune"
-          value={formatInteger(practiceSummary.notesInTune)}
+          label="Targets in tune"
+          value={formatInteger(practiceSummary.segmentsInTune)}
           valueTone="green"
         />
         <ProgressMetricCard
@@ -1294,7 +1297,7 @@ function ProgressScreen({
       <section className="progress-main-grid" aria-label="Progress details">
         <div className="progress-left-stack">
           <ProgressAccuracyCard
-            accuracy={practiceSummary.noteAccuracy}
+            accuracy={practiceSummary.segmentAccuracy}
             trend={accuracyTrend}
           />
           <ProgressWeekCard
@@ -1525,7 +1528,7 @@ function createProgressSessionItems(
 ): ProgressSessionItemView[] {
   return sessions.slice(0, 5).map((session) => {
     const exercise = exercises.find((candidate) => candidate.id === session.exerciseId);
-    const score = session.noteAccuracy;
+    const score = session.segmentAccuracy;
     return {
       id: session.id,
       exerciseId: session.exerciseId,
@@ -1544,7 +1547,7 @@ function createAccuracyTrend(sessions: ReturnType<typeof usePitchCoachController
   return sessions
     .slice(0, 10)
     .reverse()
-    .map((session) => session.noteAccuracy);
+    .map((session) => session.segmentAccuracy);
 }
 
 function formatAccuracyDelta(trend: number[]) {
@@ -1944,7 +1947,8 @@ const exerciseCategoryFilters: readonly ExerciseCategoryFilter[] = [
   "pitch",
   "interval",
   "arpeggio",
-  "scale"
+  "scale",
+  "glide"
 ];
 
 type PracticeExerciseDisplay = {
@@ -2012,13 +2016,13 @@ function ExerciseLibrary({
         <div
           className="library-heading__stat"
           aria-label={
-            practiceSummary.noteAccuracy === undefined
+            practiceSummary.segmentAccuracy === undefined
               ? "No accuracy yet"
-              : `${practiceSummary.noteAccuracy}% accuracy`
+              : `${practiceSummary.segmentAccuracy}% accuracy`
           }
         >
           <LineChart size={16} aria-hidden="true" />
-          <strong>{practiceSummary.noteAccuracy === undefined ? "New" : `${practiceSummary.noteAccuracy}%`}</strong>
+          <strong>{practiceSummary.segmentAccuracy === undefined ? "New" : `${practiceSummary.segmentAccuracy}%`}</strong>
           <span className="library-heading__spark">
             <AccuracySparkline buckets={practiceSummary.weekActivity} />
           </span>
@@ -2134,6 +2138,8 @@ function getPracticeCategoryIcon(category: ExerciseCategory) {
       return <Target size={17} strokeWidth={1.7} />;
     case "scale":
       return <LineChart size={17} strokeWidth={1.7} />;
+    case "glide":
+      return <TrendingUp size={17} strokeWidth={1.7} />;
   }
 }
 
@@ -2149,6 +2155,8 @@ function formatCategoryLabel(category: ExerciseCategoryFilter) {
       return "Triads & Chords";
     case "scale":
       return "Scales";
+    case "glide":
+      return "Slides";
   }
 }
 
@@ -2260,7 +2268,7 @@ function formatProgressSessionDate(createdAt: string) {
   });
 }
 
-function describeIssue(status: NoteAssessmentStatus) {
+function describeIssue(status: SegmentAssessmentStatus) {
   switch (status) {
     case "flat":
       return "flat";
@@ -2268,6 +2276,10 @@ function describeIssue(status: NoteAssessmentStatus) {
       return "sharp";
     case "wrongNote":
       return "wrong note";
+    case "wrongDirection":
+      return "wrong direction";
+    case "offContour":
+      return "off contour";
     case "unstable":
       return "unstable";
     case "unclear":

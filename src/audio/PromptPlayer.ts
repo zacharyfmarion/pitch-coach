@@ -1,40 +1,55 @@
 import * as Tone from "tone";
-import type { PromptStyle, TargetNote } from "../domain/contracts";
+import type { PromptStyle, TargetSegment } from "../domain/contracts";
 import type { PromptPlayer } from "./types";
 
 export class TonePromptPlayer implements PromptPlayer {
   private synth: Tone.PolySynth | null = null;
+  private glideSynth: Tone.Synth | null = null;
   private completionTimer: number | null = null;
 
-  async playPrompt(targetNotes: TargetNote[], tempoBpm: number, promptStyle: PromptStyle) {
+  async playPrompt(targetSegments: TargetSegment[], tempoBpm: number, promptStyle: PromptStyle) {
     this.cancel();
     await Tone.start();
     const synth = this.getSynth();
+    const glideSynth = this.getGlideSynth();
     const beatSeconds = 60 / tempoBpm;
     const now = Tone.now() + 0.08;
     const chordSeconds = beatSeconds * 1.05;
     const gapSeconds = beatSeconds * 0.45;
-    const shouldPlayChord = promptStyle === "chord-then-sequence" && targetNotes.length > 1;
+    const shouldPlayChord = promptStyle === "chord-then-sequence" && targetSegments.length > 1;
     const noteStartSeconds = shouldPlayChord ? now + chordSeconds + gapSeconds : now;
 
     if (shouldPlayChord) {
       synth.triggerAttackRelease(
-        [...new Set(targetNotes.map((note) => note.label))],
+        [...new Set(targetSegments.flatMap(getSegmentPromptNoteNames))],
         chordSeconds,
         now
       );
     }
 
-    targetNotes.forEach((note) => {
-      const noteDurationSeconds = Math.max(beatSeconds * 0.5, ((note.endMs - note.startMs) / 1000) * 0.72);
-      synth.triggerAttackRelease(
-        note.label,
-        noteDurationSeconds,
-        noteStartSeconds + note.startMs / 1000
+    targetSegments.forEach((segment) => {
+      const segmentStartSeconds = noteStartSeconds + segment.startMs / 1000;
+      const segmentDurationSeconds = (segment.endMs - segment.startMs) / 1000;
+      if (segment.kind === "note") {
+        const noteDurationSeconds = Math.max(beatSeconds * 0.5, segmentDurationSeconds * 0.72);
+        synth.triggerAttackRelease(
+          segment.noteName,
+          noteDurationSeconds,
+          segmentStartSeconds
+        );
+        return;
+      }
+
+      glideSynth.frequency.setValueAtTime(segment.fromFrequencyHz, segmentStartSeconds);
+      glideSynth.triggerAttack(segment.fromFrequencyHz, segmentStartSeconds);
+      glideSynth.frequency.linearRampToValueAtTime(
+        segment.toFrequencyHz,
+        segmentStartSeconds + segmentDurationSeconds
       );
+      glideSynth.triggerRelease(segmentStartSeconds + segmentDurationSeconds);
     });
 
-    const lastTargetEndSeconds = (targetNotes.at(-1)?.endMs ?? 0) / 1000;
+    const lastTargetEndSeconds = (targetSegments.at(-1)?.endMs ?? 0) / 1000;
     const leadInSeconds = shouldPlayChord ? chordSeconds + gapSeconds : 0;
     const totalMs = (leadInSeconds + lastTargetEndSeconds + beatSeconds * 0.25) * 1000;
 
@@ -49,6 +64,7 @@ export class TonePromptPlayer implements PromptPlayer {
       this.completionTimer = null;
     }
     this.synth?.releaseAll();
+    this.glideSynth?.triggerRelease();
   }
 
   private getSynth() {
@@ -68,4 +84,28 @@ export class TonePromptPlayer implements PromptPlayer {
 
     return this.synth;
   }
+
+  private getGlideSynth() {
+    if (!this.glideSynth) {
+      this.glideSynth = new Tone.Synth({
+        oscillator: {
+          type: "sine"
+        },
+        envelope: {
+          attack: 0.015,
+          decay: 0.03,
+          sustain: 0.72,
+          release: 0.18
+        }
+      }).toDestination();
+    }
+
+    return this.glideSynth;
+  }
+}
+
+function getSegmentPromptNoteNames(segment: TargetSegment) {
+  return segment.kind === "note"
+    ? [segment.noteName]
+    : [segment.fromNoteName, segment.toNoteName];
 }

@@ -98,11 +98,15 @@ function attemptRecord(
     passed: index % 2 === 0,
     summary: index % 2 === 0 ? "Nice triad." : "A3 was flat.",
     durationMs: 2400,
-    notes: [
+    segments: [
       {
-        degree: 1,
-        label: "A3",
+        id: "root",
+        kind: "note",
+        label: "Root",
+        shortLabel: "R",
+        noteName: "A3",
         midi: 57,
+        offsetSemitones: 0,
         status: index % 2 === 0 ? "pass" : "flat",
         medianCents: index % 2 === 0 ? 0 : -42,
         warnings: []

@@ -2,19 +2,64 @@ import type {
   CoachSettings,
   ExerciseDefinition,
   ExerciseId,
+  ExercisePatternSegment,
   ScoringPolicy,
-  TargetNote,
+  TargetSegment,
   VocalRange
 } from "./contracts";
 import {
-  buildMajorTriad,
   clamp,
-  degreeToSemitones,
   midiRange,
   midiToFrequency,
   midiToNoteName,
   parseNoteName
 } from "./music";
+
+const ROOT_SEGMENT = noteSegment("root", "Root", "R", 0);
+const MAJOR_SECOND_SEGMENT = noteSegment("major-second", "Major second", "M2", 2);
+const MINOR_THIRD_SEGMENT = noteSegment("minor-third", "Minor third", "m3", 3);
+const MAJOR_THIRD_SEGMENT = noteSegment("major-third", "Major third", "M3", 4);
+const PERFECT_FOURTH_SEGMENT = noteSegment("perfect-fourth", "Perfect fourth", "P4", 5);
+const DESCENDING_FOURTH_SEGMENT = noteSegment("descending-fourth", "Perfect fourth below", "↓P4", -5);
+const PERFECT_FIFTH_SEGMENT = noteSegment("perfect-fifth", "Perfect fifth", "P5", 7);
+const OCTAVE_SEGMENT = noteSegment("octave", "Octave", "8ve", 12);
+
+function noteSegment(
+  id: string,
+  label: string,
+  shortLabel: string,
+  offsetSemitones: number,
+  durationBeats?: number
+): ExercisePatternSegment {
+  return {
+    kind: "note",
+    id,
+    label,
+    shortLabel,
+    offsetSemitones,
+    ...(durationBeats === undefined ? {} : { durationBeats })
+  };
+}
+
+function glideSegment(
+  id: string,
+  label: string,
+  shortLabel: string,
+  fromOffsetSemitones: number,
+  toOffsetSemitones: number,
+  durationBeats: number
+): ExercisePatternSegment {
+  return {
+    kind: "glide",
+    id,
+    label,
+    shortLabel,
+    fromOffsetSemitones,
+    toOffsetSemitones,
+    durationBeats,
+    curve: "linear"
+  };
+}
 
 export const MAJOR_TRIAD_EXERCISE: ExerciseDefinition = {
   id: "major-triad",
@@ -23,7 +68,7 @@ export const MAJOR_TRIAD_EXERCISE: ExerciseDefinition = {
   difficulty: 3,
   category: "arpeggio",
   focus: "Triad tuning",
-  patternDegrees: [1, 3, 5],
+  patternSegments: [ROOT_SEGMENT, MAJOR_THIRD_SEGMENT, PERFECT_FIFTH_SEGMENT],
   startRootMidi: parseNoteName("A3"),
   stepSemitones: 1,
   direction: "up-then-down",
@@ -40,7 +85,7 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     difficulty: 1,
     category: "pitch",
     focus: "Pitch center",
-    patternDegrees: [1],
+    patternSegments: [ROOT_SEGMENT],
     startRootMidi: parseNoteName("A3"),
     stepSemitones: 1,
     direction: "up-then-down",
@@ -55,7 +100,7 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     difficulty: 1,
     category: "pitch",
     focus: "Stability",
-    patternDegrees: [1],
+    patternSegments: [noteSegment("root-sustain", "Root", "R", 0, 3)],
     startRootMidi: parseNoteName("A3"),
     stepSemitones: 1,
     direction: "up-then-down",
@@ -71,7 +116,7 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     difficulty: 2,
     category: "interval",
     focus: "Small intervals",
-    patternDegrees: [1, 2, 1],
+    patternSegments: [ROOT_SEGMENT, MAJOR_SECOND_SEGMENT, ROOT_SEGMENT],
     startRootMidi: parseNoteName("A3"),
     stepSemitones: 1,
     direction: "up-then-down",
@@ -86,11 +131,41 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     difficulty: 2,
     category: "interval",
     focus: "Thirds",
-    patternDegrees: [1, 3, 1],
+    patternSegments: [ROOT_SEGMENT, MAJOR_THIRD_SEGMENT, ROOT_SEGMENT],
     startRootMidi: parseNoteName("A3"),
     stepSemitones: 1,
     direction: "up-then-down",
     defaultTempoBpm: 76,
+    scoringProfile: "sequence",
+    promptStyle: "sequence-only"
+  },
+  {
+    id: "minor-third-up-back",
+    title: "Minor Third Up and Back",
+    description: "Move from the root to the minor third and return.",
+    difficulty: 2,
+    category: "interval",
+    focus: "Minor thirds",
+    patternSegments: [ROOT_SEGMENT, MINOR_THIRD_SEGMENT, ROOT_SEGMENT],
+    startRootMidi: parseNoteName("A3"),
+    stepSemitones: 1,
+    direction: "up-then-down",
+    defaultTempoBpm: 76,
+    scoringProfile: "sequence",
+    promptStyle: "sequence-only"
+  },
+  {
+    id: "descending-fourth-return",
+    title: "Descending Fourth Return",
+    description: "Drop to the fourth below and return to the root.",
+    difficulty: 3,
+    category: "interval",
+    focus: "Descending intervals",
+    patternSegments: [ROOT_SEGMENT, DESCENDING_FOURTH_SEGMENT, ROOT_SEGMENT],
+    startRootMidi: parseNoteName("A3"),
+    stepSemitones: 1,
+    direction: "up-then-down",
+    defaultTempoBpm: 72,
     scoringProfile: "sequence",
     promptStyle: "sequence-only"
   },
@@ -102,7 +177,7 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     difficulty: 3,
     category: "arpeggio",
     focus: "Descending accuracy",
-    patternDegrees: [5, 3, 1],
+    patternSegments: [PERFECT_FIFTH_SEGMENT, MAJOR_THIRD_SEGMENT, ROOT_SEGMENT],
     startRootMidi: parseNoteName("A3"),
     stepSemitones: 1,
     direction: "up-then-down",
@@ -111,13 +186,38 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     promptStyle: "chord-then-sequence"
   },
   {
+    id: "fifth-glide",
+    title: "Fifth Glide",
+    description: "Slide smoothly from the root up to the fifth.",
+    difficulty: 3,
+    category: "glide",
+    focus: "Connected ascent",
+    patternSegments: [glideSegment("root-to-fifth", "Root to fifth", "↑P5", 0, 7, 2)],
+    startRootMidi: parseNoteName("A3"),
+    stepSemitones: 1,
+    direction: "up-then-down",
+    defaultTempoBpm: 60,
+    scoringProfile: "sequence",
+    promptStyle: "sequence-only"
+  },
+  {
     id: "five-note-scale",
     title: "Five-Note Major Scale",
-    description: "Sing up and down the first five major-scale degrees.",
+    description: "Sing up and down the first five major-scale steps.",
     difficulty: 4,
     category: "scale",
     focus: "Scale motion",
-    patternDegrees: [1, 2, 3, 4, 5, 4, 3, 2, 1],
+    patternSegments: [
+      ROOT_SEGMENT,
+      MAJOR_SECOND_SEGMENT,
+      MAJOR_THIRD_SEGMENT,
+      PERFECT_FOURTH_SEGMENT,
+      PERFECT_FIFTH_SEGMENT,
+      PERFECT_FOURTH_SEGMENT,
+      MAJOR_THIRD_SEGMENT,
+      MAJOR_SECOND_SEGMENT,
+      ROOT_SEGMENT
+    ],
     startRootMidi: parseNoteName("A3"),
     stepSemitones: 1,
     direction: "up-then-down",
@@ -132,11 +232,37 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     difficulty: 5,
     category: "arpeggio",
     focus: "Range control",
-    patternDegrees: [1, 3, 5, 8, 5, 3, 1],
+    patternSegments: [
+      ROOT_SEGMENT,
+      MAJOR_THIRD_SEGMENT,
+      PERFECT_FIFTH_SEGMENT,
+      OCTAVE_SEGMENT,
+      PERFECT_FIFTH_SEGMENT,
+      MAJOR_THIRD_SEGMENT,
+      ROOT_SEGMENT
+    ],
     startRootMidi: parseNoteName("A3"),
     stepSemitones: 1,
     direction: "up-then-down",
     defaultTempoBpm: 84,
+    scoringProfile: "sequence",
+    promptStyle: "sequence-only"
+  },
+  {
+    id: "octave-siren",
+    title: "Octave Siren",
+    description: "Glide up to the octave and back without breaking the line.",
+    difficulty: 5,
+    category: "glide",
+    focus: "Range connection",
+    patternSegments: [
+      glideSegment("root-to-octave", "Root to octave", "↑8ve", 0, 12, 2),
+      glideSegment("octave-to-root", "Octave to root", "↓8ve", 12, 0, 2)
+    ],
+    startRootMidi: parseNoteName("A3"),
+    stepSemitones: 1,
+    direction: "up-then-down",
+    defaultTempoBpm: 60,
     scoringProfile: "sequence",
     promptStyle: "sequence-only"
   }
@@ -210,7 +336,7 @@ export function createScoringPolicy(settings: CoachSettings): ScoringPolicy {
       ...policy,
       attemptMaxDurationMs: Math.max(
         policy.attemptMaxDurationMs,
-        exercise.patternDegrees.length * (60000 / settings.tempoBpm) + 2500
+        getExerciseDurationBeats(exercise) * (60000 / settings.tempoBpm) + 2500
       )
     };
   }
@@ -221,10 +347,10 @@ export function createScoringPolicy(settings: CoachSettings): ScoringPolicy {
 export function normalizeRange(range: VocalRange): VocalRange {
   const lowestMidi = Math.round(range.lowestMidi);
   const highestMidi = Math.round(range.highestMidi);
-  if (highestMidi - lowestMidi < degreeToSemitones(5)) {
+  if (highestMidi - lowestMidi < 7) {
     return {
       lowestMidi,
-      highestMidi: lowestMidi + degreeToSemitones(5)
+      highestMidi: lowestMidi + 7
     };
   }
 
@@ -261,33 +387,83 @@ export function buildTargetNotes(
   rootMidi: number,
   exercise: ExerciseDefinition,
   tempoBpm: number
-): TargetNote[] {
+): TargetSegment[] {
   const beatMs = 60000 / tempoBpm;
-  const noteDurationBeats = exercise.noteDurationBeats ?? 1;
-  const noteDurationMs = beatMs * noteDurationBeats;
-  const triadMidis = buildMajorTriad(rootMidi, exercise.patternDegrees);
+  let cursorMs = 0;
 
-  return triadMidis.map((midi, index) => ({
-    degree: exercise.patternDegrees[index],
-    midi,
-    label: midiToNoteName(midi),
-    frequencyHz: midiToFrequency(midi),
-    startMs: index * noteDurationMs,
-    endMs: (index + 1) * noteDurationMs
-  }));
+  return exercise.patternSegments.map((segment, index) => {
+    const durationBeats =
+      segment.kind === "note"
+        ? segment.durationBeats ?? exercise.noteDurationBeats ?? 1
+        : segment.durationBeats;
+    const durationMs = beatMs * durationBeats;
+    const startMs = cursorMs;
+    const endMs = cursorMs + durationMs;
+    cursorMs = endMs;
+
+    if (segment.kind === "note") {
+      const midi = rootMidi + segment.offsetSemitones;
+      return {
+        kind: "note",
+        id: `${segment.id}-${index + 1}`,
+        label: segment.label,
+        shortLabel: segment.shortLabel,
+        offsetSemitones: segment.offsetSemitones,
+        midi,
+        noteName: midiToNoteName(midi),
+        frequencyHz: midiToFrequency(midi),
+        startMs,
+        endMs
+      };
+    }
+
+    const fromMidi = rootMidi + segment.fromOffsetSemitones;
+    const toMidi = rootMidi + segment.toOffsetSemitones;
+    return {
+      kind: "glide",
+      id: `${segment.id}-${index + 1}`,
+      label: segment.label,
+      shortLabel: segment.shortLabel,
+      fromOffsetSemitones: segment.fromOffsetSemitones,
+      toOffsetSemitones: segment.toOffsetSemitones,
+      fromMidi,
+      toMidi,
+      fromNoteName: midiToNoteName(fromMidi),
+      toNoteName: midiToNoteName(toMidi),
+      fromFrequencyHz: midiToFrequency(fromMidi),
+      toFrequencyHz: midiToFrequency(toMidi),
+      curve: segment.curve,
+      startMs,
+      endMs
+    };
+  });
 }
 
-export function getListeningDurationMs(targetNotes: TargetNote[]) {
-  const lastNote = targetNotes.at(-1);
-  return lastNote ? lastNote.endMs + 350 : 0;
+export function getListeningDurationMs(targetSegments: TargetSegment[]) {
+  const lastSegment = targetSegments.at(-1);
+  return lastSegment ? lastSegment.endMs + 350 : 0;
 }
 
 export function formatExercisePattern(exercise: ExerciseDefinition) {
-  return exercise.patternDegrees.join("-");
+  return exercise.patternSegments.map((segment) => segment.shortLabel).join("-");
 }
 
 function getPatternSemitoneOffsets(exercise: ExerciseDefinition) {
-  return exercise.patternDegrees.map(degreeToSemitones);
+  return exercise.patternSegments.flatMap((segment) =>
+    segment.kind === "note"
+      ? [segment.offsetSemitones]
+      : [segment.fromOffsetSemitones, segment.toOffsetSemitones]
+  );
+}
+
+function getExerciseDurationBeats(exercise: ExerciseDefinition) {
+  return exercise.patternSegments.reduce((total, segment) => {
+    if (segment.kind === "note") {
+      return total + (segment.durationBeats ?? exercise.noteDurationBeats ?? 1);
+    }
+
+    return total + segment.durationBeats;
+  }, 0);
 }
 
 function midiRangeByStep(startMidi: number, endMidi: number, stepSemitones: number) {

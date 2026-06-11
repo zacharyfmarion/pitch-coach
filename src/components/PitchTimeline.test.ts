@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { PitchFrame, TargetNote } from "../domain/contracts";
+import type { PitchFrame, TargetNoteSegment, TargetSegment } from "../domain/contracts";
 import { buildTargetNotes, MAJOR_TRIAD_EXERCISE } from "../domain/exercise";
 import { parseNoteName } from "../domain/music";
 import { getLiveTargetSpans } from "./PitchTimeline";
 
-const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80);
+const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80).filter(isNoteSegment);
 
 describe("live pitch timeline target spans", () => {
   it("keeps a sharp attack assigned to the intended target when it is still closer than the next note", () => {
@@ -35,7 +35,7 @@ describe("live pitch timeline target spans", () => {
   });
 });
 
-function noteFrames(target: TargetNote, startMs: number, durationMs: number, offsetCents = 0): PitchFrame[] {
+function noteFrames(target: TargetNoteSegment, startMs: number, durationMs: number, offsetCents = 0): PitchFrame[] {
   const frames: PitchFrame[] = [];
   for (let timeMs = startMs; timeMs <= startMs + durationMs; timeMs += 80) {
     frames.push(frameFor(target, timeMs, offsetCents));
@@ -43,11 +43,15 @@ function noteFrames(target: TargetNote, startMs: number, durationMs: number, off
   return frames;
 }
 
-function frameFor(target: TargetNote, timeMs: number, offsetCents = 0): PitchFrame {
+function frameFor(target: TargetNoteSegment, timeMs: number, offsetCents = 0): PitchFrame {
   return {
     timeMs,
     frequencyHz: target.frequencyHz * 2 ** (offsetCents / 1200),
     clarity: 0.95,
     rms: 0.08
   };
+}
+
+function isNoteSegment(segment: TargetSegment): segment is TargetNoteSegment {
+  return segment.kind === "note";
 }
