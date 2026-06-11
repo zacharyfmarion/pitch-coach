@@ -4,7 +4,8 @@ import type {
   ExerciseDefinition,
   ExerciseId,
   ExerciseProgressSummary,
-  NoteAssessmentStatus
+  NoteAssessmentStatus,
+  PracticeSessionRecord
 } from "./contracts";
 import { EXERCISES } from "./exercise";
 
@@ -42,7 +43,22 @@ export type PracticeRecommendation = {
   reason: string;
 };
 
+export type PracticeSessionSummary = {
+  id: string;
+  exerciseId: ExerciseId;
+  startedAt: string;
+  lastAttemptAt: string;
+  attemptCount: number;
+  passedAttemptCount: number;
+  totalDurationMs: number;
+  noteCount: number;
+  notesInTune: number;
+  noteAccuracy: number;
+  commonIssue?: NoteAssessmentStatus;
+};
+
 type CreateAttemptHistoryRecordOptions = {
+  sessionId: string;
   exerciseId: ExerciseId;
   rootMidi: number;
   tempoBpm: number;
@@ -51,7 +67,35 @@ type CreateAttemptHistoryRecordOptions = {
   createdAt?: string;
 };
 
+type CreatePracticeSessionRecordOptions = {
+  exerciseId: ExerciseId;
+  startedAt?: string;
+};
+
+export function createPracticeSessionRecord({
+  exerciseId,
+  startedAt = new Date().toISOString()
+}: CreatePracticeSessionRecordOptions): PracticeSessionRecord {
+  return {
+    id: createPracticeSessionId(exerciseId, startedAt),
+    exerciseId,
+    startedAt,
+    lastAttemptAt: startedAt
+  };
+}
+
+export function updatePracticeSessionAfterAttempt(
+  session: PracticeSessionRecord,
+  attempt: AttemptHistoryRecord
+): PracticeSessionRecord {
+  return {
+    ...session,
+    lastAttemptAt: attempt.createdAt
+  };
+}
+
 export function createAttemptHistoryRecord({
+  sessionId,
   exerciseId,
   rootMidi,
   tempoBpm,
@@ -61,6 +105,7 @@ export function createAttemptHistoryRecord({
 }: CreateAttemptHistoryRecordOptions): AttemptHistoryRecord {
   return {
     id: createAttemptHistoryId(exerciseId, createdAt),
+    sessionId,
     exerciseId,
     createdAt,
     rootMidi,
@@ -79,6 +124,61 @@ export function createAttemptHistoryRecord({
       warnings: note.score.warnings
     }))
   };
+}
+
+export function summarizePracticeSessions(
+  sessions: PracticeSessionRecord[],
+  records: AttemptHistoryRecord[],
+  limit = RECENT_SESSION_DISPLAY_COUNT
+): PracticeSessionSummary[] {
+  const attemptsBySession = new Map<string, AttemptHistoryRecord[]>();
+  records.forEach((record) => {
+    const attempts = attemptsBySession.get(record.sessionId) ?? [];
+    attempts.push(record);
+    attemptsBySession.set(record.sessionId, attempts);
+  });
+
+  return sessions
+    .flatMap((session) => {
+      const attempts = (attemptsBySession.get(session.id) ?? [])
+        .filter((attempt) => attempt.exerciseId === session.exerciseId)
+        .sort(compareAttemptsNewestFirst);
+      if (attempts.length === 0) {
+        return [];
+      }
+
+      const noteCount = attempts.reduce((total, attempt) => total + attempt.notes.length, 0);
+      const notesInTune = attempts.reduce(
+        (total, attempt) => total + attempt.notes.filter(isInTuneHistoryNote).length,
+        0
+      );
+      const passedAttemptCount = attempts.filter((attempt) => attempt.passed).length;
+      const totalDurationMs = attempts.reduce(
+        (total, attempt) => total + Math.max(0, attempt.durationMs),
+        0
+      );
+
+      return [
+        {
+          id: session.id,
+          exerciseId: session.exerciseId,
+          startedAt: session.startedAt,
+          lastAttemptAt: resolveSessionLastAttemptAt(session, attempts),
+          attemptCount: attempts.length,
+          passedAttemptCount,
+          totalDurationMs,
+          noteCount,
+          notesInTune,
+          noteAccuracy:
+            noteCount > 0
+              ? Math.round((notesInTune / noteCount) * 100)
+              : Math.round((passedAttemptCount / attempts.length) * 100),
+          commonIssue: findCommonIssue(attempts)
+        }
+      ];
+    })
+    .sort(compareSessionSummariesNewestFirst)
+    .slice(0, limit);
 }
 
 export function pruneAttemptHistory(
@@ -219,6 +319,23 @@ export function getRecentPracticeAttempts(
   return [...records].sort(compareAttemptsNewestFirst).slice(0, limit);
 }
 
+export function getRecentPracticeSessions(
+  sessions: PracticeSessionRecord[],
+  records: AttemptHistoryRecord[],
+  limit = RECENT_SESSION_DISPLAY_COUNT
+) {
+  return summarizePracticeSessions(sessions, records, limit);
+}
+
+export function calculateAttemptNoteAccuracy(attempt: AttemptHistoryRecord) {
+  if (attempt.notes.length === 0) {
+    return attempt.passed ? 100 : 0;
+  }
+
+  const inTuneCount = attempt.notes.filter(isInTuneHistoryNote).length;
+  return Math.round((inTuneCount / attempt.notes.length) * 100);
+}
+
 function compareRecommendationCandidates(
   a: { progress: ExerciseProgressSummary },
   b: { progress: ExerciseProgressSummary }
@@ -260,6 +377,24 @@ function findCommonIssue(records: AttemptHistoryRecord[]) {
   });
 
   return [...issueCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
+function resolveSessionLastAttemptAt(
+  session: PracticeSessionRecord,
+  attempts: AttemptHistoryRecord[]
+) {
+  const latestAttemptAt = attempts[0]?.createdAt ?? session.lastAttemptAt;
+  return safeTimestamp(session.lastAttemptAt) >= safeTimestamp(latestAttemptAt)
+    ? session.lastAttemptAt
+    : latestAttemptAt;
+}
+
+function compareSessionSummariesNewestFirst(
+  a: PracticeSessionSummary,
+  b: PracticeSessionSummary
+) {
+  const timeDifference = safeTimestamp(b.lastAttemptAt) - safeTimestamp(a.lastAttemptAt);
+  return timeDifference !== 0 ? timeDifference : b.id.localeCompare(a.id);
 }
 
 function countPracticeStreak(records: AttemptHistoryRecord[], now: Date) {
@@ -387,4 +522,12 @@ function createAttemptHistoryId(exerciseId: ExerciseId, createdAt: string) {
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2);
   return `${exerciseId}-${Date.parse(createdAt) || Date.now()}-${suffix}`;
+}
+
+function createPracticeSessionId(exerciseId: ExerciseId, startedAt: string) {
+  const suffix =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  return `${exerciseId}-session-${Date.parse(startedAt) || Date.now()}-${suffix}`;
 }

@@ -189,6 +189,7 @@ export type AttemptHistoryNote = {
 
 export type AttemptHistoryRecord = {
   id: string;
+  sessionId: string;
   exerciseId: ExerciseId;
   createdAt: string;
   rootMidi: number;
@@ -198,6 +199,13 @@ export type AttemptHistoryRecord = {
   summary: string;
   durationMs: number;
   notes: AttemptHistoryNote[];
+};
+
+export type PracticeSessionRecord = {
+  id: string;
+  exerciseId: ExerciseId;
+  startedAt: string;
+  lastAttemptAt: string;
 };
 
 export type ExerciseProgressSummary = {

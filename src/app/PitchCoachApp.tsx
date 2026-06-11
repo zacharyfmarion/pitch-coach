@@ -43,7 +43,6 @@ import { StatCard } from "../components/ui/StatCard";
 import { StatusPill } from "../components/ui/StatusPill";
 import { Toggle } from "../components/ui/Toggle";
 import type {
-  AttemptHistoryRecord,
   AttemptScore,
   ExerciseCategory,
   ExerciseDefinition,
@@ -85,6 +84,8 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     initialExerciseId: router.route.screen === "practice" ? router.route.exerciseId : undefined
   });
   const activeTheme = usePitchCoachTheme(coach.settings.themePreference);
+  const activePracticeExerciseId =
+    router.route.screen === "practice" ? router.route.exerciseId : null;
 
   useEffect(() => {
     if (
@@ -100,6 +101,15 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
       void coach.stopAttempt();
     }
   }, [coach.stopAttempt, router.route.screen]);
+
+  useEffect(() => {
+    if (!activePracticeExerciseId) {
+      return;
+    }
+
+    coach.startPracticeSession(activePracticeExerciseId);
+    return () => coach.endPracticeSession(activePracticeExerciseId);
+  }, [activePracticeExerciseId, coach.endPracticeSession, coach.startPracticeSession]);
 
   const openExercise = (exerciseId: (typeof coach.exercises)[number]["id"]) => {
     if (router.route.screen === "practice" && exerciseId === coach.selectedExercise.id) {
@@ -170,7 +180,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             exercises={coach.exercises}
             exerciseProgress={coach.exerciseProgress}
             practiceSummary={coach.practiceSummary}
-            recentAttempts={coach.recentAttempts}
+            recentSessions={coach.recentSessions}
             onSelectExercise={openExercise}
           />
         )}
@@ -1233,7 +1243,7 @@ type ProgressScreenProps = {
   exercises: ReturnType<typeof usePitchCoachController>["exercises"];
   exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
-  recentAttempts: ReturnType<typeof usePitchCoachController>["recentAttempts"];
+  recentSessions: ReturnType<typeof usePitchCoachController>["recentSessions"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
 };
 
@@ -1241,12 +1251,12 @@ function ProgressScreen({
   exercises,
   exerciseProgress,
   practiceSummary,
-  recentAttempts,
+  recentSessions,
   onSelectExercise
 }: ProgressScreenProps) {
   const exercisesDone = countExercisesTried(exercises, exerciseProgress);
-  const accuracyTrend = createAccuracyTrend(recentAttempts);
-  const sessionItems = createProgressSessionItems(recentAttempts, exercises);
+  const accuracyTrend = createAccuracyTrend(recentSessions);
+  const sessionItems = createProgressSessionItems(recentSessions, exercises);
 
   return (
     <main className="mock-progress-page" aria-label="Pitch coach progress">
@@ -1510,42 +1520,31 @@ function ProgressSessionItem({
 }
 
 function createProgressSessionItems(
-  attempts: AttemptHistoryRecord[],
+  sessions: ReturnType<typeof usePitchCoachController>["recentSessions"],
   exercises: ReturnType<typeof usePitchCoachController>["exercises"]
 ): ProgressSessionItemView[] {
-  return attempts.slice(0, 5).map((attempt) => {
-    const exercise = exercises.find((candidate) => candidate.id === attempt.exerciseId);
-    const score = calculateAttemptNoteAccuracy(attempt);
+  return sessions.slice(0, 5).map((session) => {
+    const exercise = exercises.find((candidate) => candidate.id === session.exerciseId);
+    const score = session.noteAccuracy;
     return {
-      id: attempt.id,
-      exerciseId: attempt.exerciseId,
-      href: routePath({ screen: "practice", exerciseId: attempt.exerciseId }),
-      title: exercise?.title ?? getExerciseTitle(exercises, attempt.exerciseId),
-      meta: `${exercise ? formatCategoryLabel(exercise.category) : "Exercise"} · ${formatProgressSessionDate(
-        attempt.createdAt
-      )}`,
+      id: session.id,
+      exerciseId: session.exerciseId,
+      href: routePath({ screen: "practice", exerciseId: session.exerciseId }),
+      title: exercise?.title ?? getExerciseTitle(exercises, session.exerciseId),
+      meta: `${exercise ? formatCategoryLabel(exercise.category) : "Exercise"} · ${formatAttemptCount(
+        session.attemptCount
+      )} · ${formatProgressSessionDate(session.lastAttemptAt)}`,
       score,
-      tone: attempt.passed || score >= 80 ? "good" : "needs-work"
+      tone: score >= 80 ? "good" : "needs-work"
     };
   });
 }
 
-function createAccuracyTrend(attempts: AttemptHistoryRecord[]) {
-  return attempts
+function createAccuracyTrend(sessions: ReturnType<typeof usePitchCoachController>["recentSessions"]) {
+  return sessions
     .slice(0, 10)
     .reverse()
-    .map(calculateAttemptNoteAccuracy);
-}
-
-function calculateAttemptNoteAccuracy(attempt: AttemptHistoryRecord) {
-  if (attempt.notes.length === 0) {
-    return attempt.passed ? 100 : 0;
-  }
-
-  const inTuneCount = attempt.notes.filter((note) =>
-    note.status === "pass" || note.status === "passWithWarning"
-  ).length;
-  return Math.round((inTuneCount / attempt.notes.length) * 100);
+    .map((session) => session.noteAccuracy);
 }
 
 function formatAccuracyDelta(trend: number[]) {

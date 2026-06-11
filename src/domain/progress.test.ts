@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { AttemptHistoryRecord, ExerciseId, NoteAssessmentStatus } from "./contracts";
+import type {
+  AttemptHistoryRecord,
+  ExerciseId,
+  NoteAssessmentStatus,
+  PracticeSessionRecord
+} from "./contracts";
 import { EXERCISES } from "./exercise";
 import { parseNoteName } from "./music";
 import {
   getRecentPracticeAttempts,
   recommendPracticeExercise,
   summarizePracticeHistory,
+  summarizePracticeSessions,
   WEEK_ACTIVITY_DAYS
 } from "./progress";
 
@@ -78,6 +84,61 @@ describe("progress aggregation", () => {
       "five-note-scale"
     ]);
   });
+
+  it("groups multiple attempts with the same session into one recent session", () => {
+    const sessions = [
+      sessionRecord("step-session", "step-up-back", "2026-06-10T15:00:00.000Z", "2026-06-10T15:06:00.000Z")
+    ];
+    const records = [
+      historyRecord("step-up-back", "2026-06-10T15:05:00.000Z", true, 10000, ["pass", "pass"], "step-session"),
+      historyRecord("step-up-back", "2026-06-10T15:06:00.000Z", false, 10000, ["pass", "flat"], "step-session")
+    ];
+
+    const recentSessions = summarizePracticeSessions(sessions, records);
+
+    expect(recentSessions).toHaveLength(1);
+    expect(recentSessions[0]).toMatchObject({
+      id: "step-session",
+      exerciseId: "step-up-back",
+      attemptCount: 2,
+      passedAttemptCount: 1,
+      noteCount: 4,
+      notesInTune: 3,
+      noteAccuracy: 75,
+      commonIssue: "flat"
+    });
+  });
+
+  it("keeps separate sessions for the same exercise and sorts by last attempt", () => {
+    const sessions = [
+      sessionRecord("older-step-session", "step-up-back", "2026-06-10T15:00:00.000Z", "2026-06-10T15:04:00.000Z"),
+      sessionRecord("newer-step-session", "step-up-back", "2026-06-10T16:00:00.000Z", "2026-06-10T16:03:00.000Z")
+    ];
+    const records = [
+      historyRecord("step-up-back", "2026-06-10T15:04:00.000Z", true, 10000, ["pass"], "older-step-session"),
+      historyRecord("step-up-back", "2026-06-10T16:03:00.000Z", true, 10000, ["pass"], "newer-step-session")
+    ];
+
+    expect(summarizePracticeSessions(sessions, records).map((session) => session.id)).toEqual([
+      "newer-step-session",
+      "older-step-session"
+    ]);
+  });
+
+  it("excludes empty sessions and orphan attempts", () => {
+    const sessions = [
+      sessionRecord("empty-session", "major-triad", "2026-06-10T15:00:00.000Z"),
+      sessionRecord("kept-session", "major-triad", "2026-06-10T16:00:00.000Z")
+    ];
+    const records = [
+      historyRecord("major-triad", "2026-06-10T16:03:00.000Z", true, 10000, ["pass"], "kept-session"),
+      historyRecord("major-triad", "2026-06-10T17:03:00.000Z", true, 10000, ["pass"], "missing-session")
+    ];
+
+    expect(summarizePracticeSessions(sessions, records).map((session) => session.id)).toEqual([
+      "kept-session"
+    ]);
+  });
 });
 
 function historyRecord(
@@ -85,10 +146,12 @@ function historyRecord(
   createdAt: string,
   passed: boolean,
   durationMs: number,
-  noteStatuses: NoteAssessmentStatus[]
+  noteStatuses: NoteAssessmentStatus[],
+  sessionId = `${exerciseId}-session-${createdAt}`
 ): AttemptHistoryRecord {
   return {
     id: `${exerciseId}-${createdAt}`,
+    sessionId,
     exerciseId,
     createdAt,
     rootMidi: parseNoteName("A3"),
@@ -106,5 +169,19 @@ function historyRecord(
       stabilityCents: 8,
       warnings: []
     }))
+  };
+}
+
+function sessionRecord(
+  id: string,
+  exerciseId: ExerciseId,
+  startedAt: string,
+  lastAttemptAt = startedAt
+): PracticeSessionRecord {
+  return {
+    id,
+    exerciseId,
+    startedAt,
+    lastAttemptAt
   };
 }

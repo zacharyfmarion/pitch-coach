@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AudioCaptureConfig, AudioInputEngine, PitchDetectorAdapter, PromptPlayer } from "../audio/types";
-import type { CoachSettings, PitchFrame } from "../domain/contracts";
+import type { CoachSettings, PitchFrame, PracticeSessionRecord } from "../domain/contracts";
 import {
   buildTargetNotes,
   DEFAULT_SCORING_POLICY,
@@ -14,7 +14,11 @@ import { createStereoBuffer } from "../song/audioData";
 import { SONG_REFERENCE_ANALYSIS_VERSION } from "../song/referenceVersion";
 import type { SongModeServices, SongPracticeConfig, SongReference, SongStereoBuffer } from "../song/types";
 import type { AttemptHistoryRecord } from "../domain/contracts";
-import { saveAttemptHistoryRecord } from "../storage/attemptHistoryStorage";
+import {
+  loadAttemptHistory,
+  saveAttemptHistoryRecord,
+  savePracticeSessionRecord
+} from "../storage/attemptHistoryStorage";
 import { installFakeIndexedDB } from "../test/fakeIndexedDB";
 import { DEFAULT_THEME } from "../themes";
 import { PitchCoachApp } from "./PitchCoachApp";
@@ -108,8 +112,12 @@ describe("PitchCoachApp", () => {
   });
 
   it("renders the progress route from local attempt history", async () => {
-    await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
-    await saveAttemptHistoryRecord(historyRecord("five-note-scale", 1, true));
+    const triadAttempt = historyRecord("major-triad", 0, false);
+    const scaleAttempt = historyRecord("five-note-scale", 1, true);
+    await savePracticeSessionRecord(sessionRecord(triadAttempt.sessionId, triadAttempt.exerciseId, 0));
+    await saveAttemptHistoryRecord(triadAttempt);
+    await savePracticeSessionRecord(sessionRecord(scaleAttempt.sessionId, scaleAttempt.exerciseId, 1));
+    await saveAttemptHistoryRecord(scaleAttempt);
     window.history.replaceState(null, "", "/progress");
 
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
@@ -127,10 +135,45 @@ describe("PitchCoachApp", () => {
     expect(screen.getByText("This week")).toBeTruthy();
     expect(screen.getByText(/Scales/)).toBeTruthy();
     expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getAllByText(/1 attempt/).length).toBeGreaterThan(0);
     const recentScaleLink = screen.getByRole("link", { name: /Five-Note Major Scale/ });
     expect(recentScaleLink.getAttribute("href")).toBe("/exercises/five-note-scale");
     fireEvent.click(recentScaleLink);
     expect(window.location.pathname).toBe("/exercises/five-note-scale");
+  });
+
+  it("groups progress recent activity by practice session", async () => {
+    const session = sessionRecord("step-session", "step-up-back", 3);
+    await savePracticeSessionRecord(session);
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 0, true, session.id));
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 1, true, session.id));
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 2, false, session.id));
+    window.history.replaceState(null, "", "/progress");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("link", { name: /Step Up and Back/ })).toHaveLength(1);
+    });
+    const stepSession = screen.getByRole("link", { name: /Step Up and Back/ });
+    expect(stepSession.textContent).toContain("3 attempts");
+    expect(stepSession.textContent).toContain("67%");
+  });
+
+  it("renders separate progress rows for separate visits to the same exercise", async () => {
+    const firstSession = sessionRecord("first-step-session", "step-up-back", 0);
+    const secondSession = sessionRecord("second-step-session", "step-up-back", 1);
+    await savePracticeSessionRecord(firstSession);
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 0, true, firstSession.id));
+    await savePracticeSessionRecord(secondSession);
+    await saveAttemptHistoryRecord(historyRecord("step-up-back", 1, true, secondSession.id));
+    window.history.replaceState(null, "", "/progress");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("link", { name: /Step Up and Back/ })).toHaveLength(2);
+    });
   });
 
   it("opens the recommendation card into the matching exercise route", () => {
@@ -582,6 +625,41 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("100% recent pass");
   });
 
+  it("keeps repeated attempts in one session until leaving the exercise route", async () => {
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+    fireEvent.click(screen.getByRole("button", { name: "Retry triad" }));
+    await flushReact();
+    await flushReact();
+
+    const records = await loadAttemptHistory();
+    expect(records).toHaveLength(2);
+    expect(new Set(records.map((record) => record.sessionId)).size).toBe(1);
+  });
+
+  it("starts a new session after leaving and reopening an exercise route", async () => {
+    render(<PitchCoachApp services={createServices(stableFrames(-55))} initialSettings={DEFAULT_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+    fireEvent.click(screen.getByRole("button", { name: "Back to exercises" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Major Triad/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+
+    const records = await loadAttemptHistory();
+    expect(records).toHaveLength(2);
+    expect(new Set(records.map((record) => record.sessionId)).size).toBe(2);
+  });
+
   it("loads selected exercise history on a direct exercise route", async () => {
     await saveAttemptHistoryRecord(historyRecord("five-note-scale", 0, true));
     window.history.replaceState(null, "", "/exercises/five-note-scale");
@@ -779,10 +857,12 @@ function stableFramesForTargets(targets: ReturnType<typeof buildTargetNotes>, of
 function historyRecord(
   exerciseId: AttemptHistoryRecord["exerciseId"],
   index: number,
-  passed: boolean
+  passed: boolean,
+  sessionId = `${exerciseId}-session-${index}`
 ): AttemptHistoryRecord {
   return {
     id: `${exerciseId}-${index}`,
+    sessionId,
     exerciseId,
     createdAt: new Date(Date.UTC(2026, 4, 13, 18, index)).toISOString(),
     rootMidi: parseNoteName("A3"),
@@ -801,6 +881,20 @@ function historyRecord(
         warnings: []
       }
     ]
+  };
+}
+
+function sessionRecord(
+  id: string,
+  exerciseId: PracticeSessionRecord["exerciseId"],
+  index: number
+): PracticeSessionRecord {
+  const timestamp = new Date(Date.UTC(2026, 4, 13, 18, index)).toISOString();
+  return {
+    id,
+    exerciseId,
+    startedAt: timestamp,
+    lastAttemptAt: timestamp
   };
 }
 
