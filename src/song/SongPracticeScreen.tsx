@@ -542,6 +542,7 @@ function SongProcessingState({
   support: SongRuntimeSupport;
 }) {
   const activeDetail = createSongProcessingDetail(stage, status, support.supported);
+  const displayFileName = fileName ?? "song.mp3";
   return (
     <Card
       as="section"
@@ -555,8 +556,8 @@ function SongProcessingState({
           <SongWaveGlyph />
         </span>
         <div>
-          <h2>{fileName ?? "song.mp3"}</h2>
-          <p>{activeDetail}</p>
+          <h2 title={displayFileName}>{displayFileName}</h2>
+          <p title={activeDetail}>{activeDetail}</p>
         </div>
         <strong>{progress}%</strong>
       </div>
@@ -571,7 +572,7 @@ function SongProcessingState({
               <span>{state === "done" ? <CheckCircle2 size={24} /> : index + 1}</span>
               <div>
                 <strong>{step.label}</strong>
-                <p>{step.detail}</p>
+                <p title={step.detail}>{step.detail}</p>
               </div>
             </li>
           );
@@ -775,7 +776,7 @@ function SongStagePanel({
               </StatusPill>
               <span>{statusView.detail}</span>
             </div>
-            <CardTitle>{song.fileName ?? "Song practice"}</CardTitle>
+            <CardTitle title={song.fileName ?? "Song practice"}>{song.fileName ?? "Song practice"}</CardTitle>
             <CardDescription>
               Follow the mapped vocal contour, then compare your live pitch against the reference.
             </CardDescription>

@@ -151,6 +151,31 @@ describe("PitchCoachApp", () => {
     expect(screen.queryByLabelText("Song controls and feedback")).toBeNull();
   });
 
+  it("keeps long uploaded song names available while the processing title can truncate", async () => {
+    const longFileName =
+      "YTDown_YouTube_Green-Day-Good-Riddance-Time-Of-Your-Life_Media_fhrK0i-2Nes_009_128K.mp3";
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        songServices={createSongServices({ supported: false })}
+        initialSettings={DEFAULT_SETTINGS}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Sing a Song/ }));
+    const fileInput = await screen.findByLabelText("Audio");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["audio"], longFileName, { type: "audio/mpeg" })]
+      }
+    });
+
+    await screen.findByLabelText("Song processing");
+    const titledFilenameNodes = screen.getAllByTitle(longFileName);
+    expect(titledFilenameNodes[0].tagName).toBe("H2");
+    expect(titledFilenameNodes.length).toBeGreaterThan(1);
+  });
+
   it("applies the locked mock theme on direct song mode navigation", async () => {
     mockPreferredColorScheme(true);
     window.history.replaceState(null, "", "/songs");
