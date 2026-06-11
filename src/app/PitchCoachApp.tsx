@@ -32,7 +32,6 @@ import { Button } from "../components/ui/Button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle
 } from "../components/ui/Card";
@@ -44,14 +43,15 @@ import { StatCard } from "../components/ui/StatCard";
 import { StatusPill } from "../components/ui/StatusPill";
 import { Toggle } from "../components/ui/Toggle";
 import type {
+  AttemptHistoryRecord,
   AttemptScore,
   ExerciseCategory,
+  ExerciseDefinition,
   ExerciseId,
   ExerciseProgressSummary,
   LessonStatus,
   NoteAssessmentStatus,
-  TargetNote,
-  ExerciseDefinition,
+  TargetNote
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import { degreeToSemitones, midiToNoteName } from "../domain/music";
@@ -171,6 +171,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             exerciseProgress={coach.exerciseProgress}
             practiceSummary={coach.practiceSummary}
             recentAttempts={coach.recentAttempts}
+            onSelectExercise={openExercise}
           />
         )}
       </MainShell>
@@ -1233,144 +1234,359 @@ type ProgressScreenProps = {
   exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   recentAttempts: ReturnType<typeof usePitchCoachController>["recentAttempts"];
+  onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
 };
 
 function ProgressScreen({
   exercises,
   exerciseProgress,
   practiceSummary,
-  recentAttempts
+  recentAttempts,
+  onSelectExercise
 }: ProgressScreenProps) {
-  const hasHistory = practiceSummary.attemptCount > 0;
+  const exercisesDone = countExercisesTried(exercises, exerciseProgress);
+  const accuracyTrend = createAccuracyTrend(recentAttempts);
+  const sessionItems = createProgressSessionItems(recentAttempts, exercises);
 
   return (
-    <main className="mock-home mock-progress" aria-label="Pitch coach progress">
-      <section className="mock-home__header mock-progress__header">
-        <div>
-          <h1>Your Progress</h1>
-          <p>Review attempts, note accuracy, weekly activity, and drill progress saved on this device.</p>
-        </div>
-      </section>
-      <section className="mock-stat-grid progress-summary-grid" aria-label="Progress summary">
-        <StatCard
-          className="mock-stat-card"
-          variant="mock"
-          padding="none"
-          icon={<Flame size={19} />}
+    <main className="mock-progress-page" aria-label="Pitch coach progress">
+      <header className="mock-progress-page__header">
+        <h1>Your Progress</h1>
+        <p>Saved on this device — keep the streak alive.</p>
+      </header>
+
+      <section className="progress-metric-grid" aria-label="Progress summary">
+        <ProgressMetricCard
+          icon={<Flame size={17} aria-hidden="true" />}
           label="Day streak"
-          value={practiceSummary.streakDays}
-          valueClassName="mock-stat-card__value--accent"
+          value={formatInteger(practiceSummary.streakDays)}
+          valueTone="accent"
         />
-        <StatCard
-          className="mock-stat-card"
-          variant="mock"
-          padding="none"
-          icon={<LineChart size={19} />}
-          label="Accuracy"
-          value={practiceSummary.noteAccuracy ?? 0}
-          unit="%"
-          trend={<AccuracySparkline buckets={practiceSummary.weekActivity} />}
-        />
-        <StatCard
-          className="mock-stat-card"
-          variant="mock"
-          padding="none"
-          icon={<CheckCircle2 size={18} />}
+        <ProgressMetricCard
+          icon={<Check size={17} aria-hidden="true" />}
           label="Notes in tune"
-          value={practiceSummary.notesInTune}
-          valueClassName="mock-stat-card__value--green"
+          value={formatInteger(practiceSummary.notesInTune)}
+          valueTone="green"
         />
-        <StatCard
-          className="mock-stat-card"
-          variant="mock"
-          padding="none"
-          icon={<Clock3 size={18} />}
-          label="Practiced"
-          value={practiceSummary.practiceMinutes}
+        <ProgressMetricCard
+          icon={<Target size={17} aria-hidden="true" />}
+          label="Exercises done"
+          value={formatInteger(exercisesDone)}
+        />
+        <ProgressMetricCard
+          icon={<Clock3 size={17} aria-hidden="true" />}
+          label="Time practiced"
+          value={formatInteger(practiceSummary.practiceMinutes)}
           unit="min"
         />
       </section>
-      {!hasHistory ? (
-        <Card variant="mock" padding="lg">
-          <CardHeader>
-            <CardTitle>No attempts yet</CardTitle>
-            <CardDescription>
-              Complete a guided exercise and your local progress dashboard will fill in here.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <section className="progress-dashboard-grid">
-          <Card className="progress-week-card" variant="mock" padding="lg">
-            <CardHeader>
-              <CardTitle>Last 7 Days</CardTitle>
-              <CardDescription>Attempts saved in this browser.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <WeekActivityStrip buckets={practiceSummary.weekActivity} />
-            </CardContent>
-          </Card>
 
-          <Card className="progress-exercises-card" variant="mock" padding="lg">
-            <CardHeader>
-              <CardTitle>Exercise Progress</CardTitle>
-              <CardDescription>Recent pass rate and common issue by drill.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ol className="progress-exercise-list">
-                {exercises.map((exercise) => {
-                  const progress = exerciseProgress[exercise.id];
-                  return (
-                    <li key={exercise.id}>
-                      <span>
-                        <strong>{exercise.title}</strong>
-                        <span>{formatCategoryLabel(exercise.category)}</span>
-                      </span>
-                      <span>
-                        {progress.recentPassRate === undefined
-                          ? "No attempts"
-                          : `${progress.recentPassRate}% pass`}
-                      </span>
-                      <span>
-                        {progress.commonIssue
-                          ? `Issue: ${describeIssue(progress.commonIssue)}`
-                          : formatLastPracticed(progress.lastPracticedAt)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            </CardContent>
-          </Card>
+      <section className="progress-main-grid" aria-label="Progress details">
+        <div className="progress-left-stack">
+          <ProgressAccuracyCard
+            accuracy={practiceSummary.noteAccuracy}
+            trend={accuracyTrend}
+          />
+          <ProgressWeekCard
+            buckets={practiceSummary.weekActivity}
+            streakDays={practiceSummary.streakDays}
+          />
+        </div>
 
-          <Card className="progress-sessions-card" variant="mock" padding="lg">
-            <CardHeader>
-              <CardTitle>Recent Sessions</CardTitle>
-              <CardDescription>Newest local attempts across all exercises.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ol className="progress-session-list">
-                {recentAttempts.map((attempt) => (
-                  <li key={attempt.id}>
-                    <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
-                      {attempt.passed ? "Pass" : "Retry"}
-                    </span>
-                    <span className="history-copy">
-                      <strong>
-                        {getExerciseTitle(exercises, attempt.exerciseId)} · {midiToNoteName(attempt.rootMidi)} major
-                      </strong>
-                      <span>{formatHistoryDate(attempt.createdAt)}</span>
-                      <span>{attempt.summary}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </CardContent>
-          </Card>
-        </section>
-      )}
+        <ProgressRecentSessionsCard items={sessionItems} onSelectExercise={onSelectExercise} />
+      </section>
     </main>
   );
+}
+
+function ProgressMetricCard({
+  icon,
+  label,
+  value,
+  unit,
+  valueTone = "default"
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  unit?: ReactNode;
+  valueTone?: "default" | "accent" | "green";
+}) {
+  return (
+    <StatCard
+      className="mock-stat-card progress-metric-card"
+      variant="mock"
+      padding="none"
+      icon={icon}
+      label={label}
+      value={value}
+      unit={unit}
+      valueClassName={
+        valueTone === "accent"
+          ? "mock-stat-card__value--accent"
+          : valueTone === "green"
+            ? "mock-stat-card__value--green"
+            : ""
+      }
+    />
+  );
+}
+
+function ProgressAccuracyCard({
+  accuracy,
+  trend
+}: {
+  accuracy?: number;
+  trend: number[];
+}) {
+  return (
+    <Card className="progress-panel progress-accuracy-panel" variant="mock" padding="none">
+      <div className="progress-accuracy-panel__header">
+        <div>
+          <h2>Accuracy over time</h2>
+          <p>last 10 sessions</p>
+        </div>
+        <div className="progress-accuracy-summary">
+          <strong>{accuracy === undefined ? "New" : `${accuracy}%`}</strong>
+          <span className={getAccuracyDeltaClassName(trend)}>{formatAccuracyDelta(trend)}</span>
+        </div>
+      </div>
+      <ProgressAccuracyChart data={trend} />
+    </Card>
+  );
+}
+
+function ProgressAccuracyChart({ data }: { data: number[] }) {
+  const width = 560;
+  const height = 150;
+  const chartData =
+    data.length === 0
+      ? []
+      : data.length === 1
+        ? [data[0], data[0]]
+        : data;
+  const minValue = chartData.length === 0 ? 0 : Math.max(0, Math.min(...chartData) - 3);
+  const maxValue = chartData.length === 0 ? 100 : Math.min(100, Math.max(...chartData) + 2);
+  const range = Math.max(1, maxValue - minValue);
+  const points = chartData.map((value, index) => ({
+    x: (index / Math.max(1, chartData.length - 1)) * width,
+    y: height - 14 - ((value - minValue) / range) * (height - 28)
+  }));
+  const linePath =
+    points.length === 0
+      ? `M0 ${height - 42}H${width}`
+      : createSmoothPath(points);
+  const areaPath =
+    points.length === 0
+      ? ""
+      : `${linePath} L ${width} ${height} L 0 ${height} Z`;
+
+  return (
+    <div className="progress-accuracy-chart" aria-label="Accuracy trend">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="progressAccuracyFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--mock-green)" stopOpacity="0.22" />
+            <stop offset="1" stopColor="var(--mock-green)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[25, 50, 75].map((percent) => {
+          const y = height - 14 - (percent / 100) * (height - 28);
+          return <line key={percent} x1="0" x2={width} y1={y} y2={y} />;
+        })}
+        {areaPath ? <path className="progress-accuracy-chart__area" d={areaPath} /> : null}
+        <path
+          className={`progress-accuracy-chart__line ${points.length === 0 ? "is-empty" : ""}`.trim()}
+          d={linePath}
+        />
+        {points.map((point, index) => (
+          <circle
+            key={`${point.x}-${point.y}`}
+            cx={point.x}
+            cy={point.y}
+            r={index === points.length - 1 ? 5 : 3}
+          />
+        ))}
+      </svg>
+      {data.length === 0 ? <span>No accuracy yet</span> : null}
+    </div>
+  );
+}
+
+function ProgressWeekCard({
+  buckets,
+  streakDays
+}: {
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
+  streakDays: number;
+}) {
+  return (
+    <Card className="progress-panel progress-week-panel" variant="mock" padding="none">
+      <h2>This week</h2>
+      <div className="progress-week-content">
+        <div className="progress-week-strip" aria-label="This week">
+          {buckets.map((bucket) => {
+            const done = bucket.attemptCount > 0;
+            return (
+              <span key={bucket.date} className="progress-week-day">
+                <span className={`progress-week-box ${done ? "is-done" : ""}`.trim()}>
+                  {done ? <CheckIcon /> : null}
+                </span>
+                <span>{formatWeekday(bucket.date).slice(0, 1)}</span>
+              </span>
+            );
+          })}
+        </div>
+        <div className="progress-week-streak">
+          <Flame size={24} aria-hidden="true" />
+          <strong>{formatDayCount(streakDays)} streak</strong>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+type ProgressSessionItemView = {
+  id: string;
+  exerciseId: ExerciseId;
+  href: string;
+  title: string;
+  meta: string;
+  score: number;
+  tone: "good" | "needs-work";
+};
+
+function ProgressRecentSessionsCard({
+  items,
+  onSelectExercise
+}: {
+  items: ProgressSessionItemView[];
+  onSelectExercise: (exerciseId: ExerciseId) => void;
+}) {
+  return (
+    <Card className="progress-panel progress-recent-panel" variant="mock" padding="none">
+      <h2>Recent sessions</h2>
+      {items.length === 0 ? (
+        <p className="progress-empty-copy">Complete a guided exercise and recent sessions will appear here.</p>
+      ) : (
+        <ol className="progress-session-list">
+          {items.map((item) => (
+            <ProgressSessionItem key={item.id} item={item} onSelectExercise={onSelectExercise} />
+          ))}
+        </ol>
+      )}
+    </Card>
+  );
+}
+
+function ProgressSessionItem({
+  item,
+  onSelectExercise
+}: {
+  item: ProgressSessionItemView;
+  onSelectExercise: (exerciseId: ExerciseId) => void;
+}) {
+  return (
+    <li className="progress-session-item">
+      <a
+        className="progress-session-link"
+        href={item.href}
+        onClick={(event) => {
+          event.preventDefault();
+          onSelectExercise(item.exerciseId);
+        }}
+      >
+        <span className={`progress-session-item__icon is-${item.tone}`} aria-hidden="true">
+          <Target size={18} />
+        </span>
+        <span className="progress-session-item__copy">
+          <strong>{item.title}</strong>
+          <span>{item.meta}</span>
+        </span>
+        <strong className={`progress-session-item__score is-${item.tone}`}>{item.score}%</strong>
+      </a>
+    </li>
+  );
+}
+
+function createProgressSessionItems(
+  attempts: AttemptHistoryRecord[],
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"]
+): ProgressSessionItemView[] {
+  return attempts.slice(0, 5).map((attempt) => {
+    const exercise = exercises.find((candidate) => candidate.id === attempt.exerciseId);
+    const score = calculateAttemptNoteAccuracy(attempt);
+    return {
+      id: attempt.id,
+      exerciseId: attempt.exerciseId,
+      href: routePath({ screen: "practice", exerciseId: attempt.exerciseId }),
+      title: exercise?.title ?? getExerciseTitle(exercises, attempt.exerciseId),
+      meta: `${exercise ? formatCategoryLabel(exercise.category) : "Exercise"} · ${formatProgressSessionDate(
+        attempt.createdAt
+      )}`,
+      score,
+      tone: attempt.passed || score >= 80 ? "good" : "needs-work"
+    };
+  });
+}
+
+function createAccuracyTrend(attempts: AttemptHistoryRecord[]) {
+  return attempts
+    .slice(0, 10)
+    .reverse()
+    .map(calculateAttemptNoteAccuracy);
+}
+
+function calculateAttemptNoteAccuracy(attempt: AttemptHistoryRecord) {
+  if (attempt.notes.length === 0) {
+    return attempt.passed ? 100 : 0;
+  }
+
+  const inTuneCount = attempt.notes.filter((note) =>
+    note.status === "pass" || note.status === "passWithWarning"
+  ).length;
+  return Math.round((inTuneCount / attempt.notes.length) * 100);
+}
+
+function formatAccuracyDelta(trend: number[]) {
+  if (trend.length === 0) {
+    return "No sessions yet";
+  }
+
+  const delta = trend.at(-1)! - trend[0];
+  if (delta > 0) {
+    return `▲ ${delta} since you started`;
+  }
+  if (delta < 0) {
+    return `▼ ${Math.abs(delta)} since you started`;
+  }
+  return "0 since you started";
+}
+
+function getAccuracyDeltaClassName(trend: number[]) {
+  if (trend.length < 2) {
+    return "is-neutral";
+  }
+
+  return trend.at(-1)! >= trend[0] ? "is-positive" : "is-negative";
+}
+
+function createSmoothPath(points: { x: number; y: number }[]) {
+  if (points.length === 0) {
+    return "";
+  }
+
+  return points.reduce((path, point, index) => {
+    if (index === 0) {
+      return `M${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+    }
+
+    const previous = points[index - 1];
+    const controlX = previous.x + (point.x - previous.x) / 2;
+    return `${path} C${controlX.toFixed(1)} ${previous.y.toFixed(1)}, ${controlX.toFixed(1)} ${point.y.toFixed(
+      1
+    )}, ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+  }, "");
 }
 
 function formatClipDuration(durationMs: number) {
@@ -1922,32 +2138,6 @@ function getPracticeCategoryIcon(category: ExerciseCategory) {
   }
 }
 
-function WeekActivityStrip({
-  buckets
-}: {
-  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
-}) {
-  const maxAttemptCount = Math.max(1, ...buckets.map((bucket) => bucket.attemptCount));
-
-  return (
-    <div className="week-activity-strip" aria-label="Last seven days of attempts">
-      {buckets.map((bucket) => {
-        const height = bucket.attemptCount === 0 ? 8 : 8 + (bucket.attemptCount / maxAttemptCount) * 42;
-        return (
-          <span key={bucket.date} className="week-activity-strip__day">
-            <span
-              className="week-activity-strip__bar"
-              style={{ height }}
-              title={`${formatWeekday(bucket.date)}: ${bucket.attemptCount} attempts`}
-            />
-            <span>{formatWeekday(bucket.date)}</span>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 function formatCategoryLabel(category: ExerciseCategoryFilter) {
   switch (category) {
     case "all":
@@ -2036,6 +2226,38 @@ function formatHistoryDate(createdAt: string) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit"
+  });
+}
+
+function formatProgressSessionDate(createdAt: string) {
+  const timestamp = Date.parse(createdAt);
+  if (!Number.isFinite(timestamp)) {
+    return "Unknown time";
+  }
+
+  const date = new Date(timestamp);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const elapsedDays = Math.round((todayStart - dateStart) / 86400000);
+  const time = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+
+  if (elapsedDays === 0) {
+    return `Today · ${time}`;
+  }
+  if (elapsedDays === 1) {
+    return "Yesterday";
+  }
+  if (elapsedDays > 1 && elapsedDays < 7) {
+    return `${elapsedDays} days ago`;
+  }
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric"
   });
 }
 

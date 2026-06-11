@@ -114,17 +114,23 @@ describe("PitchCoachApp", () => {
 
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
+    expect(screen.getByRole("heading", { name: "Recent sessions" })).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Recent Sessions" })).toBeTruthy();
+      expect(screen.getAllByText(/Five-Note Major Scale/).length).toBeGreaterThan(0);
     });
     expect(screen.queryByText("Local stats")).toBeNull();
     expect(screen.getByText("Day streak")).toBeTruthy();
-    expect(screen.getByText("Accuracy")).toBeTruthy();
+    expect(screen.getByText("Accuracy over time")).toBeTruthy();
     expect(screen.getByText("Notes in tune")).toBeTruthy();
-    expect(screen.getByText("Practiced")).toBeTruthy();
-    expect(screen.getByText(/Major Triad · A3 major/)).toBeTruthy();
-    expect(screen.getByText("A3 was flat.")).toBeTruthy();
-    expect(screen.getAllByText(/Five-Note Major Scale/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Exercises done")).toBeTruthy();
+    expect(screen.getByText("Time practiced")).toBeTruthy();
+    expect(screen.getByText("This week")).toBeTruthy();
+    expect(screen.getByText(/Scales/)).toBeTruthy();
+    expect(screen.getByText("100%")).toBeTruthy();
+    const recentScaleLink = screen.getByRole("link", { name: /Five-Note Major Scale/ });
+    expect(recentScaleLink.getAttribute("href")).toBe("/exercises/five-note-scale");
+    fireEvent.click(recentScaleLink);
+    expect(window.location.pathname).toBe("/exercises/five-note-scale");
   });
 
   it("opens the recommendation card into the matching exercise route", () => {

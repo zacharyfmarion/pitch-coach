@@ -43,9 +43,18 @@ test("navigates the shell and renders progress from local history", async ({ pag
 
   await page.goto("/progress");
   await expect(page.getByRole("heading", { name: "Your Progress" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Recent Sessions" })).toBeVisible();
-  await expect(page.getByText(/Major Triad · A3 major/)).toBeVisible();
-  await expect(page.getByText("Nice triad.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent sessions" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accuracy over time" })).toBeVisible();
+  await expect(page.getByText("Exercises done")).toBeVisible();
+  await expect(page.getByText("Major Triad")).toBeVisible();
+  await expect(page.getByText(/Triads & Chords/)).toBeVisible();
+  const recentSessionLink = page.locator('.progress-session-link[href="/exercises/major-triad"]');
+  await expect(recentSessionLink).toHaveCount(1);
+  await expect(recentSessionLink).toContainText("100%");
+  await recentSessionLink.click();
+  await expect(page).toHaveURL(/\/exercises\/major-triad$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/progress$/);
 
   await page.getByRole("tab", { name: "Practice" }).click();
   await expect(page).toHaveURL(/\/practice$/);
