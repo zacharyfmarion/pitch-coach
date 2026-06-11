@@ -3293,7 +3293,7 @@
       .library-filters {
         margin: 0 -34px !important;
         padding: 16px 34px 20px !important;
-        border-bottom: 1px solid var(--mock-line) !important;
+        border-bottom: 0 !important;
         background: transparent !important;
       }
 
@@ -3684,8 +3684,9 @@
         gap: 20px !important;
         height: 100% !important;
         min-height: 0 !important;
-        padding: 0 24px 24px !important;
-        overflow: hidden !important;
+        margin: 0 -24px !important;
+        padding: 0 48px 24px !important;
+        overflow: visible !important;
       }
 
       .coach-workspace .lesson-panel {
@@ -3694,7 +3695,7 @@
         height: 100% !important;
         max-height: none !important;
         min-height: 0 !important;
-        overflow: hidden !important;
+        overflow: visible !important;
         padding: 0 !important;
         border: 0 !important;
         border-radius: 0 !important;
@@ -4036,9 +4037,10 @@
         gap: 12px !important;
         height: 100% !important;
         min-height: 0 !important;
-        margin-top: 0 !important;
-        overflow: auto !important;
-        padding: 0 2px 8px 0 !important;
+        margin: 0 -10px 0 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        padding: 0 10px 8px 0 !important;
         border: 0 !important;
         border-radius: 0 !important;
         background: transparent !important;
@@ -4175,7 +4177,8 @@
           grid-template-columns: 1fr !important;
           grid-template-rows: auto auto !important;
           gap: 18px !important;
-          padding: 0 20px 24px !important;
+          margin: 0 -20px !important;
+          padding: 0 40px 24px !important;
           overflow: visible !important;
         }
 
@@ -4241,7 +4244,9 @@
 
         .coach-workspace .side-panel {
           grid-template-columns: 1fr !important;
-          margin-top: 0 !important;
+          margin: 0 !important;
+          overflow: visible !important;
+          padding: 0 !important;
         }
       }
     </style>
