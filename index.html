@@ -3277,11 +3277,11 @@
         max-height: none !important;
         min-height: 0 !important;
         overflow: hidden !important;
-        padding: 22px !important;
-        border: 1px solid var(--mock-line) !important;
-        border-radius: 22px !important;
-        background: var(--mock-card) !important;
-        box-shadow: 0 20px 50px rgba(70, 45, 25, 0.10) !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
       }
 
       .coach-workspace .exercise-strip {
@@ -3297,7 +3297,7 @@
         grid-template-columns: none !important;
         align-items: center !important;
         gap: 14px !important;
-        padding: 0 0 18px !important;
+        padding: 4px 0 18px !important;
         border-bottom: 0 !important;
         background: transparent !important;
       }
@@ -3349,12 +3349,14 @@
       }
 
       .coach-workspace .practice-status-stack {
-        display: grid !important;
-        min-width: 190px !important;
-        justify-items: end !important;
-        align-content: center !important;
-        gap: 5px !important;
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
         padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0 0 0 0) !important;
+        white-space: nowrap !important;
         border: 0 !important;
         background: transparent !important;
       }
@@ -3378,6 +3380,19 @@
         clip: rect(0 0 0 0) !important;
         white-space: nowrap !important;
         border: 0 !important;
+      }
+
+      .coach-workspace .practice-main-card {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        padding: 22px !important;
+        border: 1px solid var(--mock-line) !important;
+        border-radius: 22px !important;
+        background: var(--mock-card) !important;
+        box-shadow: 0 20px 50px rgba(70, 45, 25, 0.10) !important;
       }
 
       .coach-workspace .practice-target-row {
@@ -3750,12 +3765,18 @@
           height: auto !important;
           max-height: none !important;
           overflow: visible !important;
-          padding: 16px !important;
+          padding: 0 !important;
         }
 
         .coach-workspace .practice-guidance {
           align-items: stretch !important;
           flex-direction: column !important;
+        }
+
+        .coach-workspace .practice-main-card {
+          flex: 0 0 auto !important;
+          overflow: visible !important;
+          padding: 16px !important;
         }
 
         .coach-workspace .practice-status-stack {

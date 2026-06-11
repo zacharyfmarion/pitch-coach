@@ -257,29 +257,31 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
                 </div>
               </div>
 
-              <div className="practice-target-row">
-                <NoteCheckpointStrip
+              <div className="practice-main-card">
+                <div className="practice-target-row">
+                  <NoteCheckpointStrip
+                    targetNotes={coach.targetNotes}
+                    attemptScore={coach.attemptScore}
+                  />
+                  <div className="practice-score-readout" aria-label={`${notesInTuneCount} notes in tune`}>
+                    <strong>
+                      {notesInTuneCount}
+                      <span>/{coach.targetNotes.length}</span>
+                    </strong>
+                    <span>notes in tune</span>
+                  </div>
+                </div>
+
+                <PitchTimeline
+                  frames={coach.pitchFrames}
                   targetNotes={coach.targetNotes}
                   attemptScore={coach.attemptScore}
+                  totalDurationMs={coach.listeningDurationMs}
+                  toleranceCents={coach.settings.toleranceCents}
+                  status={coach.lessonState.status}
+                  themeName={activeTheme.name}
                 />
-                <div className="practice-score-readout" aria-label={`${notesInTuneCount} notes in tune`}>
-                  <strong>
-                    {notesInTuneCount}
-                    <span>/{coach.targetNotes.length}</span>
-                  </strong>
-                  <span>notes in tune</span>
-                </div>
               </div>
-
-              <PitchTimeline
-                frames={coach.pitchFrames}
-                targetNotes={coach.targetNotes}
-                attemptScore={coach.attemptScore}
-                totalDurationMs={coach.listeningDurationMs}
-                toleranceCents={coach.settings.toleranceCents}
-                status={coach.lessonState.status}
-                themeName={activeTheme.name}
-              />
 
               <div className="transport-row">
                 <Button
