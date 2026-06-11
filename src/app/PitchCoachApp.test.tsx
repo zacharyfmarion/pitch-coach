@@ -216,7 +216,7 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("tab", { name: "Sing" }).getAttribute("data-state")).toBe("active");
     expect(screen.getByRole("heading", { name: "Sing a Song" })).toBeTruthy();
     expect(screen.getByText("Drop a song here")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Choose a file" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Choose a file" })).toBeTruthy();
     expect(screen.getByText(/How it works/i)).toBeTruthy();
     expect(screen.queryByLabelText("Song pitch timeline")).toBeNull();
     expect(screen.queryByLabelText("Song controls and feedback")).toBeNull();
