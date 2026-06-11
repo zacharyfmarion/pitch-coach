@@ -3123,8 +3123,10 @@
       }
 
       /* Live exercise practice mock parity */
-      .app-shell {
-        min-height: 100vh !important;
+      .practice-detail-page {
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
         background: var(--mock-shell) !important;
         color: var(--mock-ink) !important;
       }
@@ -3134,7 +3136,8 @@
         grid-template-rows: auto minmax(0, 1fr) !important;
         width: 100% !important;
         max-width: none !important;
-        min-height: 100vh !important;
+        height: 100% !important;
+        min-height: 0 !important;
         margin: 0 !important;
         background: var(--mock-shell) !important;
       }
@@ -3144,7 +3147,7 @@
         align-items: center !important;
         gap: 16px !important;
         min-height: 0 !important;
-        padding: 20px 32px 18px !important;
+        padding: 20px 24px 18px !important;
         border: 0 !important;
         background: transparent !important;
       }
@@ -3258,19 +3261,20 @@
 
       .coach-workspace .practice-layout {
         display: grid !important;
-        grid-template-columns: 1fr !important;
-        grid-template-rows: minmax(0, 1fr) auto !important;
+        grid-template-columns: minmax(0, 1fr) 330px !important;
+        grid-template-rows: minmax(0, 1fr) !important;
         gap: 20px !important;
+        height: 100% !important;
         min-height: 0 !important;
-        padding: 0 32px 26px !important;
-        overflow: auto !important;
+        padding: 0 24px 24px !important;
+        overflow: hidden !important;
       }
 
       .coach-workspace .lesson-panel {
         display: flex !important;
         flex-direction: column !important;
-        height: calc(100vh - 122px) !important;
-        max-height: 720px !important;
+        height: 100% !important;
+        max-height: none !important;
         min-height: 0 !important;
         overflow: hidden !important;
         padding: 22px !important;
@@ -3594,12 +3598,14 @@
 
       .coach-workspace .side-panel {
         display: grid !important;
-        grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
-        gap: 10px !important;
-        margin-top: 40px !important;
-        max-height: none !important;
-        overflow: visible !important;
-        padding: 0 0 8px !important;
+        grid-template-columns: 1fr !important;
+        align-content: start !important;
+        gap: 12px !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        margin-top: 0 !important;
+        overflow: auto !important;
+        padding: 0 2px 8px 0 !important;
         border: 0 !important;
         border-radius: 0 !important;
         background: transparent !important;
@@ -3608,10 +3614,12 @@
       .coach-workspace .side-panel .control-group,
       .coach-workspace .side-panel .feedback-panel {
         align-content: start !important;
-        padding: 13px !important;
+        gap: 12px !important;
+        padding: 14px !important;
         border: 1px solid var(--mock-line) !important;
         border-radius: 13px !important;
         background: var(--mock-card) !important;
+        box-shadow: none !important;
       }
 
       @media (max-width: 760px) {
@@ -3705,6 +3713,13 @@
         }
 
         .coach-workspace {
+          height: auto !important;
+          min-height: 100vh !important;
+          overflow: visible !important;
+        }
+
+        .practice-detail-page {
+          height: auto !important;
           min-height: 100vh !important;
           overflow: visible !important;
         }
@@ -3724,6 +3739,8 @@
 
         .coach-workspace .practice-layout {
           display: grid !important;
+          grid-template-columns: 1fr !important;
+          grid-template-rows: auto auto !important;
           gap: 18px !important;
           padding: 0 20px 24px !important;
           overflow: visible !important;

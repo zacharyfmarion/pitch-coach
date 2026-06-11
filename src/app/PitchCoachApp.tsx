@@ -114,6 +114,22 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     });
   };
 
+  const navigateTopLevel = (screen: TopLevelScreen) => {
+    if (screen === "home") {
+      router.navigateToHome();
+      return;
+    }
+    if (screen === "library") {
+      router.navigateToLibrary();
+      return;
+    }
+    if (screen === "songs") {
+      router.navigateToSongs();
+      return;
+    }
+    router.navigateToProgress();
+  };
+
   const backToLibrary = async () => {
     await coach.stopAttempt();
     router.goBackToLibraryFallback();
@@ -121,24 +137,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
 
   if (router.route.screen !== "practice") {
     return (
-      <MainShell
-        activeScreen={router.route.screen}
-        onNavigate={(screen) => {
-          if (screen === "home") {
-            router.navigateToHome();
-            return;
-          }
-          if (screen === "library") {
-            router.navigateToLibrary();
-            return;
-          }
-          if (screen === "songs") {
-            router.navigateToSongs();
-            return;
-          }
-          router.navigateToProgress();
-        }}
-      >
+      <MainShell activeScreen={router.route.screen} onNavigate={navigateTopLevel}>
         {router.route.screen === "home" ? (
           <HomeScreen
             exercises={coach.exercises}
@@ -203,306 +202,336 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     ).length ?? 0;
 
   return (
-    <main className="app-shell">
-      <section className="coach-workspace" aria-label="Pitch coach exercise">
-        <header className="top-bar">
-          <div className="brand-lockup">
-            <IconButton
-              className="back-action"
-              size="sm"
-              onClick={() => void backToLibrary()}
-              aria-label="Back to exercises"
-              title="Back to exercises"
-            >
-              <ArrowLeft size={18} />
-            </IconButton>
-            <div className="brand-mark" aria-hidden="true">
-              <Mic size={22} />
-            </div>
-            <div className="brand-copy">
-              <Dropdown
-                ariaLabel="Exercise"
-                value={coach.selectedExercise.id}
-                options={exerciseOptions}
-                onValueChange={openExercise}
-                disabled={coach.isBusy}
-                triggerClassName="practice-title-dropdown"
-              />
-              <p>Take {coach.lessonState.attemptNumber + 1}</p>
-            </div>
-          </div>
-          <div className="top-actions">
-            <div className="session-readout" aria-live="polite">
-              <span className="readout-label">Key of</span>
-              <strong>{coach.currentKeyLabel}</strong>
-            </div>
-          </div>
-        </header>
-
-        <section className="practice-layout">
-          <div className="lesson-panel">
-            <div className="practice-guidance" aria-label="Practice guidance">
-              <CoachBubble tone={coachGuidance.tone} icon={coachGuidance.icon}>
-                <strong>{coachGuidance.title}</strong>
-                <span>{coachGuidance.message}</span>
-              </CoachBubble>
-              <div className="practice-status-stack">
-                <StatusPill tone={practiceStatusView.tone} pulse={practiceStatusView.pulse}>
-                  {practiceStatusView.label}
-                </StatusPill>
-                <span className="practice-status-detail">{practiceStatusView.detail}</span>
-                <span className="practice-status-legacy">
-                  {legacyStatusCopy[coach.lessonState.status]}
-                </span>
+    <MainShell activeScreen="library" onNavigate={navigateTopLevel}>
+      <main className="practice-detail-page">
+        <section className="coach-workspace" aria-label="Pitch coach exercise">
+          <header className="top-bar">
+            <div className="brand-lockup">
+              <IconButton
+                className="back-action"
+                size="sm"
+                onClick={() => void backToLibrary()}
+                aria-label="Back to exercises"
+                title="Back to exercises"
+              >
+                <ArrowLeft size={18} />
+              </IconButton>
+              <div className="brand-mark" aria-hidden="true">
+                <Mic size={22} />
+              </div>
+              <div className="brand-copy">
+                <Dropdown
+                  ariaLabel="Exercise"
+                  value={coach.selectedExercise.id}
+                  options={exerciseOptions}
+                  onValueChange={openExercise}
+                  disabled={coach.isBusy}
+                  triggerClassName="practice-title-dropdown"
+                />
+                <p>Take {coach.lessonState.attemptNumber + 1}</p>
               </div>
             </div>
+            <div className="top-actions">
+              <div className="session-readout" aria-live="polite">
+                <span className="readout-label">Key of</span>
+                <strong>{coach.currentKeyLabel}</strong>
+              </div>
+            </div>
+          </header>
 
-            <div className="practice-target-row">
-              <NoteCheckpointStrip
+          <section className="practice-layout">
+            <div className="lesson-panel">
+              <div className="practice-guidance" aria-label="Practice guidance">
+                <CoachBubble tone={coachGuidance.tone} icon={coachGuidance.icon}>
+                  <strong>{coachGuidance.title}</strong>
+                  <span>{coachGuidance.message}</span>
+                </CoachBubble>
+                <div className="practice-status-stack">
+                  <StatusPill tone={practiceStatusView.tone} pulse={practiceStatusView.pulse}>
+                    {practiceStatusView.label}
+                  </StatusPill>
+                  <span className="practice-status-detail">{practiceStatusView.detail}</span>
+                  <span className="practice-status-legacy">
+                    {legacyStatusCopy[coach.lessonState.status]}
+                  </span>
+                </div>
+              </div>
+
+              <div className="practice-target-row">
+                <NoteCheckpointStrip
+                  targetNotes={coach.targetNotes}
+                  attemptScore={coach.attemptScore}
+                />
+                <div className="practice-score-readout" aria-label={`${notesInTuneCount} notes in tune`}>
+                  <strong>
+                    {notesInTuneCount}
+                    <span>/{coach.targetNotes.length}</span>
+                  </strong>
+                  <span>notes in tune</span>
+                </div>
+              </div>
+
+              <PitchTimeline
+                frames={coach.pitchFrames}
                 targetNotes={coach.targetNotes}
                 attemptScore={coach.attemptScore}
+                totalDurationMs={coach.listeningDurationMs}
+                toleranceCents={coach.settings.toleranceCents}
+                status={coach.lessonState.status}
+                themeName={activeTheme.name}
               />
-              <div className="practice-score-readout" aria-label={`${notesInTuneCount} notes in tune`}>
-                <strong>
-                  {notesInTuneCount}
-                  <span>/{coach.targetNotes.length}</span>
-                </strong>
-                <span>notes in tune</span>
+
+              <div className="transport-row">
+                <Button
+                  className="primary-action"
+                  variant="primary"
+                  size="lg"
+                  onClick={() => void primaryAction()}
+                  disabled={coach.isBusy || coach.lessonState.status === "passed"}
+                  aria-label={primaryLabel}
+                  title={primaryLabel}
+                >
+                  {coach.lessonState.status === "complete" ? <RotateCcw size={18} /> : <Play size={18} />}
+                  <span>{primaryLabel}</span>
+                </Button>
+                <IconButton
+                  size="lg"
+                  variant="toolbar"
+                  onClick={() => void coach.stopAttempt()}
+                  disabled={!coach.isBusy && coach.lessonState.status !== "passed"}
+                  aria-label="Stop"
+                  title="Stop"
+                >
+                  <Square size={18} />
+                </IconButton>
+                <IconButton
+                  size="lg"
+                  variant="toolbar"
+                  onClick={() => void coach.resetLesson()}
+                  disabled={coach.isBusy}
+                  aria-label="Reset"
+                  title="Reset"
+                >
+                  <RotateCcw size={18} />
+                </IconButton>
               </div>
-            </div>
 
-            <PitchTimeline
-              frames={coach.pitchFrames}
-              targetNotes={coach.targetNotes}
-              attemptScore={coach.attemptScore}
-              totalDurationMs={coach.listeningDurationMs}
-              toleranceCents={coach.settings.toleranceCents}
-              status={coach.lessonState.status}
-              themeName={activeTheme.name}
-            />
-
-            <div className="transport-row">
-              <Button
-                className="primary-action"
-                variant="primary"
-                size="lg"
-                onClick={() => void primaryAction()}
-                disabled={coach.isBusy || coach.lessonState.status === "passed"}
-                aria-label={primaryLabel}
-                title={primaryLabel}
-              >
-                {coach.lessonState.status === "complete" ? <RotateCcw size={18} /> : <Play size={18} />}
-                <span>{primaryLabel}</span>
-              </Button>
-              <IconButton
-                size="lg"
-                variant="toolbar"
-                onClick={() => void coach.stopAttempt()}
-                disabled={!coach.isBusy && coach.lessonState.status !== "passed"}
-                aria-label="Stop"
-                title="Stop"
-              >
-                <Square size={18} />
-              </IconButton>
-              <IconButton
-                size="lg"
-                variant="toolbar"
-                onClick={() => void coach.resetLesson()}
-                disabled={coach.isBusy}
-                aria-label="Reset"
-                title="Reset"
-              >
-                <RotateCcw size={18} />
-              </IconButton>
-            </div>
-
-            {coach.errorMessage ? (
-              <div className="error-banner" role="alert">
-                {coach.errorMessage}
-              </div>
-            ) : null}
-          </div>
-
-          <aside className="side-panel" aria-label="Lesson controls and feedback">
-            <section className="control-group" aria-label="Range">
-              <div className="group-heading">
-                <SlidersHorizontal size={17} />
-                <h2>Range</h2>
-              </div>
-              <label>
-                <span>Low</span>
-                <Dropdown
-                  ariaLabel="Low"
-                  value={coach.settings.range.lowestMidi}
-                  options={noteOptions}
-                  onValueChange={(lowestMidi) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      range: {
-                        ...coach.settings.range,
-                        lowestMidi
-                      }
-                    })
-                  }
-                />
-              </label>
-              <label>
-                <span>High</span>
-                <Dropdown
-                  ariaLabel="High"
-                  value={coach.settings.range.highestMidi}
-                  options={noteOptions}
-                  onValueChange={(highestMidi) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      range: {
-                        ...coach.settings.range,
-                        highestMidi
-                      }
-                    })
-                  }
-                />
-              </label>
-            </section>
-
-            <section className="control-group" aria-label="Scoring">
-              <div className="group-heading">
-                <Gauge size={17} />
-                <h2>Scoring</h2>
-              </div>
-              <label>
-                <span>Guide tempo</span>
-                <input
-                  type="range"
-                  min="50"
-                  max="140"
-                  value={coach.settings.tempoBpm}
-                  onChange={(event) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      tempoBpm: Number(event.target.value)
-                    })
-                  }
-                />
-                <output>{coach.settings.tempoBpm} BPM</output>
-              </label>
-              <label>
-                <span>Tolerance</span>
-                <input
-                  type="range"
-                  min="15"
-                  max="60"
-                  value={coach.settings.toleranceCents}
-                  onChange={(event) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      toleranceCents: Number(event.target.value)
-                    })
-                  }
-                />
-                <output>{coach.settings.toleranceCents} cents</output>
-              </label>
-              <label className="toggle-row">
-                <span>Local clips</span>
-                <Toggle
-                  aria-label="Local clips"
-                  checked={coach.settings.saveLocalClips}
-                  onChange={(saveLocalClips) =>
-                    coach.setSettings({
-                      ...coach.settings,
-                      saveLocalClips
-                    })
-                  }
-                />
-              </label>
-            </section>
-
-            {coach.localClip || coach.clipErrorMessage ? (
-              <section className="control-group" aria-label="Latest local clip">
-                <div className="group-heading">
-                  <Volume2 size={17} />
-                  <h2>Latest Clip</h2>
+              {coach.errorMessage ? (
+                <div className="error-banner" role="alert">
+                  {coach.errorMessage}
                 </div>
-                {coach.localClip ? (
-                  <>
-                    <audio className="clip-player" controls src={coach.localClip.url} />
-                    <div className="clip-actions">
-                      <span>{formatClipDuration(coach.localClip.durationMs)}</span>
-                      <Button
-                        className="text-action"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void coach.deleteLocalClip()}
-                      >
-                        <Trash2 size={16} />
-                        <span>Delete</span>
-                      </Button>
-                    </div>
-                  </>
-                ) : null}
-                {coach.clipErrorMessage ? (
-                  <p className="clip-error" role="alert">
-                    {coach.clipErrorMessage}
-                  </p>
-                ) : null}
-              </section>
-            ) : null}
+              ) : null}
+            </div>
 
-            <section className="feedback-panel" aria-label="Attempt feedback">
-              <div className="group-heading">
-                <Music2 size={17} />
-                <h2>Feedback</h2>
-              </div>
-              <p className="coach-summary">
-                {coach.attemptScore?.summary ??
-                  `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`}
-              </p>
-              <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
-            </section>
+            <aside className="side-panel practice-side-panel" aria-label="Lesson controls and feedback">
+              <Card as="section" className="control-group" variant="mock" padding="md" aria-label="Range">
+                <CardHeader className="group-heading">
+                  <SlidersHorizontal size={17} />
+                  <CardTitle>Range</CardTitle>
+                </CardHeader>
+                <CardContent className="control-group__body">
+                  <label>
+                    <span>Low</span>
+                    <Dropdown
+                      ariaLabel="Low"
+                      value={coach.settings.range.lowestMidi}
+                      options={noteOptions}
+                      onValueChange={(lowestMidi) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          range: {
+                            ...coach.settings.range,
+                            lowestMidi
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>High</span>
+                    <Dropdown
+                      ariaLabel="High"
+                      value={coach.settings.range.highestMidi}
+                      options={noteOptions}
+                      onValueChange={(highestMidi) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          range: {
+                            ...coach.settings.range,
+                            highestMidi
+                          }
+                        })
+                      }
+                    />
+                  </label>
+                </CardContent>
+              </Card>
 
-            <section className="control-group history-panel" aria-label="Attempt history">
-              <div className="group-heading">
-                <History size={17} />
-                <h2>History</h2>
-              </div>
-              {coach.selectedExerciseHistory.length > 0 ? (
-                <ol className="history-list">
-                  {coach.selectedExerciseHistory.map((attempt) => (
-                    <li key={attempt.id}>
-                      <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
-                        {attempt.passed ? "Pass" : "Retry"}
-                      </span>
-                      <span className="history-copy">
-                        <strong>
-                          {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
-                        </strong>
-                        <span>{attempt.summary}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="history-empty">No attempts yet for this exercise.</p>
-              )}
-              <Button
-                className="text-action"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (window.confirm("Clear all local attempt history?")) {
-                    void coach.clearLocalAttemptHistory();
-                  }
-                }}
-                disabled={coach.attemptHistoryCount === 0}
+              <Card as="section" className="control-group" variant="mock" padding="md" aria-label="Scoring">
+                <CardHeader className="group-heading">
+                  <Gauge size={17} />
+                  <CardTitle>Scoring</CardTitle>
+                </CardHeader>
+                <CardContent className="control-group__body">
+                  <label>
+                    <span>Guide tempo</span>
+                    <input
+                      type="range"
+                      min="50"
+                      max="140"
+                      value={coach.settings.tempoBpm}
+                      onChange={(event) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          tempoBpm: Number(event.target.value)
+                        })
+                      }
+                    />
+                    <output>{coach.settings.tempoBpm} BPM</output>
+                  </label>
+                  <label>
+                    <span>Tolerance</span>
+                    <input
+                      type="range"
+                      min="15"
+                      max="60"
+                      value={coach.settings.toleranceCents}
+                      onChange={(event) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          toleranceCents: Number(event.target.value)
+                        })
+                      }
+                    />
+                    <output>{coach.settings.toleranceCents} cents</output>
+                  </label>
+                  <label className="toggle-row">
+                    <span>Local clips</span>
+                    <Toggle
+                      aria-label="Local clips"
+                      checked={coach.settings.saveLocalClips}
+                      onChange={(saveLocalClips) =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          saveLocalClips
+                        })
+                      }
+                    />
+                  </label>
+                </CardContent>
+              </Card>
+
+              {coach.localClip || coach.clipErrorMessage ? (
+                <Card
+                  as="section"
+                  className="control-group"
+                  variant="mock"
+                  padding="md"
+                  aria-label="Latest local clip"
+                >
+                  <CardHeader className="group-heading">
+                    <Volume2 size={17} />
+                    <CardTitle>Latest Clip</CardTitle>
+                  </CardHeader>
+                  <CardContent className="control-group__body">
+                    {coach.localClip ? (
+                      <>
+                        <audio className="clip-player" controls src={coach.localClip.url} />
+                        <div className="clip-actions">
+                          <span>{formatClipDuration(coach.localClip.durationMs)}</span>
+                          <Button
+                            className="text-action"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void coach.deleteLocalClip()}
+                          >
+                            <Trash2 size={16} />
+                            <span>Delete</span>
+                          </Button>
+                        </div>
+                      </>
+                    ) : null}
+                    {coach.clipErrorMessage ? (
+                      <p className="clip-error" role="alert">
+                        {coach.clipErrorMessage}
+                      </p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              <Card
+                as="section"
+                className="feedback-panel"
+                variant="mock"
+                padding="md"
+                aria-label="Attempt feedback"
               >
-                <Trash2 size={16} />
-                <span>Clear history</span>
-              </Button>
-            </section>
-          </aside>
+                <CardHeader className="group-heading">
+                  <Music2 size={17} />
+                  <CardTitle>Feedback</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="coach-summary">
+                    {coach.attemptScore?.summary ??
+                      `Sing ${coach.targetNotes.map((note) => midiToNoteName(note.midi)).join(" - ")} after the guide.`}
+                  </p>
+                  <FeedbackList targetNotes={coach.targetNotes} attemptScore={coach.attemptScore} />
+                </CardContent>
+              </Card>
+
+              <Card
+                as="section"
+                className="control-group history-panel"
+                variant="mock"
+                padding="md"
+                aria-label="Attempt history"
+              >
+                <CardHeader className="group-heading">
+                  <History size={17} />
+                  <CardTitle>History</CardTitle>
+                </CardHeader>
+                <CardContent className="control-group__body">
+                  {coach.selectedExerciseHistory.length > 0 ? (
+                    <ol className="history-list">
+                      {coach.selectedExerciseHistory.map((attempt) => (
+                        <li key={attempt.id}>
+                          <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
+                            {attempt.passed ? "Pass" : "Retry"}
+                          </span>
+                          <span className="history-copy">
+                            <strong>
+                              {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
+                            </strong>
+                            <span>{attempt.summary}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="history-empty">No attempts yet for this exercise.</p>
+                  )}
+                  <Button
+                    className="text-action"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (window.confirm("Clear all local attempt history?")) {
+                        void coach.clearLocalAttemptHistory();
+                      }
+                    }}
+                    disabled={coach.attemptHistoryCount === 0}
+                  >
+                    <Trash2 size={16} />
+                    <span>Clear history</span>
+                  </Button>
+                </CardContent>
+              </Card>
+            </aside>
+          </section>
         </section>
-      </section>
-    </main>
+      </main>
+    </MainShell>
   );
 }
 
