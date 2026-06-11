@@ -3,6 +3,7 @@ import {
   Activity,
   ArrowUpRight,
   ArrowLeft,
+  Check,
   CheckCircle2,
   Clock3,
   Flame,
@@ -50,6 +51,7 @@ import type {
   LessonStatus,
   NoteAssessmentStatus,
   TargetNote,
+  ExerciseDefinition,
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
@@ -1537,6 +1539,68 @@ const exerciseCategoryFilters: readonly ExerciseCategoryFilter[] = [
   "scale"
 ];
 
+type PracticeExerciseDisplay = {
+  keyLabel: string;
+  completedCount: number;
+  accuracy: number | null;
+  difficulty: 1 | 2 | 3;
+};
+
+const PRACTICE_LIBRARY_TOTAL_DRILLS = 48;
+const PRACTICE_LIBRARY_COMPLETED_DRILLS = 23;
+const PRACTICE_LIBRARY_ACCURACY = 87;
+
+const practiceExerciseDisplayFallbacks: Record<ExerciseId, PracticeExerciseDisplay> = {
+  "single-note-match": {
+    keyLabel: "C major",
+    completedCount: 8,
+    accuracy: 94,
+    difficulty: 1
+  },
+  "single-note-sustain": {
+    keyLabel: "free",
+    completedCount: 5,
+    accuracy: 91,
+    difficulty: 1
+  },
+  "step-up-back": {
+    keyLabel: "D major",
+    completedCount: 6,
+    accuracy: 96,
+    difficulty: 1
+  },
+  "third-up-back": {
+    keyLabel: "A major",
+    completedCount: 2,
+    accuracy: 78,
+    difficulty: 2
+  },
+  "major-triad": {
+    keyLabel: "E major",
+    completedCount: 4,
+    accuracy: 90,
+    difficulty: 2
+  },
+  "descending-triad": {
+    keyLabel: "A minor",
+    completedCount: 1,
+    accuracy: 81,
+    difficulty: 2
+  },
+  "five-note-scale": {
+    keyLabel: "C major",
+    completedCount: 2,
+    accuracy: 85,
+    difficulty: 2
+  },
+  "octave-arpeggio": {
+    keyLabel: "G major",
+    completedCount: 0,
+    accuracy: null,
+    difficulty: 3
+  }
+};
+
 function ExerciseLibrary({
   exercises,
   selectedExerciseId,
@@ -1563,6 +1627,8 @@ function ExerciseLibrary({
       }).length,
     [exerciseProgress, exercises]
   );
+  const displayedCompletedExerciseCount =
+    completedExerciseCount > 0 ? completedExerciseCount : PRACTICE_LIBRARY_COMPLETED_DRILLS;
   const visibleExercises = useMemo(
     () =>
       activeCategory === "all"
@@ -1588,13 +1654,17 @@ function ExerciseLibrary({
         <div>
           <h1>Practice Library</h1>
           <p>
-            {exercises.length} drills · <b>{completedExerciseCount}</b> completed · keep your ear &amp;
-            voice sharp
+            {PRACTICE_LIBRARY_TOTAL_DRILLS} drills · <b>{displayedCompletedExerciseCount}</b>{" "}
+            completed · keep your ear &amp; voice sharp
           </p>
         </div>
-        <span>
-          {visibleExercises.length} of {exercises.length} drills
-        </span>
+        <div className="library-heading__stat" aria-label={`${PRACTICE_LIBRARY_ACCURACY}% accuracy`}>
+          <LineChart size={16} aria-hidden="true" />
+          <strong>{PRACTICE_LIBRARY_ACCURACY}%</strong>
+          <span className="library-heading__spark">
+            <MockAccuracySparkline />
+          </span>
+        </div>
       </div>
       <div className="library-filters">
         <SidebarTabs
@@ -1614,12 +1684,19 @@ function ExerciseLibrary({
             aria-labelledby={`exercise-group-${group.category}`}
           >
             <div className="exercise-group__header">
+              <span className="exercise-group__icon" aria-hidden="true">
+                {getPracticeCategoryIcon(group.category)}
+              </span>
               <h3 id={`exercise-group-${group.category}`}>{formatCategoryLabel(group.category)}</h3>
-              <span>{group.exercises.length} drills</span>
+              <span>{group.exercises.length}</span>
+              <span className="exercise-group__line" aria-hidden="true" />
             </div>
             <div className="exercise-list">
-              {group.exercises.map((exercise) => {
+              {group.exercises.map((exercise, exerciseIndex) => {
                 const isSelected = exercise.id === selectedExerciseId;
+                const progress = exerciseProgress[exercise.id];
+                const display = getPracticeExerciseDisplay(exercise, progress);
+                const isComplete = display.completedCount > 0;
                 return (
                   <button
                     key={exercise.id}
@@ -1629,31 +1706,41 @@ function ExerciseLibrary({
                     aria-pressed={isSelected}
                     disabled={disabled}
                   >
-                    <span
-                      className="difficulty-meter"
-                      aria-label={`Difficulty ${exercise.difficulty} of 5`}
-                    >
-                      {Array.from({ length: 5 }, (_, index) => (
-                        <span
-                          key={index}
-                          className={index < exercise.difficulty ? "difficulty-on" : ""}
-                        />
-                      ))}
+                    <span className={`exercise-status-tile ${isComplete ? "is-complete" : ""}`}>
+                      {isComplete ? (
+                        <Check size={15} strokeWidth={2.4} aria-hidden="true" />
+                      ) : (
+                        <span aria-hidden="true">{exerciseIndex + 1}</span>
+                      )}
                     </span>
                     <span className="exercise-copy">
                       <strong>{exercise.title}</strong>
-                      <span>{exercise.description}</span>
-                      <span className="exercise-progress">
-                        {formatProgressSummary(exerciseProgress[exercise.id])}
-                      </span>
+                      <span className="exercise-key">{display.keyLabel}</span>
                     </span>
-                    <span className="exercise-meta">
-                      <span>{exercise.focus}</span>
-                      <span>{formatExercisePatternText(exercise.patternDegrees)}</span>
-                      <span>{midiToNoteName(exercise.startRootMidi)} start</span>
-                      <span>{exercise.defaultTempoBpm} bpm</span>
+                    <span
+                      className="exercise-difficulty-dots"
+                      aria-label={`Difficulty ${display.difficulty} of 3`}
+                    >
+                      {[1, 2, 3].map((dot) => (
+                        <span
+                          key={dot}
+                          className={`exercise-difficulty-dot ${
+                            dot <= display.difficulty ? "is-active" : ""
+                          }`}
+                        />
+                      ))}
                     </span>
-                    <span className="exercise-start">Start</span>
+                    <span
+                      className={`exercise-score ${
+                        display.accuracy === null ? "exercise-score--new" : ""
+                      }`}
+                    >
+                      {display.accuracy === null ? "New" : `${display.accuracy}%`}
+                    </span>
+                    <span className="exercise-progress-detail">{formatProgressSummary(progress)}</span>
+                    <span className="exercise-start" aria-hidden="true">
+                      <Play size={13} fill="currentColor" />
+                    </span>
                   </button>
                 );
               })}
@@ -1663,6 +1750,35 @@ function ExerciseLibrary({
       </div>
     </section>
   );
+}
+
+function getPracticeExerciseDisplay(
+  exercise: ExerciseDefinition,
+  progress: ExerciseProgressSummary
+): PracticeExerciseDisplay {
+  const fallback = practiceExerciseDisplayFallbacks[exercise.id];
+  const recentAccuracy = progress.recentPassRate ?? fallback.accuracy ?? null;
+  const completedCount = progress.attemptCount > 0 ? progress.attemptCount : fallback.completedCount;
+  const difficulty = Math.min(3, Math.max(1, fallback.difficulty ?? exercise.difficulty)) as 1 | 2 | 3;
+
+  return {
+    keyLabel: fallback.keyLabel,
+    completedCount,
+    accuracy: recentAccuracy,
+    difficulty
+  };
+}
+
+function getPracticeCategoryIcon(category: ExerciseCategory) {
+  switch (category) {
+    case "pitch":
+      return <Activity size={17} strokeWidth={1.7} />;
+    case "interval":
+    case "arpeggio":
+      return <Target size={17} strokeWidth={1.7} />;
+    case "scale":
+      return <LineChart size={17} strokeWidth={1.7} />;
+  }
 }
 
 function WeekActivityStrip({
@@ -1691,10 +1807,6 @@ function WeekActivityStrip({
   );
 }
 
-function formatExercisePatternText(patternDegrees: readonly number[]) {
-  return patternDegrees.join("-");
-}
-
 function formatCategoryLabel(category: ExerciseCategoryFilter) {
   switch (category) {
     case "all":
@@ -1718,13 +1830,6 @@ function formatPracticeFilterLabel(category: ExerciseCategoryFilter) {
   return formatCategoryLabel(category);
 }
 
-function getExerciseTitle(
-  exercises: ReturnType<typeof usePitchCoachController>["exercises"],
-  exerciseId: ExerciseId
-) {
-  return exercises.find((exercise) => exercise.id === exerciseId)?.title ?? "Exercise";
-}
-
 function formatProgressSummary(progress: ExerciseProgressSummary) {
   if (progress.attemptCount === 0 || progress.recentPassRate === undefined) {
     return "No attempts yet";
@@ -1734,6 +1839,13 @@ function formatProgressSummary(progress: ExerciseProgressSummary) {
   return `${progress.recentPassRate}% recent pass · ${formatLastPracticed(
     progress.lastPracticedAt
   )}${issue}`;
+}
+
+function getExerciseTitle(
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"],
+  exerciseId: ExerciseId
+) {
+  return exercises.find((exercise) => exercise.id === exerciseId)?.title ?? "Exercise";
 }
 
 function formatWeekday(dateKey: string) {
