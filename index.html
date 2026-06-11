@@ -574,7 +574,7 @@
       .mock-practice-progress > span::before {
         position: absolute;
         inset: 0 auto 0 0;
-        width: 48%;
+        width: var(--practice-progress, 0%);
         border-radius: inherit;
         background: var(--mock-coral);
         content: "";
@@ -740,6 +740,12 @@
         stroke-width: 4;
         stroke-linecap: round;
         stroke-linejoin: round;
+      }
+
+      .mock-accuracy-sparkline.is-empty {
+        stroke: var(--mock-muted-2);
+        stroke-width: 3;
+        opacity: 0.55;
       }
 
       .mock-song-page {

@@ -18,6 +18,8 @@ export type WeekActivityBucket = {
   date: string;
   attemptCount: number;
   passedAttemptCount: number;
+  noteCount: number;
+  notesInTune: number;
   durationMs: number;
 };
 
@@ -297,6 +299,8 @@ function createWeekActivity(records: AttemptHistoryRecord[], now: Date) {
       date: toLocalDateKey(date),
       attemptCount: 0,
       passedAttemptCount: 0,
+      noteCount: 0,
+      notesInTune: 0,
       durationMs: 0
     };
   });
@@ -315,6 +319,8 @@ function createWeekActivity(records: AttemptHistoryRecord[], now: Date) {
 
     bucket.attemptCount += 1;
     bucket.passedAttemptCount += record.passed ? 1 : 0;
+    bucket.noteCount += record.notes.length;
+    bucket.notesInTune += record.notes.filter(isInTuneHistoryNote).length;
     bucket.durationMs += Math.max(0, record.durationMs);
   });
 

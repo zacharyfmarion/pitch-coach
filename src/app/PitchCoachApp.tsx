@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Activity,
   ArrowUpRight,
@@ -54,7 +54,7 @@ import type {
   ExerciseDefinition,
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
-import { midiToNoteName } from "../domain/music";
+import { degreeToSemitones, midiToNoteName } from "../domain/music";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
 import { usePitchCoachTheme } from "./theme";
@@ -137,7 +137,11 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
 
   if (router.route.screen !== "practice") {
     return (
-      <MainShell activeScreen={router.route.screen} onNavigate={navigateTopLevel}>
+      <MainShell
+        activeScreen={router.route.screen}
+        onNavigate={navigateTopLevel}
+        practiceSummary={coach.practiceSummary}
+      >
         {router.route.screen === "home" ? (
           <HomeScreen
             exercises={coach.exercises}
@@ -155,6 +159,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             exercises={coach.exercises}
             selectedExerciseId={coach.selectedExercise.id}
             exerciseProgress={coach.exerciseProgress}
+            practiceSummary={coach.practiceSummary}
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
@@ -202,7 +207,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     ).length ?? 0;
 
   return (
-    <MainShell activeScreen="library" onNavigate={navigateTopLevel}>
+    <MainShell activeScreen="library" onNavigate={navigateTopLevel} practiceSummary={coach.practiceSummary}>
       <main className="practice-detail-page">
         <section className="coach-workspace" aria-label="Pitch coach exercise">
           <header className="top-bar">
@@ -786,10 +791,12 @@ const navigationItems = [
 function MainShell({
   activeScreen,
   onNavigate,
+  practiceSummary,
   children
 }: {
   activeScreen: TopLevelScreen;
   onNavigate: (screen: TopLevelScreen) => void;
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   children: ReactNode;
 }) {
   return (
@@ -801,7 +808,7 @@ function MainShell({
           items={navigationItems}
           activeValue={activeScreen}
           onNavigate={onNavigate}
-          footer={<LocalSaveFooter />}
+          footer={<LocalSaveFooter practiceSummary={practiceSummary} />}
         />
       }
     >
@@ -821,22 +828,26 @@ function PitchCoachBrand() {
   );
 }
 
-function LocalSaveFooter() {
+function LocalSaveFooter({
+  practiceSummary
+}: {
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+}) {
   return (
     <div className="shell-local-footer">
       <div className="shell-streak-card">
         <Flame size={22} aria-hidden="true" />
         <span>
-          <strong>12 days</strong>
+          <strong>{formatDayCount(practiceSummary.streakDays)}</strong>
           <span>practice streak</span>
         </span>
       </div>
       <div className="shell-user-card">
         <span className="shell-user-avatar" aria-hidden="true">
-          R
+          L
         </span>
         <span className="shell-user-copy">
-          <strong>Robin</strong>
+          <strong>Local practice</strong>
           <span>Saved on this device</span>
         </span>
         <span className="shell-user-sun" aria-hidden="true">
@@ -860,6 +871,7 @@ type LibraryScreenProps = {
   exercises: ReturnType<typeof usePitchCoachController>["exercises"];
   selectedExerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"];
   exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
   disabled: boolean;
 };
@@ -872,19 +884,29 @@ type HomeScreenProps = LibraryScreenProps & {
 };
 
 function HomeScreen({
+  exercises,
+  exerciseProgress,
+  practiceSummary,
+  recommendedExercise,
   onSelectExercise,
   onNavigateToPractice,
   onNavigateToSongs,
   disabled
 }: HomeScreenProps) {
+  const recommendedProgress = exerciseProgress[recommendedExercise.exercise.id];
+  const completedExerciseCount = countExercisesTried(exercises, exerciseProgress);
+  const exerciseCoveragePercent =
+    exercises.length > 0 ? Math.round((completedExerciseCount / exercises.length) * 100) : 0;
+  const hasRecommendedHistory = recommendedProgress.attemptCount > 0;
+
   return (
     <main className="mock-home" aria-label="Pitch coach home">
       <section className="mock-home__header">
         <div>
-          <h1>Good evening, Robin</h1>
-          <p>You’re on a 12-day roll — a few minutes keeps it alive.</p>
+          <h1>Good evening</h1>
+          <p>{createHomeIntroCopy(practiceSummary)}</p>
         </div>
-        <WeeklyStreakMock />
+        <WeeklyStreakSummary buckets={practiceSummary.weekActivity} />
       </section>
 
       <Card
@@ -892,35 +914,37 @@ function HomeScreen({
         className="mock-resume-card"
         variant="mockSoft"
         padding="none"
-        aria-label="Pick up where you left off"
+        aria-label={hasRecommendedHistory ? "Pick up where you left off" : "Recommended practice"}
       >
         <div className="mock-resume-card__copy">
           <div className="mock-kicker">
             <Sparkles size={18} aria-hidden="true" />
-            <span>Pick up where you left off</span>
+            <span>{hasRecommendedHistory ? "Pick up where you left off" : "Recommended practice"}</span>
           </div>
           <div className="mock-resume-card__title-row">
-            <h2>Major Third</h2>
-            <span>Intervals · A major</span>
+            <h2>{recommendedExercise.exercise.title}</h2>
+            <span>{createRecommendationMeta(recommendedExercise.exercise)}</span>
           </div>
-          <p>Your thirds slipped flat last session — let’s lock them in.</p>
+          <p>{createRecommendationCopy(recommendedExercise.reason, recommendedProgress)}</p>
           <div className="mock-resume-card__actions">
             <button
               className="mock-primary-action"
               type="button"
-              onClick={() => onSelectExercise("third-up-back")}
+              onClick={() => onSelectExercise(recommendedExercise.exercise.id)}
               disabled={disabled}
             >
               <Play size={17} fill="currentColor" aria-hidden="true" />
-              <span>Resume practice</span>
+              <span>{hasRecommendedHistory ? "Resume practice" : "Start practice"}</span>
             </button>
-            <span>
-              <strong>78%</strong>
-              best so far
-            </span>
+            {hasRecommendedHistory && recommendedProgress.recentPassRate !== undefined ? (
+              <span>
+                <strong>{recommendedProgress.recentPassRate}%</strong>
+                recent pass
+              </span>
+            ) : null}
           </div>
         </div>
-        <MockPitchPreview />
+        <ExercisePitchPreview exercise={recommendedExercise.exercise} />
       </Card>
 
       <section className="mock-mode-grid" aria-label="Practice modes">
@@ -938,7 +962,7 @@ function HomeScreen({
             </span>
             <span className="mock-mode-copy">
               <strong>Interval Training</strong>
-              <span>12 guided drills · ear & voice</span>
+              <span>{exercises.length} guided exercises · ear &amp; voice</span>
             </span>
             <ArrowUpRight size={27} aria-hidden="true" />
           </div>
@@ -949,8 +973,17 @@ function HomeScreen({
             <span>Scales</span>
           </div>
           <div className="mock-practice-progress">
-            <span />
-            <strong>23 <span>/ 48 done</span></strong>
+            <span
+              style={
+                {
+                  "--practice-progress": `${exerciseCoveragePercent}%`
+                } as CSSProperties
+              }
+            />
+            <strong>
+              {formatInteger(practiceSummary.attemptCount)}{" "}
+              <span>{practiceSummary.attemptCount === 1 ? "attempt logged" : "attempts logged"}</span>
+            </strong>
           </div>
         </Card>
 
@@ -989,7 +1022,7 @@ function HomeScreen({
           padding="none"
           icon={<Flame size={19} />}
           label="Day streak"
-          value="12"
+          value={formatInteger(practiceSummary.streakDays)}
           valueClassName="mock-stat-card__value--accent"
         />
         <StatCard
@@ -998,9 +1031,9 @@ function HomeScreen({
           padding="none"
           icon={<LineChart size={19} />}
           label="Accuracy"
-          value="87"
+          value={practiceSummary.noteAccuracy ?? 0}
           unit="%"
-          trend={<MockAccuracySparkline />}
+          trend={<AccuracySparkline buckets={practiceSummary.weekActivity} />}
         />
         <StatCard
           className="mock-stat-card"
@@ -1008,7 +1041,7 @@ function HomeScreen({
           padding="none"
           icon={<CheckCircle2 size={18} />}
           label="Notes in tune"
-          value="1,284"
+          value={formatInteger(practiceSummary.notesInTune)}
           valueClassName="mock-stat-card__value--green"
         />
         <StatCard
@@ -1017,7 +1050,7 @@ function HomeScreen({
           padding="none"
           icon={<Clock3 size={18} />}
           label="Practiced"
-          value="142"
+          value={formatInteger(practiceSummary.practiceMinutes)}
           unit="min"
         />
       </section>
@@ -1025,27 +1058,86 @@ function HomeScreen({
   );
 }
 
-function WeeklyStreakMock() {
-  const days = [
-    { label: "M", done: true },
-    { label: "T", done: true },
-    { label: "W", done: true },
-    { label: "T", done: false },
-    { label: "F", done: true },
-    { label: "S", done: true },
-    { label: "S", done: true }
-  ];
+function countExercisesTried(
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"],
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"]
+) {
+  return exercises.filter((exercise) => exerciseProgress[exercise.id].attemptCount > 0).length;
+}
 
+function createHomeIntroCopy(
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"]
+) {
+  if (practiceSummary.streakDays > 0) {
+    return `You’re on a ${practiceSummary.streakDays}-day roll — a few minutes keeps it alive.`;
+  }
+
+  if (practiceSummary.attemptCount > 0) {
+    return `${formatAttemptCount(practiceSummary.attemptCount)} logged on this device.`;
+  }
+
+  return "Your local practice stats will build as you sing.";
+}
+
+function createRecommendationMeta(exercise: ExerciseDefinition) {
+  return `${formatCategoryLabel(exercise.category)} · ${exercise.focus}`;
+}
+
+function createRecommendationCopy(
+  fallbackReason: string,
+  progress: ExerciseProgressSummary
+) {
+  if (progress.attemptCount === 0) {
+    return fallbackReason;
+  }
+
+  if (progress.commonIssue) {
+    return `${capitalizeFirst(describeIssue(progress.commonIssue))} showed up in recent attempts — let’s clean it up.`;
+  }
+
+  if (progress.recentPassRate !== undefined) {
+    return `Recent pass rate is ${progress.recentPassRate}% — keep this drill in rotation.`;
+  }
+
+  return `${formatAttemptCount(progress.attemptCount)} logged — keep building the baseline.`;
+}
+
+function formatDayCount(days: number) {
+  return `${formatInteger(days)} ${days === 1 ? "day" : "days"}`;
+}
+
+function formatAttemptCount(count: number) {
+  return `${formatInteger(count)} ${count === 1 ? "attempt" : "attempts"}`;
+}
+
+function formatInteger(value: number) {
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
+function capitalizeFirst(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function WeeklyStreakSummary({
+  buckets
+}: {
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
+}) {
   return (
     <div className="mock-week-streak" aria-label="Weekly streak">
-      {days.map((day, index) => (
-        <span key={`${day.label}-${index}`} className="mock-week-streak__day">
-          <span className={day.done ? "mock-week-streak__box is-done" : "mock-week-streak__box"}>
-            {day.done ? <CheckIcon /> : null}
+      {buckets.map((bucket) => {
+        const done = bucket.attemptCount > 0;
+        return (
+        <span key={bucket.date} className="mock-week-streak__day">
+          <span className={done ? "mock-week-streak__box is-done" : "mock-week-streak__box"}>
+            {done ? <CheckIcon /> : null}
           </span>
-          <span>{day.label}</span>
+          <span>{formatWeekday(bucket.date).slice(0, 1)}</span>
         </span>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1058,28 +1150,72 @@ function CheckIcon() {
   );
 }
 
-function MockPitchPreview() {
+function ExercisePitchPreview({ exercise }: { exercise: ExerciseDefinition }) {
+  const offsets = exercise.patternDegrees.map(degreeToSemitones);
+  const minOffset = Math.min(...offsets);
+  const maxOffset = Math.max(...offsets);
+  const range = Math.max(1, maxOffset - minOffset);
+  const points = offsets.map((offset, index) => {
+    const x = 40 + (index / Math.max(1, offsets.length - 1)) * 340;
+    const y = 170 - ((offset - minOffset) / range) * 112;
+    return { x, y };
+  });
+  const path = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .join(" ");
+  const guide = points
+    .map((point) => `M${Math.max(20, point.x - 24).toFixed(1)} ${point.y.toFixed(1)}H${Math.min(400, point.x + 24).toFixed(1)}`)
+    .join(" ");
+
   return (
     <div className="mock-pitch-preview" aria-hidden="true">
       <svg viewBox="0 0 420 230" preserveAspectRatio="none">
         <path className="mock-pitch-preview__grid" d="M20 34H400M20 81H400M20 128H400M20 175H400" />
-        <path className="mock-pitch-preview__guide" d="M50 150H140M150 104H245M255 58H318" />
-        <path
-          className="mock-pitch-preview__line"
-          d="M30 170 C40 148 38 132 58 132 C92 132 100 132 113 132 C140 132 143 105 169 101 C197 98 210 101 239 100 C260 100 260 84 280 66 C301 47 305 22 311 32 C318 48 322 58 350 57 C368 57 383 58 400 57"
-        />
-        <circle className="mock-pitch-preview__dot" cx="47" cy="132" r="5" />
-        <circle className="mock-pitch-preview__dot" cx="168" cy="101" r="5" />
-        <circle className="mock-pitch-preview__dot" cx="311" cy="57" r="5" />
+        <path className="mock-pitch-preview__guide" d={guide} />
+        <path className="mock-pitch-preview__line" d={path} />
+        {points.map((point, index) => (
+          <circle
+            key={`${point.x}-${index}`}
+            className="mock-pitch-preview__dot"
+            cx={point.x}
+            cy={point.y}
+            r="5"
+          />
+        ))}
       </svg>
     </div>
   );
 }
 
-function MockAccuracySparkline() {
+function AccuracySparkline({
+  buckets
+}: {
+  buckets: ReturnType<typeof usePitchCoachController>["practiceSummary"]["weekActivity"];
+}) {
+  const points = buckets.flatMap((bucket, index) => {
+    if (bucket.noteCount === 0) {
+      return [];
+    }
+
+    const accuracy = bucket.notesInTune / bucket.noteCount;
+    const x = 5 + (index / Math.max(1, buckets.length - 1)) * 140;
+    const y = 4 + (1 - accuracy) * 40;
+    return [{ x, y }];
+  });
+  const path =
+    points.length === 0
+      ? "M5 35H145"
+      : points
+          .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+          .join(" ");
+
   return (
-    <svg className="mock-accuracy-sparkline" viewBox="0 0 150 48" aria-hidden="true">
-      <path d="M5 35 C18 28 22 22 33 29 C43 37 47 20 60 18 C76 15 75 6 92 8 C104 10 104 1 119 4 C132 7 134 0 145 0" />
+    <svg
+      className={`mock-accuracy-sparkline ${points.length === 0 ? "is-empty" : ""}`.trim()}
+      viewBox="0 0 150 48"
+      aria-hidden="true"
+    >
+      <path d={path} />
     </svg>
   );
 }
@@ -1133,7 +1269,7 @@ function ProgressScreen({
           label="Accuracy"
           value={practiceSummary.noteAccuracy ?? 0}
           unit="%"
-          trend={<MockAccuracySparkline />}
+          trend={<AccuracySparkline buckets={practiceSummary.weekActivity} />}
         />
         <StatCard
           className="mock-stat-card"
@@ -1581,6 +1717,7 @@ type ExerciseLibraryProps = {
   exercises: ReturnType<typeof usePitchCoachController>["exercises"];
   selectedExerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"];
   exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"];
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
   disabled: boolean;
 };
@@ -1602,65 +1739,11 @@ type PracticeExerciseDisplay = {
   difficulty: 1 | 2 | 3;
 };
 
-const PRACTICE_LIBRARY_TOTAL_DRILLS = 48;
-const PRACTICE_LIBRARY_COMPLETED_DRILLS = 23;
-const PRACTICE_LIBRARY_ACCURACY = 87;
-
-const practiceExerciseDisplayFallbacks: Record<ExerciseId, PracticeExerciseDisplay> = {
-  "single-note-match": {
-    keyLabel: "C major",
-    completedCount: 8,
-    accuracy: 94,
-    difficulty: 1
-  },
-  "single-note-sustain": {
-    keyLabel: "free",
-    completedCount: 5,
-    accuracy: 91,
-    difficulty: 1
-  },
-  "step-up-back": {
-    keyLabel: "D major",
-    completedCount: 6,
-    accuracy: 96,
-    difficulty: 1
-  },
-  "third-up-back": {
-    keyLabel: "A major",
-    completedCount: 2,
-    accuracy: 78,
-    difficulty: 2
-  },
-  "major-triad": {
-    keyLabel: "E major",
-    completedCount: 4,
-    accuracy: 90,
-    difficulty: 2
-  },
-  "descending-triad": {
-    keyLabel: "A minor",
-    completedCount: 1,
-    accuracy: 81,
-    difficulty: 2
-  },
-  "five-note-scale": {
-    keyLabel: "C major",
-    completedCount: 2,
-    accuracy: 85,
-    difficulty: 2
-  },
-  "octave-arpeggio": {
-    keyLabel: "G major",
-    completedCount: 0,
-    accuracy: null,
-    difficulty: 3
-  }
-};
-
 function ExerciseLibrary({
   exercises,
   selectedExerciseId,
   exerciseProgress,
+  practiceSummary,
   onSelectExercise,
   disabled
 }: ExerciseLibraryProps) {
@@ -1683,8 +1766,6 @@ function ExerciseLibrary({
       }).length,
     [exerciseProgress, exercises]
   );
-  const displayedCompletedExerciseCount =
-    completedExerciseCount > 0 ? completedExerciseCount : PRACTICE_LIBRARY_COMPLETED_DRILLS;
   const visibleExercises = useMemo(
     () =>
       activeCategory === "all"
@@ -1710,15 +1791,21 @@ function ExerciseLibrary({
         <div>
           <h1>Practice Library</h1>
           <p>
-            {PRACTICE_LIBRARY_TOTAL_DRILLS} drills · <b>{displayedCompletedExerciseCount}</b>{" "}
-            completed · keep your ear &amp; voice sharp
+            <b>{completedExerciseCount}</b> / {exercises.length} exercises tried · keep your ear &amp; voice sharp
           </p>
         </div>
-        <div className="library-heading__stat" aria-label={`${PRACTICE_LIBRARY_ACCURACY}% accuracy`}>
+        <div
+          className="library-heading__stat"
+          aria-label={
+            practiceSummary.noteAccuracy === undefined
+              ? "No accuracy yet"
+              : `${practiceSummary.noteAccuracy}% accuracy`
+          }
+        >
           <LineChart size={16} aria-hidden="true" />
-          <strong>{PRACTICE_LIBRARY_ACCURACY}%</strong>
+          <strong>{practiceSummary.noteAccuracy === undefined ? "New" : `${practiceSummary.noteAccuracy}%`}</strong>
           <span className="library-heading__spark">
-            <MockAccuracySparkline />
+            <AccuracySparkline buckets={practiceSummary.weekActivity} />
           </span>
         </div>
       </div>
@@ -1812,14 +1899,12 @@ function getPracticeExerciseDisplay(
   exercise: ExerciseDefinition,
   progress: ExerciseProgressSummary
 ): PracticeExerciseDisplay {
-  const fallback = practiceExerciseDisplayFallbacks[exercise.id];
-  const recentAccuracy = progress.recentPassRate ?? fallback.accuracy ?? null;
-  const completedCount = progress.attemptCount > 0 ? progress.attemptCount : fallback.completedCount;
-  const difficulty = Math.min(3, Math.max(1, fallback.difficulty ?? exercise.difficulty)) as 1 | 2 | 3;
+  const recentAccuracy = progress.recentPassRate ?? null;
+  const difficulty = Math.min(3, Math.max(1, Math.ceil(exercise.difficulty / 2))) as 1 | 2 | 3;
 
   return {
-    keyLabel: fallback.keyLabel,
-    completedCount,
+    keyLabel: exercise.focus,
+    completedCount: progress.attemptCount,
     accuracy: recentAccuracy,
     difficulty
   };
@@ -1892,7 +1977,7 @@ function formatProgressSummary(progress: ExerciseProgressSummary) {
   }
 
   const issue = progress.commonIssue ? ` · Issue: ${describeIssue(progress.commonIssue)}` : "";
-  return `${progress.recentPassRate}% recent pass · ${formatLastPracticed(
+  return `${formatAttemptCount(progress.attemptCount)} logged · ${progress.recentPassRate}% recent pass · ${formatLastPracticed(
     progress.lastPracticedAt
   )}${issue}`;
 }

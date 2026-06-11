@@ -40,6 +40,8 @@ describe("progress aggregation", () => {
       date: "2026-06-10",
       attemptCount: 1,
       passedAttemptCount: 1,
+      noteCount: 2,
+      notesInTune: 2,
       durationMs: 60000
     });
   });

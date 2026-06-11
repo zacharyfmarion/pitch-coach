@@ -41,14 +41,32 @@ describe("PitchCoachApp", () => {
   it("renders the initial exercise screen", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    expect(screen.getByRole("heading", { name: "Good evening, Robin" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Resume practice/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
+    expect(screen.getByText("Your local practice stats will build as you sing.")).toBeTruthy();
+    expect(screen.getByText("Local practice")).toBeTruthy();
+    expect(screen.queryByText("Robin")).toBeNull();
+    expect(screen.getByRole("button", { name: /Start practice/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Interval Training/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Sing a Song/i })).toBeTruthy();
-    expect(screen.getByText("12 days")).toBeTruthy();
-    expect(screen.getByText("1,284")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("0 attempts logged");
+    expect(screen.queryByText("1,284")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Practice Library" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
+  });
+
+  it("renders home stats from local attempt history", async () => {
+    await saveAttemptHistoryRecord(historyRecord("major-triad", 0, false));
+    await saveAttemptHistoryRecord(historyRecord("five-note-scale", 1, true));
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("2 attempts logged")
+    );
+    const stats = screen.getByLabelText("Practice stats").textContent ?? "";
+    expect(stats).toContain("Accuracy50%");
+    expect(stats).toContain("Notes in tune1");
+    expect(stats).toContain("Practiced1min");
   });
 
   it("navigates top-level shell tabs without leaving the app shell", async () => {
@@ -82,7 +100,11 @@ describe("PitchCoachApp", () => {
 
     expect(screen.getByRole("tab", { name: "Practice" }).getAttribute("data-state")).toBe("active");
     expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
+    expect(document.querySelector(".library-heading")?.textContent).toContain("0 / 8 exercises tried");
+    expect(screen.getByLabelText("No accuracy yet").textContent).toContain("New");
     expect(screen.getByRole("button", { name: /Major Triad/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("New");
+    expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("No attempts yet");
   });
 
   it("renders the progress route from local attempt history", async () => {
@@ -105,12 +127,12 @@ describe("PitchCoachApp", () => {
     expect(screen.getAllByText(/Five-Note Major Scale/).length).toBeGreaterThan(0);
   });
 
-  it("opens the mock resume card into the matching exercise route", () => {
+  it("opens the recommendation card into the matching exercise route", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Resume practice/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
 
-    expect(window.location.pathname).toBe("/exercises/third-up-back");
+    expect(window.location.pathname).toBe("/exercises/major-triad");
     expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
   });
 
@@ -652,7 +674,7 @@ describe("PitchCoachApp", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
-    expect(screen.getByRole("heading", { name: "Good evening, Robin" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
   });
 

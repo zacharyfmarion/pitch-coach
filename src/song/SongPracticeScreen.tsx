@@ -244,7 +244,9 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                     </label>
                     <div className="song-section-readout">
                       <span>{formatDuration(song.selectedDurationMs)} selected</span>
-                      <span>V1 target: 0:30-1:30</span>
+                      <span>
+                        {formatDuration(SONG_SECTION_LIMITS.minMs)}-{formatDuration(SONG_SECTION_LIMITS.maxMs)} recommended
+                      </span>
                     </div>
                   </section>
                 ) : null}

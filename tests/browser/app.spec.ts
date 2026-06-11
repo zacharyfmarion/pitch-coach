@@ -2,15 +2,17 @@ import { expect, test } from "@playwright/test";
 
 test("renders the pitch coach workspace", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Good evening, Robin" })).toBeVisible();
-  await expect(page.getByText("You’re on a 12-day roll")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Resume practice/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
+  await expect(page.getByText("Your local practice stats will build as you sing.")).toBeVisible();
+  await expect(page.locator(".shell-user-copy").getByText("Local practice")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Start practice/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Interval Training/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Sing a Song/ })).toBeVisible();
-  await expect(page.getByText("1,284")).toBeVisible();
+  await expect(page.getByText("0 attempts logged")).toBeVisible();
+  await expect(page.getByText("Robin")).toHaveCount(0);
 
-  await page.getByRole("button", { name: /Resume practice/ }).click();
-  await expect(page).toHaveURL(/\/exercises\/third-up-back$/);
+  await page.getByRole("button", { name: /Start practice/ }).click();
+  await expect(page).toHaveURL(/\/exercises\/major-triad$/);
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
   await expect(page.getByText("Guide tempo")).toBeVisible();
@@ -25,7 +27,7 @@ test("renders the pitch coach workspace", async ({ page }) => {
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "Good evening, Robin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
 });
 
 test("opens exercise routes directly", async ({ page }) => {
@@ -48,6 +50,7 @@ test("navigates the shell and renders progress from local history", async ({ pag
   await page.getByRole("tab", { name: "Practice" }).click();
   await expect(page).toHaveURL(/\/practice$/);
   await expect(page.getByRole("heading", { name: "Practice Library", level: 1 })).toBeVisible();
+  await expect(page.getByText(/1 \/ 8 exercises tried/)).toBeVisible();
 });
 
 test("opens song mode directly without starting model download on unsupported browsers", async ({ page }) => {
@@ -76,10 +79,10 @@ test("keeps the exercise usable on a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Good evening, Robin" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Resume practice/ })).toBeVisible();
-  await page.getByRole("button", { name: /Resume practice/ }).click();
-  await expect(page).toHaveURL(/\/exercises\/third-up-back$/);
+  await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Start practice/ })).toBeVisible();
+  await page.getByRole("button", { name: /Start practice/ }).click();
+  await expect(page).toHaveURL(/\/exercises\/major-triad$/);
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
 });
