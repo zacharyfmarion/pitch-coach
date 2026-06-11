@@ -9,7 +9,6 @@ import {
   Gauge,
   History,
   Home,
-  Layers3,
   LineChart,
   Mic,
   Music2,
@@ -38,7 +37,6 @@ import {
 } from "../components/ui/Card";
 import { CoachBubble } from "../components/ui/CoachBubble";
 import { IconButton } from "../components/ui/IconButton";
-import { PageHeader } from "../components/ui/PageHeader";
 import { SidebarNav } from "../components/ui/SidebarNav";
 import { SidebarTabs, type SidebarTabItem } from "../components/ui/SidebarTabs";
 import { StatCard } from "../components/ui/StatCard";
@@ -1030,13 +1028,7 @@ function MockAccuracySparkline() {
 
 function PracticeLibraryScreen(props: LibraryScreenProps) {
   return (
-    <main className="shell-page" aria-label="Pitch coach exercises">
-      <PageHeader
-        icon={<Target size={24} />}
-        eyebrow="Exercises"
-        title="Practice Library"
-        description="Pick a focused drill and keep the feedback loop moving."
-      />
+    <main className="mock-practice-page" aria-label="Pitch coach exercises">
       <ExerciseLibrary {...props} />
     </main>
   );
@@ -1556,18 +1548,20 @@ function ExerciseLibrary({
   const categoryItems = useMemo(
     () =>
       exerciseCategoryFilters.map((category): SidebarTabItem<ExerciseCategoryFilter> => {
-        const count =
-          category === "all"
-            ? exercises.length
-            : exercises.filter((exercise) => exercise.category === category).length;
         return {
           value: category,
-          label: formatCategoryLabel(category),
-          icon: category === "all" ? <Layers3 size={15} /> : categoryIcon(category),
-          meta: count
+          label: formatPracticeFilterLabel(category)
         };
       }),
-    [exercises]
+    []
+  );
+  const completedExerciseCount = useMemo(
+    () =>
+      exercises.filter((exercise) => {
+        const progress = exerciseProgress[exercise.id];
+        return progress.attemptCount > 0;
+      }).length,
+    [exerciseProgress, exercises]
   );
   const visibleExercises = useMemo(
     () =>
@@ -1592,8 +1586,11 @@ function ExerciseLibrary({
     <section className="exercise-library" aria-label="Exercise library">
       <div className="library-heading">
         <div>
-          <span className="readout-label">Exercises</span>
-          <h2>Practice Library</h2>
+          <h1>Practice Library</h1>
+          <p>
+            {exercises.length} drills · <b>{completedExerciseCount}</b> completed · keep your ear &amp;
+            voice sharp
+          </p>
         </div>
         <span>
           {visibleExercises.length} of {exercises.length} drills
@@ -1703,14 +1700,22 @@ function formatCategoryLabel(category: ExerciseCategoryFilter) {
     case "all":
       return "All";
     case "pitch":
-      return "Pitch";
+      return "Warm-ups";
     case "interval":
       return "Intervals";
     case "arpeggio":
-      return "Arpeggios";
+      return "Triads & Chords";
     case "scale":
       return "Scales";
   }
+}
+
+function formatPracticeFilterLabel(category: ExerciseCategoryFilter) {
+  if (category === "arpeggio") {
+    return "Triads";
+  }
+
+  return formatCategoryLabel(category);
 }
 
 function getExerciseTitle(
@@ -1718,19 +1723,6 @@ function getExerciseTitle(
   exerciseId: ExerciseId
 ) {
   return exercises.find((exercise) => exercise.id === exerciseId)?.title ?? "Exercise";
-}
-
-function categoryIcon(category: ExerciseCategory) {
-  switch (category) {
-    case "pitch":
-      return <Target size={15} />;
-    case "interval":
-      return <Activity size={15} />;
-    case "arpeggio":
-      return <TrendingUp size={15} />;
-    case "scale":
-      return <Gauge size={15} />;
-  }
 }
 
 function formatProgressSummary(progress: ExerciseProgressSummary) {
