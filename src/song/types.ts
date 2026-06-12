@@ -133,6 +133,7 @@ export type SongPracticeConfig = {
   vocals: SongStereoBuffer;
   detector: PitchDetectorAdapter;
   bounds: PitchDetectionBounds;
+  deviceId?: string;
   vocalGuideGain: number;
   onPitchFrame: (frame: PitchFrame) => void;
   onPlaybackTime?: (timeMs: number) => void;

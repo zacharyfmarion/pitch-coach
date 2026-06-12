@@ -1,4 +1,5 @@
 import { createAudioBufferFromStereo } from "./audioData";
+import { createAudioInputConstraints } from "../audio/inputConstraints";
 import type { SongPracticeConfig, SongPracticeEngine } from "./types";
 
 const WORKLET_URL = new URL("../audio/audio-input-processor.js", import.meta.url);
@@ -37,12 +38,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     this.context = new AudioContext({ latencyHint: "interactive" });
     await this.context.audioWorklet.addModule(WORKLET_URL);
     this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false
-      }
+      audio: createAudioInputConstraints(config.deviceId)
     });
 
     this.source = this.context.createMediaStreamSource(this.stream);

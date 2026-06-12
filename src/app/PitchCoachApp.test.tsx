@@ -264,7 +264,7 @@ describe("PitchCoachApp", () => {
 
     expect(services.promptPlayer.playPrompt).toHaveBeenCalledWith(
       expect.any(Array),
-      80,
+      90,
       "chord-then-sequence"
     );
   });
@@ -318,6 +318,29 @@ describe("PitchCoachApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save range" }));
     expect(screen.getByRole("dialog", { name: "Range saved" }).textContent).toContain("C3 and C5");
+  });
+
+  it("uses the preferred microphone for range capture", async () => {
+    const services = createServices(rangeCaptureFrames());
+    render(
+      <PitchCoachApp
+        services={services}
+        initialSettings={{
+          ...ONBOARDED_SETTINGS,
+          preferredAudioInput: {
+            deviceId: "studio-mic",
+            label: "Studio Mic"
+          }
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Find it by singing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start - sing your lowest" }));
+
+    await waitFor(() => expect(services.audioEngine.lastConfig?.deviceId).toBe("studio-mic"));
   });
 
   it("filters the practice library by exercise category", async () => {
@@ -507,6 +530,10 @@ describe("PitchCoachApp", () => {
           range: {
             lowestMidi: parseNoteName("C3"),
             highestMidi: parseNoteName("D4")
+          },
+          preferredAudioInput: {
+            deviceId: "studio-mic",
+            label: "Studio Mic"
           }
         }}
       />
@@ -536,6 +563,7 @@ describe("PitchCoachApp", () => {
     expect(songServices.practiceEngine.lastConfig?.bounds.maxFrequencyHz).toBeGreaterThan(
       midiToFrequency(parseNoteName("D#4"))
     );
+    expect(songServices.practiceEngine.lastConfig?.deviceId).toBe("studio-mic");
   });
 
   it("advances a half step after a passing attempt", async () => {
@@ -791,7 +819,7 @@ describe("PitchCoachApp", () => {
   it("opens a selected exercise detail screen from the library", async () => {
     vi.useFakeTimers();
     const exercise = getExerciseById("single-note-match");
-    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm).filter(isNoteSegment);
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, ONBOARDED_SETTINGS.defaultTempoBpm).filter(isNoteSegment);
     render(
       <PitchCoachApp
         services={createServices(stableFramesForTargets(targets, 0))}
@@ -800,7 +828,7 @@ describe("PitchCoachApp", () => {
     );
 
     openSingleNoteMatch();
-    expect(screen.getByText("72 BPM")).toBeTruthy();
+    expect(screen.getByText("90 BPM")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
     expect(window.location.pathname).toBe("/exercises/single-note-match");
 
@@ -945,7 +973,7 @@ describe("PitchCoachApp", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     expect(screen.getAllByText("Five-Note Major Scale").length).toBeGreaterThan(0);
-    expect(screen.getByText("92 BPM")).toBeTruthy();
+    expect(screen.getByText("90 BPM")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back to exercises" })).toBeTruthy();
   });
 
@@ -1004,15 +1032,35 @@ describe("PitchCoachApp", () => {
 
     expect(services.promptPlayer.playPrompt).toHaveBeenCalledWith(
       expect.any(Array),
-      80,
+      90,
       "chord-then-sequence"
     );
+  });
+
+  it("uses the preferred microphone for exercise capture", async () => {
+    const services = createServices(stableFrames(0));
+    render(
+      <PitchCoachApp
+        services={services}
+        initialSettings={{
+          ...ONBOARDED_SETTINGS,
+          preferredAudioInput: {
+            deviceId: "studio-mic",
+            label: "Studio Mic"
+          }
+        }}
+      />
+    );
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await waitFor(() => expect(services.audioEngine.lastConfig?.deviceId).toBe("studio-mic"));
   });
 
   it("uses a sequence-only prompt for scale exercises", async () => {
     vi.useFakeTimers();
     const exercise = getExerciseById("five-note-scale");
-    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm).filter(isNoteSegment);
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, ONBOARDED_SETTINGS.defaultTempoBpm).filter(isNoteSegment);
     const services = createServices(stableFramesForTargets(targets, 0));
     render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
 
@@ -1022,7 +1070,7 @@ describe("PitchCoachApp", () => {
 
     expect(services.promptPlayer.playPrompt).toHaveBeenCalledWith(
       expect.any(Array),
-      92,
+      90,
       "sequence-only"
     );
   });
@@ -1173,7 +1221,7 @@ function scoopedFrames(): PitchFrame[] {
 }
 
 function createServices(frames: PitchFrame[], rejection?: Error): {
-  audioEngine: AudioInputEngine;
+  audioEngine: MockAudioEngine;
   detector: PitchDetectorAdapter;
   promptPlayer: PromptPlayer;
 } {
@@ -1356,12 +1404,15 @@ function createTestSongBuffer(): SongStereoBuffer {
 }
 
 class MockAudioEngine implements AudioInputEngine {
+  lastConfig: AudioCaptureConfig | null = null;
+
   constructor(
     private readonly frames: PitchFrame[],
     private readonly rejection?: Error
   ) {}
 
   async startCapture(config: AudioCaptureConfig) {
+    this.lastConfig = config;
     if (this.rejection) {
       throw this.rejection;
     }
