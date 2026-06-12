@@ -75,18 +75,18 @@
   --range-accent: var(--accent-song);
   --score-neutral-bg: color-mix(in srgb, var(--text-primary) 8%, transparent);
 
-  --timeline-surface: var(--bg-canvas);
-  --timeline-target-band: rgba(238, 108, 77, 0.13);
-  --timeline-target-line: rgba(238, 108, 77, 0.72);
+  --timeline-surface: #fffdf9;
+  --timeline-target-band: rgba(74, 132, 166, 0.13);
+  --timeline-target-line: rgba(74, 132, 166, 0.66);
   --timeline-target-text: var(--text-primary);
   --timeline-status-text: var(--text-secondary);
-  --timeline-grid-border: var(--border-default);
-  --timeline-grid-line: rgba(46, 38, 32, 0.1);
-  --timeline-grid-strong-line: rgba(46, 38, 32, 0.18);
+  --timeline-grid-border: rgba(60, 42, 28, 0.1);
+  --timeline-grid-line: rgba(46, 38, 32, 0.06);
+  --timeline-grid-strong-line: rgba(46, 38, 32, 0.11);
   --timeline-grid-label: var(--text-secondary);
-  --timeline-time-marker: rgba(228, 215, 200, 0.78);
+  --timeline-time-marker: rgba(228, 215, 200, 0.34);
   --timeline-ignored-event: rgba(140, 127, 113, 0.28);
-  --timeline-pitch-line: rgba(125, 111, 208, 0.7);
+  --timeline-pitch-line: rgba(125, 111, 208, 0.72);
   --timeline-noisy-frame: rgba(217, 92, 74, 0.28);
   --timeline-pass-line: var(--status-success);
   --timeline-error-line: var(--status-danger);
