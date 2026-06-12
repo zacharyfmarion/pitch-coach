@@ -34,6 +34,7 @@ export function normalizeSettings(settings: Partial<CoachSettings>): CoachSettin
   return {
     exerciseId: isExerciseId(settings.exerciseId) ? settings.exerciseId : DEFAULT_SETTINGS.exerciseId,
     timingMode: "pitch-first",
+    practiceMode: settings.practiceMode === "manual" ? "manual" : "auto",
     saveLocalClips: Boolean(settings.saveLocalClips),
     tempoBpm: clampNumber(
       Math.round(settings.tempoBpm ?? DEFAULT_SETTINGS.tempoBpm),

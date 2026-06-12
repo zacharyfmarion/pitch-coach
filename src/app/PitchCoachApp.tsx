@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Activity,
   ArrowRight,
@@ -9,27 +9,22 @@ import {
   Clock3,
   Flame,
   Gauge,
-  History,
   Home,
   LineChart,
   Mic,
+  Pause,
   Music2,
   Play,
   RotateCcw,
-  SlidersHorizontal,
   Sparkles,
-  Square,
   Target,
-  Trash2,
   TrendingUp,
   Upload,
   Volume2
 } from "lucide-react";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
-import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
 import {
-  RangeControlSummary,
   RangeSetupModal,
   RangeSetupToast
 } from "../components/range/RangeSetupModal";
@@ -41,13 +36,10 @@ import {
   CardHeader,
   CardTitle
 } from "../components/ui/Card";
-import { CoachBubble } from "../components/ui/CoachBubble";
 import { IconButton } from "../components/ui/IconButton";
 import { SidebarNav } from "../components/ui/SidebarNav";
 import { SidebarTabs, type SidebarTabItem } from "../components/ui/SidebarTabs";
 import { StatCard } from "../components/ui/StatCard";
-import { StatusPill } from "../components/ui/StatusPill";
-import { Toggle } from "../components/ui/Toggle";
 import type {
   AttemptScore,
   CoachSettings,
@@ -56,11 +48,13 @@ import type {
   ExerciseId,
   ExerciseProgressSummary,
   LessonStatus,
+  PracticeMode,
   SegmentAssessmentStatus,
   TargetSegment
 } from "../domain/contracts";
 import { isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
+import { getGuidePlaybackFrame, getPromptTimeline } from "../domain/promptTiming";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
 import { usePitchCoachTheme } from "./theme";
@@ -97,6 +91,10 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const activePracticeExerciseId =
     router.route.screen === "practice" ? router.route.exerciseId : null;
   const [rangeSetupRequest, setRangeSetupRequest] = useState<RangeSetupRequest | null>(null);
+  const [practicePaused, setPracticePaused] = useState(false);
+  const [transportProgress, setTransportProgress] = useState(0);
+  const [guideProgress, setGuideProgress] = useState(0);
+  const replayAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (
@@ -116,9 +114,88 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   useEffect(() => {
     if (router.route.screen !== "practice") {
       setRangeSetupRequest(null);
+      setPracticePaused(false);
       void coach.stopRangeCapture();
     }
   }, [coach.stopRangeCapture, router.route.screen]);
+
+  useEffect(() => {
+    if (coach.settings.practiceMode === "manual") {
+      setPracticePaused(false);
+    }
+  }, [coach.settings.practiceMode]);
+
+  useEffect(() => {
+    if (coach.settings.practiceMode !== "manual") {
+      return;
+    }
+
+    if (coach.lessonState.status === "promptPlaying" || coach.lessonState.status === "awaitingVoice") {
+      setTransportProgress(0);
+      return;
+    }
+
+    if (coach.lessonState.status !== "listening" && coach.lessonState.status !== "scoring") {
+      return;
+    }
+
+    const latestFrameMs = coach.pitchFrames.at(-1)?.timeMs;
+    if (latestFrameMs === undefined) {
+      return;
+    }
+
+    setTransportProgress(Math.min(1, Math.max(0, latestFrameMs / Math.max(coach.listeningDurationMs, 1))));
+  }, [
+    coach.lessonState.status,
+    coach.listeningDurationMs,
+    coach.pitchFrames,
+    coach.settings.practiceMode
+  ]);
+
+  useEffect(() => {
+    if (router.route.screen !== "practice" || coach.lessonState.status !== "promptPlaying") {
+      setGuideProgress(0);
+      return;
+    }
+
+    let frameId = 0;
+    const startedAt = performance.now();
+    const durationMs = getPromptTimeline(
+      coach.targetSegments,
+      coach.settings.tempoBpm,
+      coach.selectedExercise.promptStyle
+    ).totalDurationMs;
+
+    const tick = (timestamp: number) => {
+      const nextProgress = Math.min(1, Math.max(0, (timestamp - startedAt) / durationMs));
+      setGuideProgress(nextProgress);
+      if (nextProgress < 1) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    setGuideProgress(0);
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [
+    coach.lessonState.status,
+    coach.selectedExercise.promptStyle,
+    coach.settings.tempoBpm,
+    coach.targetSegments,
+    router.route.screen
+  ]);
+
+  useEffect(() => {
+    return () => {
+      replayAudioRef.current?.pause();
+    };
+  }, []);
+
+  useEffect(() => {
+    replayAudioRef.current?.pause();
+    replayAudioRef.current = null;
+    setTransportProgress(0);
+  }, [coach.localClip?.url]);
 
   useEffect(() => {
     if (!activePracticeExerciseId) {
@@ -173,7 +250,8 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     void coach.stopRangeCapture();
     setRangeSetupRequest(null);
     if (shouldStart) {
-      void coach.startAttempt();
+      setPracticePaused(false);
+      void coach.startAttempt({ includePrompt: coach.settings.practiceMode !== "manual" });
     }
   };
 
@@ -183,9 +261,83 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     coach.skipRangeSetup();
     setRangeSetupRequest(null);
     if (shouldStart) {
-      void coach.startAttempt();
+      setPracticePaused(false);
+      void coach.startAttempt({ includePrompt: coach.settings.practiceMode !== "manual" });
     }
   };
+
+  const runPrimaryAction = useCallback(() => {
+    if (coach.lessonState.status === "complete") {
+      void coach.resetLesson();
+      return;
+    }
+
+    if (coach.settings.rangeSetup.status === "unseen") {
+      setRangeSetupRequest("start");
+      return;
+    }
+
+    if (coach.settings.practiceMode === "manual") {
+      setPracticePaused(false);
+      void coach.startAttempt({ includePrompt: false });
+      return;
+    }
+
+    setPracticePaused(false);
+    void coach.startAttempt();
+  }, [
+    coach.lessonState.status,
+    coach.resetLesson,
+    coach.settings.practiceMode,
+    coach.settings.rangeSetup.status,
+    coach.startAttempt
+  ]);
+
+  const toggleAutoPractice = useCallback(() => {
+    if (coach.settings.practiceMode !== "auto") {
+      return;
+    }
+
+    if (isAutoPracticeActive(coach.lessonState.status, coach.isBusy)) {
+      setPracticePaused(true);
+      void coach.stopAttempt();
+      return;
+    }
+
+    runPrimaryAction();
+  }, [
+    coach.isBusy,
+    coach.lessonState.status,
+    coach.settings.practiceMode,
+    coach.stopAttempt,
+    runPrimaryAction
+  ]);
+
+  useEffect(() => {
+    if (router.route.screen !== "practice" || coach.settings.practiceMode !== "auto") {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.code !== "Space" ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        isEditableShortcutTarget(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      toggleAutoPractice();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [coach.settings.practiceMode, router.route.screen, toggleAutoPractice]);
 
   const rangeSetupModal = (
     <RangeSetupModal
@@ -254,27 +406,6 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     );
   }
 
-  const primaryAction = async () => {
-    if (coach.lessonState.status === "complete") {
-      await coach.resetLesson();
-      return;
-    }
-
-    if (coach.settings.rangeSetup.status === "unseen") {
-      setRangeSetupRequest("start");
-      return;
-    }
-
-    await coach.startAttempt();
-  };
-  const primaryLabel =
-    coach.lessonState.status === "retry"
-      ? coach.selectedExercise.id === "major-triad"
-        ? "Retry triad"
-        : "Retry exercise"
-      : coach.lessonState.status === "complete"
-        ? "Reset lesson"
-        : "Start lesson";
   const exerciseOptions = coach.exercises.map((exercise) => ({
     value: exercise.id,
     label: exercise.title
@@ -290,26 +421,81 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     coach.attemptScore?.segments.filter((segment) =>
       segment.score ? ["pass", "passWithWarning"].includes(segment.score.status) : false
     ).length ?? 0;
+  const strictness = getStrictnessOption(coach.settings.toleranceCents);
+  const mode = coach.settings.practiceMode;
+  const canStepKeyDown = coach.currentRootIndex > 0 && !coach.isBusy;
+  const canStepKeyUp = coach.currentRootIndex < coach.rootSequence.length - 1 && !coach.isBusy;
+  const restartAutoPractice = async () => {
+    setPracticePaused(false);
+    await coach.resetLesson();
+  };
+  const scrubManualTransport = (progress: number) => {
+    const nextProgress = Math.min(1, Math.max(0, progress));
+    setTransportProgress(nextProgress);
+
+    const audio = replayAudioRef.current;
+    if (!audio || !coach.localClip) {
+      return;
+    }
+
+    audio.currentTime = nextProgress * Math.max(coach.localClip.durationMs / 1000, 0);
+  };
+  const replayLatestTake = () => {
+    if (!coach.localClip) {
+      setTransportProgress(0);
+      return;
+    }
+
+    const audio = replayAudioRef.current ?? new Audio(coach.localClip.url);
+    replayAudioRef.current = audio;
+    audio.src = coach.localClip.url;
+    audio.currentTime = transportProgress * Math.max(coach.localClip.durationMs / 1000, 0);
+    audio.ontimeupdate = () => {
+      if (!Number.isFinite(audio.duration) || audio.duration <= 0) {
+        return;
+      }
+      setTransportProgress(Math.min(1, Math.max(0, audio.currentTime / audio.duration)));
+    };
+    audio.onended = () => setTransportProgress(0);
+    void audio.play().catch(() => undefined);
+  };
+  const tempoProgress = calculateTempoProgress(coach.settings.tempoBpm);
+  const activeTempoPreset = getActiveTempoPreset(coach.settings.tempoBpm);
+  const autoToggleLabel = isAutoPracticeActive(coach.lessonState.status, coach.isBusy)
+    ? "Pause practice"
+    : practicePaused
+      ? "Resume practice"
+      : createPrimaryPracticeLabel(coach.lessonState.status, coach.selectedExercise, mode);
+  const guidePlaybackFrame =
+    coach.lessonState.status === "promptPlaying"
+      ? getGuidePlaybackFrame(
+          coach.targetSegments,
+          coach.settings.tempoBpm,
+          coach.selectedExercise.promptStyle,
+          guideProgress
+        )
+      : {
+          phase: "tail" as const,
+          playheadMs: null,
+          activeSegmentIndices: []
+        };
 
   return (
     <MainShell activeScreen="library" onNavigate={navigateTopLevel} practiceSummary={coach.practiceSummary}>
-      <main className="practice-detail-page">
-        <section className="coach-workspace" aria-label="Pitch coach exercise">
-          <header className="top-bar">
-            <div className="brand-lockup">
+      <main className="exercise-screen-page">
+        <section className="exercise-screen" aria-label="Pitch coach exercise">
+          <header className="exercise-screen__header">
+            <div className="exercise-screen__title-row">
               <IconButton
-                className="back-action"
-                size="sm"
+                className="exercise-back-action"
+                size="lg"
                 onClick={() => void backToLibrary()}
                 aria-label="Back to exercises"
                 title="Back to exercises"
               >
                 <ArrowLeft size={18} />
               </IconButton>
-              <div className="brand-mark" aria-hidden="true">
-                <Mic size={22} />
-              </div>
-              <div className="brand-copy">
+              <div className="exercise-screen__title-copy">
                 <Dropdown
                   ariaLabel="Exercise"
                   value={coach.selectedExercise.id}
@@ -318,280 +504,222 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
                   disabled={coach.isBusy}
                   triggerClassName="practice-title-dropdown"
                 />
-                <p>Take {coach.lessonState.attemptNumber + 1}</p>
+                <p>
+                  {formatCategoryLabel(coach.selectedExercise.category)} · Take {coach.lessonState.attemptNumber + 1}
+                </p>
               </div>
             </div>
-            <div className="top-actions">
-              <div className="session-readout" aria-live="polite">
-                <span className="readout-label">Key of</span>
-                <strong>{coach.currentKeyLabel}</strong>
+            <div className="exercise-control-bar" aria-label="Exercise controls">
+              <span className="visually-hidden">{coach.currentKeyLabel}</span>
+              <ExerciseSettingPopover
+                ariaLabel="Key"
+                icon={<Activity size={18} />}
+                label="Key"
+                value={`${formatKeyName(coach.currentRootMidi)} major`}
+              >
+                <div className="exercise-key-stepper">
+                  <button
+                    type="button"
+                    onClick={() => void coach.setCurrentRootIndex(coach.currentRootIndex - 1)}
+                    disabled={!canStepKeyDown}
+                    aria-label="Lower key"
+                  >
+                    -
+                  </button>
+                  <span>
+                    <strong>{formatKeyName(coach.currentRootMidi)}</strong>
+                    <small>{coach.currentKeyLabel}</small>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void coach.setCurrentRootIndex(coach.currentRootIndex + 1)}
+                    disabled={!canStepKeyUp}
+                    aria-label="Raise key"
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="exercise-popover-note">
+                  Fits your range · {midiToNoteName(coach.settings.range.lowestMidi)}-
+                  {midiToNoteName(coach.settings.range.highestMidi)}
+                </p>
+              </ExerciseSettingPopover>
+              <ExerciseSettingPopover
+                ariaLabel="Strictness"
+                icon={<Target size={18} />}
+                label="Strictness"
+                value={strictness.label}
+              >
+                <div className="exercise-segmented-row" role="group" aria-label="Strictness">
+                  {STRICTNESS_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      data-active={option.id === strictness.id || undefined}
+                      onClick={() =>
+                        coach.setSettings({
+                          ...coach.settings,
+                          toleranceCents: option.cents
+                        })
+                      }
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="exercise-popover-note">
+                  Within ±{strictness.cents} cents counts as in-tune.
+                </p>
+              </ExerciseSettingPopover>
+              <ExerciseSettingPopover
+                ariaLabel="Tempo"
+                icon={<Clock3 size={18} />}
+                label="Tempo"
+                value={`${coach.settings.tempoBpm} BPM`}
+                contentClassName="exercise-setting-popover__content--tempo"
+              >
+                <div className="exercise-tempo-control">
+                  <input
+                    aria-label="Guide tempo"
+                    className="exercise-tempo-slider"
+                    type="range"
+                    min="60"
+                    max="120"
+                    step="2"
+                    value={coach.settings.tempoBpm}
+                    style={{ "--tempo-progress": `${tempoProgress}%` } as CSSProperties}
+                    onChange={(event) =>
+                      coach.setSettings({
+                        ...coach.settings,
+                        tempoBpm: Number(event.target.value)
+                      })
+                    }
+                  />
+                  <div className="exercise-tempo-presets" role="group" aria-label="Tempo presets">
+                    {TEMPO_PRESETS.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        data-active={activeTempoPreset.label === preset.label || undefined}
+                        onClick={() =>
+                          coach.setSettings({
+                            ...coach.settings,
+                            tempoBpm: preset.bpm
+                          })
+                        }
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </ExerciseSettingPopover>
+              <span className="exercise-control-divider" aria-hidden="true" />
+              <div className="exercise-mode-toggle" role="group" aria-label="Practice mode">
+                {(["auto", "manual"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={mode === option}
+                    data-active={mode === option || undefined}
+                    disabled={coach.isBusy}
+                    onClick={() =>
+                      coach.setSettings({
+                        ...coach.settings,
+                        practiceMode: option
+                      })
+                    }
+                  >
+                    {option === "auto" ? <Play size={16} fill="currentColor" /> : <Target size={16} />}
+                    <span>{option === "auto" ? "Auto" : "Manual"}</span>
+                  </button>
+                ))}
               </div>
+              {mode === "auto" ? (
+                <button
+                  type="button"
+                  className="exercise-header-toggle"
+                  onClick={toggleAutoPractice}
+                  aria-label={autoToggleLabel}
+                  title={autoToggleLabel}
+                >
+                  {isAutoPracticeActive(coach.lessonState.status, coach.isBusy) ? (
+                    <Pause size={18} fill="currentColor" />
+                  ) : coach.lessonState.status === "complete" ? (
+                    <RotateCcw size={18} />
+                  ) : (
+                    <Play size={18} fill="currentColor" />
+                  )}
+                </button>
+              ) : null}
             </div>
           </header>
 
-          <section className="practice-layout">
-            <div className="lesson-panel">
-              <div className="practice-guidance" aria-label="Practice guidance">
-                <CoachBubble tone={coachGuidance.tone} icon={coachGuidance.icon}>
-                  <strong>{coachGuidance.title}</strong>
-                  <span>{coachGuidance.message}</span>
-                </CoachBubble>
-                <div className="practice-status-stack">
-                  <StatusPill tone={practiceStatusView.tone} pulse={practiceStatusView.pulse}>
-                    {practiceStatusView.label}
-                  </StatusPill>
-                  <span className="practice-status-detail">{practiceStatusView.detail}</span>
-                  <span className="practice-status-legacy">
-                    {legacyStatusCopy[coach.lessonState.status]}
-                  </span>
-                </div>
+          <section className="exercise-coach-row" aria-label="Practice guidance">
+            <div className="exercise-coach-mark" aria-hidden="true">
+              <Music2 size={23} />
+            </div>
+            <div className="exercise-coach-bubble">
+              <strong>{createMockCoachTitle(coach.lessonState.status, mode)}</strong>
+              <span>{createMockCoachMessage(coachGuidance, coach.lessonState.status, mode)}</span>
+            </div>
+          </section>
+
+          <section className="exercise-roll-card">
+            <div className="practice-target-row">
+              <NoteCheckpointStrip
+                targetSegments={coach.targetSegments}
+                attemptScore={coach.attemptScore}
+                activeSegmentIndices={guidePlaybackFrame.activeSegmentIndices}
+                guideActive={coach.lessonState.status === "promptPlaying"}
+              />
+              <div className="practice-score-readout" aria-label={`${targetsInTuneCount} notes in tune`}>
+                <strong>
+                  {targetsInTuneCount}
+                  <span>/{coach.targetSegments.length}</span>
+                </strong>
+                <span>notes in tune</span>
               </div>
-
-              <div className="practice-main-card">
-                <div className="practice-target-row">
-                  <NoteCheckpointStrip
-                    targetSegments={coach.targetSegments}
-                    attemptScore={coach.attemptScore}
-                  />
-                  <div className="practice-score-readout" aria-label={`${targetsInTuneCount} targets in tune`}>
-                    <strong>
-                      {targetsInTuneCount}
-                      <span>/{coach.targetSegments.length}</span>
-                    </strong>
-                    <span>targets in tune</span>
-                  </div>
-                </div>
-
-                <PitchTimeline
-                  frames={coach.pitchFrames}
-                  targetSegments={coach.targetSegments}
-                  attemptScore={coach.attemptScore}
-                  totalDurationMs={coach.listeningDurationMs}
-                  toleranceCents={coach.settings.toleranceCents}
-                  status={coach.lessonState.status}
-                  themeName={activeTheme.name}
-                />
-              </div>
-
-              <div className="transport-row">
-                <Button
-                  className="primary-action"
-                  variant="primary"
-                  size="lg"
-                  onClick={() => void primaryAction()}
-                  disabled={coach.isBusy || coach.lessonState.status === "passed"}
-                  aria-label={primaryLabel}
-                  title={primaryLabel}
-                >
-                  {coach.lessonState.status === "complete" ? <RotateCcw size={18} /> : <Play size={18} />}
-                  <span>{primaryLabel}</span>
-                </Button>
-                <IconButton
-                  size="lg"
-                  variant="toolbar"
-                  onClick={() => void coach.stopAttempt()}
-                  disabled={!coach.isBusy && coach.lessonState.status !== "passed"}
-                  aria-label="Stop"
-                  title="Stop"
-                >
-                  <Square size={18} />
-                </IconButton>
-                <IconButton
-                  size="lg"
-                  variant="toolbar"
-                  onClick={() => void coach.resetLesson()}
-                  disabled={coach.isBusy}
-                  aria-label="Reset"
-                  title="Reset"
-                >
-                  <RotateCcw size={18} />
-                </IconButton>
-              </div>
-
-              {coach.errorMessage ? (
-                <div className="error-banner" role="alert">
-                  {coach.errorMessage}
-                </div>
-              ) : null}
             </div>
 
-            <aside className="side-panel practice-side-panel" aria-label="Lesson controls and feedback">
-              <Card as="section" className="control-group" variant="mock" padding="md" aria-label="Range">
-                <CardHeader className="group-heading">
-                  <SlidersHorizontal size={17} />
-                  <CardTitle>Range</CardTitle>
-                </CardHeader>
-                <CardContent className="control-group__body">
-                  <RangeControlSummary
-                    range={coach.settings.range}
-                    status={coach.settings.rangeSetup.status}
-                    onEdit={() => setRangeSetupRequest("edit")}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card as="section" className="control-group" variant="mock" padding="md" aria-label="Scoring">
-                <CardHeader className="group-heading">
-                  <Gauge size={17} />
-                  <CardTitle>Scoring</CardTitle>
-                </CardHeader>
-                <CardContent className="control-group__body">
-                  <label>
-                    <span>Guide tempo</span>
-                    <input
-                      type="range"
-                      min="50"
-                      max="140"
-                      value={coach.settings.tempoBpm}
-                      onChange={(event) =>
-                        coach.setSettings({
-                          ...coach.settings,
-                          tempoBpm: Number(event.target.value)
-                        })
-                      }
-                    />
-                    <output>{coach.settings.tempoBpm} BPM</output>
-                  </label>
-                  <label>
-                    <span>Tolerance</span>
-                    <input
-                      type="range"
-                      min="15"
-                      max="60"
-                      value={coach.settings.toleranceCents}
-                      onChange={(event) =>
-                        coach.setSettings({
-                          ...coach.settings,
-                          toleranceCents: Number(event.target.value)
-                        })
-                      }
-                    />
-                    <output>{coach.settings.toleranceCents} cents</output>
-                  </label>
-                  <label className="toggle-row">
-                    <span>Local clips</span>
-                    <Toggle
-                      aria-label="Local clips"
-                      checked={coach.settings.saveLocalClips}
-                      onChange={(saveLocalClips) =>
-                        coach.setSettings({
-                          ...coach.settings,
-                          saveLocalClips
-                        })
-                      }
-                    />
-                  </label>
-                </CardContent>
-              </Card>
-
-              {coach.localClip || coach.clipErrorMessage ? (
-                <Card
-                  as="section"
-                  className="control-group"
-                  variant="mock"
-                  padding="md"
-                  aria-label="Latest local clip"
-                >
-                  <CardHeader className="group-heading">
-                    <Volume2 size={17} />
-                    <CardTitle>Latest Clip</CardTitle>
-                  </CardHeader>
-                  <CardContent className="control-group__body">
-                    {coach.localClip ? (
-                      <>
-                        <audio className="clip-player" controls src={coach.localClip.url} />
-                        <div className="clip-actions">
-                          <span>{formatClipDuration(coach.localClip.durationMs)}</span>
-                          <Button
-                            className="text-action"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void coach.deleteLocalClip()}
-                          >
-                            <Trash2 size={16} />
-                            <span>Delete</span>
-                          </Button>
-                        </div>
-                      </>
-                    ) : null}
-                    {coach.clipErrorMessage ? (
-                      <p className="clip-error" role="alert">
-                        {coach.clipErrorMessage}
-                      </p>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              ) : null}
-
-              <Card
-                as="section"
-                className="feedback-panel"
-                variant="mock"
-                padding="md"
-                aria-label="Attempt feedback"
-              >
-                <CardHeader className="group-heading">
-                  <Music2 size={17} />
-                  <CardTitle>Feedback</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="coach-summary">
-                    {coach.attemptScore?.summary ??
-                      `Sing ${formatTargetSegmentPattern(coach.targetSegments)} after the guide.`}
-                  </p>
-                  <FeedbackList targetSegments={coach.targetSegments} attemptScore={coach.attemptScore} />
-                </CardContent>
-              </Card>
-
-              <Card
-                as="section"
-                className="control-group history-panel"
-                variant="mock"
-                padding="md"
-                aria-label="Attempt history"
-              >
-                <CardHeader className="group-heading">
-                  <History size={17} />
-                  <CardTitle>History</CardTitle>
-                </CardHeader>
-                <CardContent className="control-group__body">
-                  {coach.selectedExerciseHistory.length > 0 ? (
-                    <ol className="history-list">
-                      {coach.selectedExerciseHistory.map((attempt) => (
-                        <li key={attempt.id}>
-                          <span className={`history-result ${attempt.passed ? "history-pass" : "history-fail"}`}>
-                            {attempt.passed ? "Pass" : "Retry"}
-                          </span>
-                          <span className="history-copy">
-                            <strong>
-                              {midiToNoteName(attempt.rootMidi)} major · {formatHistoryDate(attempt.createdAt)}
-                            </strong>
-                            <span>{attempt.summary}</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="history-empty">No attempts yet for this exercise.</p>
-                  )}
-                  <Button
-                    className="text-action"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (window.confirm("Clear all local attempt history?")) {
-                        void coach.clearLocalAttemptHistory();
-                      }
-                    }}
-                    disabled={coach.attemptHistoryCount === 0}
-                  >
-                    <Trash2 size={16} />
-                    <span>Clear history</span>
-                  </Button>
-                </CardContent>
-              </Card>
-            </aside>
+            <PitchTimeline
+              frames={coach.pitchFrames}
+              targetSegments={coach.targetSegments}
+              attemptScore={coach.attemptScore}
+              totalDurationMs={coach.listeningDurationMs}
+              toleranceCents={coach.settings.toleranceCents}
+              status={coach.lessonState.status}
+              themeName={activeTheme.name}
+              guidePlayheadMs={guidePlaybackFrame.playheadMs}
+              guideActiveSegmentIndices={guidePlaybackFrame.activeSegmentIndices}
+            />
           </section>
+
+          <section className="exercise-action-bar" aria-label="Practice transport">
+            <ExerciseTransport
+              mode={mode}
+              status={coach.lessonState.status}
+              statusView={practiceStatusView}
+              isBusy={coach.isBusy}
+              isPaused={practicePaused}
+              progress={transportProgress}
+              canReplayTake={Boolean(coach.localClip)}
+              primaryLabel={createPrimaryPracticeLabel(coach.lessonState.status, coach.selectedExercise, mode)}
+              onPrimaryAction={runPrimaryAction}
+              onPlayGuide={() => void coach.playGuide()}
+              onReplayTake={replayLatestTake}
+              onScrub={scrubManualTransport}
+              onResume={runPrimaryAction}
+              onRestart={() => void restartAutoPractice()}
+              onAdvance={() => void coach.advanceLesson()}
+            />
+          </section>
+
+          {coach.errorMessage ? (
+            <div className="error-banner" role="alert">
+              {coach.errorMessage}
+            </div>
+          ) : null}
         </section>
         {rangeSetupModal}
       </main>
@@ -684,6 +812,90 @@ function createPracticeStatusView(
   }
 }
 
+function createAutoTransportView(status: LessonStatus, fallback: PracticeStatusView) {
+  switch (status) {
+    case "idle":
+      return {
+        label: "Ready to begin",
+        detail: "Press play to start auto-practice.",
+        tone: "idle" as const,
+        icon: <Play size={16} fill="currentColor" />
+      };
+    case "promptPlaying":
+      return {
+        label: "Listening to the guide...",
+        detail: "Reference is playing.",
+        tone: "info" as const,
+        pulse: true,
+        icon: null
+      };
+    case "awaitingVoice":
+      return {
+        label: "Get ready...",
+        detail: "Sing after the cue.",
+        tone: "accent" as const,
+        icon: <Mic size={16} />
+      };
+    case "listening":
+      return {
+        label: "Listening to you...",
+        detail: "Pitch is being tracked locally.",
+        tone: "accent" as const,
+        pulse: true,
+        icon: null
+      };
+    case "scoring":
+      return {
+        label: "Scoring locally...",
+        detail: "Checking pitch centers and contour.",
+        tone: "info" as const,
+        pulse: true,
+        icon: null
+      };
+    case "passed":
+      return {
+        label: "Nailed it - moving on",
+        detail: "Next key is queued.",
+        tone: "success" as const,
+        icon: <CheckCircle2 size={16} />
+      };
+    case "retry":
+      return {
+        label: "Replaying the targets...",
+        detail: "Listen, then sing it back.",
+        tone: "warning" as const,
+        icon: <RotateCcw size={16} />
+      };
+    case "complete":
+      return {
+        label: "Lesson complete",
+        detail: fallback.detail,
+        tone: "success" as const,
+        icon: <CheckCircle2 size={16} />
+      };
+  }
+}
+
+function isAutoPracticeActive(status: LessonStatus, isBusy: boolean) {
+  return isBusy || status === "passed";
+}
+
+function calculateTempoProgress(tempoBpm: number) {
+  return Math.min(100, Math.max(0, ((tempoBpm - 60) / 60) * 100));
+}
+
+function isEditableShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      "a, button, input, textarea, select, [contenteditable='true'], [role='textbox'], [role='slider']"
+    )
+  );
+}
+
 function createCoachGuidance({
   status,
   exerciseTitle,
@@ -757,33 +969,380 @@ function createCoachGuidance({
   }
 }
 
+const STRICTNESS_OPTIONS = [
+  { id: "gentle", label: "Gentle", cents: 50 },
+  { id: "standard", label: "Standard", cents: 35 },
+  { id: "strict", label: "Strict", cents: 22 }
+] as const;
+
+const TEMPO_PRESETS = [
+  { label: "Slow", bpm: 70 },
+  { label: "Medium", bpm: 90 },
+  { label: "Brisk", bpm: 110 }
+] as const;
+
+type StrictnessOption = (typeof STRICTNESS_OPTIONS)[number];
+
+function getStrictnessOption(toleranceCents: number): StrictnessOption {
+  return STRICTNESS_OPTIONS.reduce((nearest, option) =>
+    Math.abs(option.cents - toleranceCents) < Math.abs(nearest.cents - toleranceCents)
+      ? option
+      : nearest
+  );
+}
+
+function getActiveTempoPreset(tempoBpm: number) {
+  return TEMPO_PRESETS.reduce((nearest, preset) =>
+    Math.abs(preset.bpm - tempoBpm) < Math.abs(nearest.bpm - tempoBpm) ? preset : nearest
+  );
+}
+
+function ExerciseSettingPopover({
+  ariaLabel,
+  icon,
+  label,
+  value,
+  contentClassName,
+  children
+}: {
+  ariaLabel: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+  contentClassName?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  return (
+    <div className="exercise-setting-popover" ref={rootRef}>
+      <button
+        type="button"
+        className="exercise-setting-chip"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="exercise-setting-chip__icon">{icon}</span>
+        <span className="exercise-setting-chip__copy">
+          <span>{label}</span>
+          <strong>{value}</strong>
+        </span>
+        <span className="exercise-setting-chip__chevron" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      {open ? (
+        <div
+          className={`exercise-setting-popover__content ${contentClassName ?? ""}`.trim()}
+          role="dialog"
+          aria-label={`${label} settings`}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ExerciseTransport({
+  mode,
+  status,
+  statusView,
+  isBusy,
+  isPaused,
+  progress,
+  canReplayTake,
+  primaryLabel,
+  onPrimaryAction,
+  onPlayGuide,
+  onReplayTake,
+  onScrub,
+  onResume,
+  onRestart,
+  onAdvance
+}: {
+  mode: PracticeMode;
+  status: LessonStatus;
+  statusView: PracticeStatusView;
+  isBusy: boolean;
+  isPaused: boolean;
+  progress: number;
+  canReplayTake: boolean;
+  primaryLabel: string;
+  onPrimaryAction: () => void;
+  onPlayGuide: () => void;
+  onReplayTake: () => void;
+  onScrub: (progress: number) => void;
+  onResume: () => void;
+  onRestart: () => void;
+  onAdvance: () => void;
+}) {
+  if (mode === "manual") {
+    return (
+      <>
+        <IconButton
+          size="lg"
+          variant="toolbar"
+          onClick={onPlayGuide}
+          disabled={isBusy || status === "complete"}
+          aria-label="Hear guide"
+          title="Hear guide"
+        >
+          <Play size={18} fill="currentColor" />
+        </IconButton>
+        <IconButton
+          size="lg"
+          variant="toolbar"
+          onClick={onReplayTake}
+          disabled={!canReplayTake}
+          aria-label="Replay take"
+          title={canReplayTake ? "Replay take" : "Save local clips to replay your take"}
+        >
+          <LineChart size={18} />
+        </IconButton>
+        <div className="exercise-transport-scrub">
+          <input
+            className="exercise-transport-slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.001"
+            value={progress}
+            onChange={(event) => onScrub(Number(event.target.value))}
+            aria-label="Practice scrub"
+            style={{ "--transport-progress": `${Math.round(progress * 100)}%` } as CSSProperties}
+          />
+          <p>{createTransportHint(status, mode)}</p>
+        </div>
+        {status === "retry" ? (
+          <IconButton
+            className="exercise-restart-action"
+            size="lg"
+            variant="toolbar"
+            onClick={onPrimaryAction}
+            disabled={isBusy}
+            aria-label={primaryLabel}
+            title={primaryLabel}
+          >
+            <RotateCcw size={24} strokeWidth={2.25} />
+          </IconButton>
+        ) : status === "passed" ? (
+          <Button className="exercise-primary-action" variant="primary" size="lg" onClick={onAdvance}>
+            <Play size={18} />
+            <span>Move on</span>
+          </Button>
+        ) : (
+          <Button
+            className="exercise-primary-action"
+            variant="primary"
+            size="lg"
+            onClick={onPrimaryAction}
+            disabled={isBusy || status === "complete"}
+            aria-label={primaryLabel}
+            title={primaryLabel}
+          >
+            <Mic size={18} />
+            <span>{primaryLabel}</span>
+          </Button>
+        )}
+      </>
+    );
+  }
+
+  const autoView = createAutoTransportView(status, statusView);
+  const autoPillContent = (
+    <>
+      {autoView.pulse ? <span className="exercise-eq-bars" aria-hidden="true"><i /><i /><i /></span> : autoView.icon}
+      <span>{autoView.label}</span>
+      <small>{autoView.detail}</small>
+    </>
+  );
+
+  return (
+    <>
+      <div className="exercise-auto-center">
+        {isPaused ? (
+          <button type="button" className="exercise-auto-pill exercise-auto-pill--success" onClick={onResume}>
+            <Play size={16} fill="currentColor" />
+            <span>Resume practice</span>
+          </button>
+        ) : status === "idle" ? (
+          <button
+            type="button"
+            className={`exercise-auto-pill exercise-auto-pill--${autoView.tone}`}
+            onClick={onPrimaryAction}
+            aria-label={`${autoView.label}. ${autoView.detail}`}
+          >
+            {autoPillContent}
+          </button>
+        ) : (
+          <div
+            className={`exercise-auto-pill exercise-auto-pill--${autoView.tone}`}
+            aria-live="polite"
+          >
+            {autoPillContent}
+          </div>
+        )}
+      </div>
+      <IconButton
+        className="exercise-restart-action"
+        size="lg"
+        variant="toolbar"
+        onClick={onRestart}
+        disabled={isBusy}
+        aria-label="Restart practice"
+        title="Restart practice"
+      >
+        <RotateCcw size={24} strokeWidth={2.25} />
+      </IconButton>
+    </>
+  );
+}
+
+function createPrimaryPracticeLabel(
+  status: LessonStatus,
+  exercise: ExerciseDefinition,
+  mode: PracticeMode
+) {
+  if (status === "complete") {
+    return "Reset lesson";
+  }
+
+  if (status === "retry") {
+    return exercise.id === "major-triad" ? "Retry triad" : "Retry exercise";
+  }
+
+  return mode === "manual" ? "Sing it" : "Start lesson";
+}
+
+function createTransportHint(status: LessonStatus, mode: PracticeMode) {
+  if (mode === "manual") {
+    if (status === "promptPlaying") {
+      return "Listening to the guide...";
+    }
+    if (status === "listening") {
+      return "Listening to you...";
+    }
+    if (status === "retry") {
+      return "Replay the guide or sing again";
+    }
+    if (status === "passed") {
+      return "Clean take - move on when ready";
+    }
+    return "Drag to scrub · hear the guide, then sing";
+  }
+
+  return legacyStatusCopy[status];
+}
+
+function createMockCoachTitle(status: LessonStatus, mode: PracticeMode) {
+  if (mode === "manual" && status === "idle") {
+    return "Manual mode";
+  }
+
+  switch (status) {
+    case "promptPlaying":
+      return "Listen closely";
+    case "awaitingVoice":
+      return "Your turn";
+    case "listening":
+      return "Sing it back";
+    case "scoring":
+      return "Scoring locally";
+    case "passed":
+      return "Nice pass";
+    case "retry":
+      return "Try it again";
+    case "complete":
+      return "Lesson complete";
+    case "idle":
+      return "Ready";
+  }
+}
+
+function createMockCoachMessage(
+  guidance: CoachGuidanceView,
+  status: LessonStatus,
+  mode: PracticeMode
+) {
+  if (mode === "manual" && status === "idle") {
+    return "Hear the guide, then sing whenever you're ready.";
+  }
+
+  if (status === "promptPlaying") {
+    return "Root, third, then the fifth.";
+  }
+
+  return formatDisplayNoteName(guidance.message);
+}
+
+function formatKeyName(midi: number) {
+  return formatDisplayNoteName(midiToNoteName(midi)).replace(/\d+$/, "");
+}
+
+function formatDisplayNoteName(label: string) {
+  return label.replaceAll("#", "♯");
+}
+
 function NoteCheckpointStrip({
   targetSegments,
-  attemptScore
+  attemptScore,
+  activeSegmentIndices,
+  guideActive
 }: {
   targetSegments: TargetSegment[];
   attemptScore: AttemptScore | null;
+  activeSegmentIndices: number[];
+  guideActive: boolean;
 }) {
   const segments = attemptScore?.segments ?? targetSegments.map((segment) => ({ ...segment, score: null }));
 
   return (
-    <ol className="target-checkpoint-strip" aria-label="Target segments">
+    <ol className="note-checkpoint-strip" aria-label="Target segments">
       {segments.map((segment, index) => {
         const status = segment.score?.status ?? "target";
+        const displayStatus = guideActive ? "target" : status;
+        const isActive = guideActive && activeSegmentIndices.includes(index);
         return (
           <li
             key={`${index}-${segment.id}`}
-            className={`target-checkpoint target-checkpoint--${status}`}
+            className={`note-checkpoint note-checkpoint--${displayStatus}${isActive ? " note-checkpoint--active" : ""}`}
+            aria-current={isActive ? "step" : undefined}
           >
-            <span className="target-checkpoint__chip">{segment.shortLabel}</span>
-            <strong>{describeTargetSegmentPitch(segment)}</strong>
-            <span className="target-checkpoint__label">{describeCheckpointLabel(segment, status, index)}</span>
-            <span className="checkpoint-status-legacy">{describeCheckpointStatus(status)}</span>
+            <span className="note-checkpoint__degree">{getCheckpointIcon(segment, displayStatus)}</span>
+            <strong>{formatDisplayNoteName(describeTargetSegmentPitch(segment))}</strong>
+            <span className="note-checkpoint__label">{describeCheckpointLabel(segment, displayStatus, index)}</span>
+            <span className="checkpoint-status-legacy">{describeCheckpointStatus(displayStatus)}</span>
           </li>
         );
       })}
     </ol>
   );
+}
+
+function getCheckpointIcon(segment: TargetSegment, status: SegmentAssessmentStatus | "target") {
+  if (status === "pass" || status === "passWithWarning") {
+    return <Check size={20} strokeWidth={3} aria-hidden="true" />;
+  }
+
+  return getCheckpointMarker(segment);
 }
 
 function formatTargetSegmentPattern(targetSegments: TargetSegment[]) {
@@ -794,6 +1353,38 @@ function describeTargetSegmentPitch(segment: TargetSegment) {
   return segment.kind === "note"
     ? segment.noteName
     : `${segment.fromNoteName} to ${segment.toNoteName}`;
+}
+
+function getCheckpointMarker(segment: TargetSegment) {
+  if (segment.kind === "glide") {
+    return segment.shortLabel;
+  }
+
+  return formatScaleDegreeMarker(segment.offsetSemitones) ?? segment.shortLabel;
+}
+
+function formatScaleDegreeMarker(offsetSemitones: number) {
+  const normalizedOffset = ((offsetSemitones % 12) + 12) % 12;
+  if (offsetSemitones !== 0 && offsetSemitones % 12 === 0) {
+    return "8";
+  }
+
+  const degreeByOffset: Record<number, string> = {
+    0: "1",
+    1: "2",
+    2: "2",
+    3: "3",
+    4: "3",
+    5: "4",
+    6: "5",
+    7: "5",
+    8: "6",
+    9: "6",
+    10: "7",
+    11: "7"
+  };
+
+  return degreeByOffset[normalizedOffset];
 }
 
 function describeCheckpointLabel(
@@ -1806,10 +2397,6 @@ function createSmoothPath(points: { x: number; y: number }[]) {
   }, "");
 }
 
-function formatClipDuration(durationMs: number) {
-  return `${Math.max(0, durationMs / 1000).toFixed(1)}s`;
-}
-
 type AppRoute =
   | {
       screen: "home";
@@ -2435,20 +3022,6 @@ function formatLastPracticed(createdAt: string | undefined) {
     month: "short",
     day: "numeric"
   })}`;
-}
-
-function formatHistoryDate(createdAt: string) {
-  const timestamp = Date.parse(createdAt);
-  if (!Number.isFinite(timestamp)) {
-    return "Unknown time";
-  }
-
-  return new Date(timestamp).toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
 }
 
 function formatProgressSessionDate(createdAt: string) {

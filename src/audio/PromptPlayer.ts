@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import type { PromptStyle, TargetSegment } from "../domain/contracts";
+import { getPromptTimeline } from "../domain/promptTiming";
 import type { PromptPlayer } from "./types";
 
 export class TonePromptPlayer implements PromptPlayer {
@@ -12,12 +13,12 @@ export class TonePromptPlayer implements PromptPlayer {
     await Tone.start();
     const synth = this.getSynth();
     const glideSynth = this.getGlideSynth();
-    const beatSeconds = 60 / tempoBpm;
+    const promptTimeline = getPromptTimeline(targetSegments, tempoBpm, promptStyle);
+    const beatSeconds = promptTimeline.beatMs / 1000;
     const now = Tone.now() + 0.08;
-    const chordSeconds = beatSeconds * 1.05;
-    const gapSeconds = beatSeconds * 0.45;
-    const shouldPlayChord = promptStyle === "chord-then-sequence" && targetSegments.length > 1;
-    const noteStartSeconds = shouldPlayChord ? now + chordSeconds + gapSeconds : now;
+    const chordSeconds = promptTimeline.chordDurationMs / 1000;
+    const shouldPlayChord = chordSeconds > 0;
+    const noteStartSeconds = now + promptTimeline.sequenceLeadInMs / 1000;
 
     if (shouldPlayChord) {
       synth.triggerAttackRelease(
@@ -49,12 +50,8 @@ export class TonePromptPlayer implements PromptPlayer {
       glideSynth.triggerRelease(segmentStartSeconds + segmentDurationSeconds);
     });
 
-    const lastTargetEndSeconds = (targetSegments.at(-1)?.endMs ?? 0) / 1000;
-    const leadInSeconds = shouldPlayChord ? chordSeconds + gapSeconds : 0;
-    const totalMs = (leadInSeconds + lastTargetEndSeconds + beatSeconds * 0.25) * 1000;
-
     await new Promise<void>((resolve) => {
-      this.completionTimer = window.setTimeout(resolve, totalMs);
+      this.completionTimer = window.setTimeout(resolve, promptTimeline.totalDurationMs);
     });
   }
 

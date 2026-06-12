@@ -288,6 +288,7 @@ export const DEFAULT_SETTINGS: CoachSettings = {
   exerciseId: "major-triad",
   saveLocalClips: false,
   timingMode: "pitch-first",
+  practiceMode: "auto",
   themePreference: {
     mode: "system"
   }

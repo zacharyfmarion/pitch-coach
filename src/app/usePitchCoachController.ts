@@ -64,6 +64,7 @@ import {
 } from "../domain/vocalRange";
 
 const PASS_ADVANCE_DELAY_MS = 900;
+const AUTO_RETRY_DELAY_MS = 1200;
 const VOICE_START_RMS = 0.006;
 const MAX_RENDERED_FRAMES = 1000;
 const RANGE_CAPTURE_MIN_DURATION_MS = 900;
@@ -142,7 +143,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const localClipUrlRef = useRef<string | null>(null);
   const lessonStateRef = useRef(lessonState);
   const listeningTimerRef = useRef<number | null>(null);
-  const passTimerRef = useRef<number | null>(null);
+  const autoFlowTimerRef = useRef<number | null>(null);
   const rangeCaptureMidisRef = useRef<number[]>([]);
 
   const currentRootMidi = getCurrentRootMidi(lessonState) ?? selectedExercise.startRootMidi;
@@ -234,9 +235,9 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
   const clearTimers = useCallback(() => {
     clearListeningTimer();
-    if (passTimerRef.current !== null) {
-      window.clearTimeout(passTimerRef.current);
-      passTimerRef.current = null;
+    if (autoFlowTimerRef.current !== null) {
+      window.clearTimeout(autoFlowTimerRef.current);
+      autoFlowTimerRef.current = null;
     }
   }, [clearListeningTimer]);
 
@@ -306,15 +307,22 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       await persistPendingClip(score);
       setLessonState((current) => resolveAttempt(current, score));
 
-      if (score.passed) {
-        passTimerRef.current = window.setTimeout(() => {
-          const advanced = advanceAfterPass(lessonStateRef.current);
-          passTimerRef.current = null;
-          setLessonState(advanced);
-          if (advanced.status === "idle") {
+      if (settings.practiceMode === "auto") {
+        if (score.passed) {
+          autoFlowTimerRef.current = window.setTimeout(() => {
+            const advanced = advanceAfterPass(lessonStateRef.current);
+            autoFlowTimerRef.current = null;
+            setLessonState(advanced);
+            if (advanced.status === "idle") {
+              setQueuedAutoStart(true);
+            }
+          }, PASS_ADVANCE_DELAY_MS);
+        } else {
+          autoFlowTimerRef.current = window.setTimeout(() => {
+            autoFlowTimerRef.current = null;
             setQueuedAutoStart(true);
-          }
-        }, PASS_ADVANCE_DELAY_MS);
+          }, AUTO_RETRY_DELAY_MS);
+        }
       }
     },
     [
@@ -327,17 +335,23 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       settings.saveLocalClips,
       settings.tempoBpm,
       settings.toleranceCents,
+      settings.practiceMode,
       targetSegments
     ]
   );
 
-  const startAttempt = useCallback(async () => {
+  const startAttempt = useCallback(async (options: { includePrompt?: boolean } = {}) => {
     const rootMidi = getCurrentRootMidi(lessonStateRef.current);
     if (rootMidi === null) {
       setErrorMessage("Your range is too narrow for this exercise.");
       return;
     }
 
+    if (lessonStateRef.current.status === "complete") {
+      return;
+    }
+
+    const includePrompt = options.includePrompt ?? true;
     const runId = runIdRef.current + 1;
     runIdRef.current = runId;
     clearTimers();
@@ -357,17 +371,22 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     };
 
     try {
-      setLessonState((current) => startPrompt(current));
-      await services.promptPlayer.playPrompt(
-        attemptTargets,
-        settings.tempoBpm,
-        selectedExercise.promptStyle
-      );
-      if (runId !== runIdRef.current) {
-        return;
+      if (includePrompt) {
+        setLessonState((current) => startPrompt(current));
+        await services.promptPlayer.playPrompt(
+          attemptTargets,
+          settings.tempoBpm,
+          selectedExercise.promptStyle
+        );
+        if (runId !== runIdRef.current) {
+          return;
+        }
+
+        setLessonState((current) => beginAwaitingVoice(current));
+      } else {
+        setLessonState((current) => beginAwaitingVoice(startPrompt(current)));
       }
 
-      setLessonState((current) => beginAwaitingVoice(current));
       await services.audioEngine.startCapture({
         detector: services.detector,
         bounds,
@@ -439,13 +458,79 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   ]);
 
   useEffect(() => {
-    if (!queuedAutoStart || lessonState.status !== "idle") {
+    if (!queuedAutoStart) {
+      return;
+    }
+
+    if (settings.practiceMode !== "auto") {
+      setQueuedAutoStart(false);
+      return;
+    }
+
+    if (lessonState.status !== "idle" && lessonState.status !== "retry") {
       return;
     }
 
     setQueuedAutoStart(false);
     void startAttempt();
-  }, [lessonState.status, queuedAutoStart, startAttempt]);
+  }, [lessonState.status, queuedAutoStart, settings.practiceMode, startAttempt]);
+
+  const playGuide = useCallback(async () => {
+    const rootMidi = getCurrentRootMidi(lessonStateRef.current);
+    if (rootMidi === null) {
+      setErrorMessage("Your range is too narrow for this exercise.");
+      return;
+    }
+
+    if (lessonStateRef.current.status === "complete") {
+      return;
+    }
+
+    const runId = runIdRef.current + 1;
+    runIdRef.current = runId;
+    clearTimers();
+    setErrorMessage(null);
+    setAttemptScore(null);
+    framesRef.current = [];
+    setPitchFrames([]);
+
+    const attemptTargets = buildTargetNotes(rootMidi, selectedExercise, settings.tempoBpm);
+
+    try {
+      setLessonState((current) =>
+        current.status === "complete"
+          ? current
+          : {
+              ...current,
+              status: "promptPlaying"
+            }
+      );
+      await services.promptPlayer.playPrompt(
+        attemptTargets,
+        settings.tempoBpm,
+        selectedExercise.promptStyle
+      );
+      if (runId !== runIdRef.current) {
+        return;
+      }
+
+      setLessonState((current) =>
+        current.status === "complete"
+          ? current
+          : {
+              ...current,
+              status: "idle"
+            }
+      );
+    } catch (error) {
+      if (runId !== runIdRef.current) {
+        return;
+      }
+
+      setLessonState((current) => ({ ...current, status: "idle" }));
+      setErrorMessage(createAudioErrorMessage(error));
+    }
+  }, [clearTimers, selectedExercise, services.promptPlayer, settings.tempoBpm]);
 
   const stopAttempt = useCallback(async () => {
     runIdRef.current += 1;
@@ -554,12 +639,51 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     [services, stopAttempt]
   );
 
+  const advanceLesson = useCallback(async () => {
+    runIdRef.current += 1;
+    clearTimers();
+    services.promptPlayer.cancel();
+    await services.audioEngine.stop();
+    voiceStartMsRef.current = null;
+    lastCompletionCheckMsRef.current = 0;
+    finishStartedRef.current = false;
+    pendingClipRef.current = null;
+    framesRef.current = [];
+    setPitchFrames([]);
+    setAttemptScore(null);
+    setLessonState((current) => advanceAfterPass(current));
+  }, [clearTimers, services.audioEngine, services.promptPlayer]);
+
   useEffect(() => {
     void stopAttempt();
     setLessonState(createLessonState(selectedExercise, settings.range));
     setAttemptScore(null);
     setPitchFrames([]);
   }, [selectedExercise, settings.range.lowestMidi, settings.range.highestMidi, stopAttempt]);
+
+  const setCurrentRootIndex = useCallback(
+    async (rootIndex: number) => {
+      await stopAttempt();
+      setAttemptScore(null);
+      setPitchFrames([]);
+      framesRef.current = [];
+      setLessonState((current) => {
+        const maxRootIndex = current.rootSequence.length - 1;
+        if (maxRootIndex < 0) {
+          return current;
+        }
+
+        return {
+          ...current,
+          status: "idle",
+          rootIndex: Math.min(Math.max(rootIndex, 0), maxRootIndex),
+          attemptNumber: 0,
+          lastScore: undefined
+        };
+      });
+    },
+    [stopAttempt]
+  );
 
   const resetLesson = useCallback(async () => {
     await stopAttempt();
@@ -606,6 +730,8 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     exerciseLabel: formatExercisePattern(selectedExercise),
     noteOptions,
     listeningDurationMs: timelineDurationMs,
+    currentRootIndex: lessonState.rootIndex,
+    rootSequence: lessonState.rootSequence,
     errorMessage,
     exerciseProgress,
     practiceSummary,
@@ -625,8 +751,11 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     stopRangeCapture,
     startPracticeSession,
     endPracticeSession,
+    playGuide,
     startAttempt,
     stopAttempt,
+    advanceLesson,
+    setCurrentRootIndex,
     resetLesson,
     isBusy:
       lessonState.status === "promptPlaying" ||

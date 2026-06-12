@@ -17,15 +17,29 @@ test("renders the pitch coach workspace", async ({ page }) => {
   await expect(page).toHaveURL(/\/exercises\/major-triad$/);
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
-  await expect(page.getByText("Guide tempo")).toBeVisible();
-  await expect(page.getByText("A3 major")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tempo" })).toContainText("80 BPM");
+  await expect(page.getByRole("button", { name: "Key" })).toContainText("A major");
   await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.locator(".exercise-roll-card .note-checkpoint-strip")).toHaveCSS("margin-top", "6px");
+  await expect(page.locator(".exercise-roll-card .note-checkpoint-strip")).toHaveCSS("margin-bottom", "8px");
+  await expect(page.locator(".exercise-roll-card .timeline-frame")).toHaveCSS("border-top-width", "1px");
+  await expect(page.locator(".exercise-roll-card .timeline-frame")).toHaveCSS("border-radius", "16px");
+  await expect(page.getByRole("button", { name: "Restart practice" })).toHaveCSS(
+    "background-color",
+    "rgb(255, 253, 249)"
+  );
+  await page.getByRole("button", { name: "Tempo" }).click();
+  const tempoSettings = page.getByRole("dialog", { name: "Tempo settings" });
+  await expect(tempoSettings).toBeVisible();
+  const tempoSettingsBox = await tempoSettings.boundingBox();
+  expect(tempoSettingsBox?.width).toBeLessThanOrEqual(300);
+  await page.mouse.click(10, 10);
 
   await page.getByRole("combobox", { name: "Exercise" }).click();
   await page.getByRole("option", { name: "Single Note Match" }).click();
   await expect(page).toHaveURL(/\/exercises\/single-note-match$/);
   await expect(page.getByText("72 BPM")).toBeVisible();
-  await expect(page.getByLabel("Attempt history")).toContainText("No attempts yet for this exercise.");
+  await expect(page.getByLabel("Attempt history")).toHaveCount(0);
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
@@ -37,7 +51,7 @@ test("opens exercise routes directly", async ({ page }) => {
   await page.goto("/exercises/major-triad");
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
-  await expect(page.getByText("A3 major")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Key" })).toContainText("A major");
 });
 
 test("shows range setup from Start lesson without a detail-page prompt", async ({ page }) => {
@@ -218,19 +232,16 @@ test("uses the mock theme without exposing theme choices", async ({ page }) => {
   await expect(page.getByRole("radiogroup", { name: "Theme" })).toHaveCount(0);
 });
 
-test("shows and clears local attempt history", async ({ page }) => {
+test("omits lower detail panels on the exercise mock", async ({ page }) => {
   await seedOnboardedSettings(page);
   await page.goto("/");
   await seedAttemptHistory(page, [browserAttemptRecord()]);
   await page.goto("/exercises/major-triad");
 
-  await expect(page.getByLabel("Attempt history")).toContainText("Pass");
-  await expect(page.getByLabel("Attempt history")).toContainText("Nice triad.");
-
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Clear history" }).click();
-
-  await expect(page.getByLabel("Attempt history")).toContainText("No attempts yet for this exercise.");
+  await expect(page.getByLabel("Lesson controls and feedback")).toHaveCount(0);
+  await expect(page.getByLabel("Attempt feedback")).toHaveCount(0);
+  await expect(page.getByLabel("Attempt history")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Clear history" })).toHaveCount(0);
 });
 
 type BrowserAttemptSeed = {

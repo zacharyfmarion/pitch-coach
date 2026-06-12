@@ -21,6 +21,8 @@ type PitchTimelineProps = {
   toleranceCents: number;
   status: LessonStatus;
   themeName: string;
+  guidePlayheadMs?: number | null;
+  guideActiveSegmentIndices?: number[];
 };
 
 export function PitchTimeline({
@@ -30,7 +32,9 @@ export function PitchTimeline({
   totalDurationMs,
   toleranceCents,
   status,
-  themeName
+  themeName,
+  guidePlayheadMs = null,
+  guideActiveSegmentIndices = []
 }: PitchTimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -65,10 +69,23 @@ export function PitchTimeline({
       toleranceCents,
       status,
       themeName,
+      guidePlayheadMs,
+      guideActiveSegmentIndices,
       width: size.width,
       height: size.height
     });
-  }, [attemptScore, frames, size, status, targetSegments, themeName, toleranceCents, totalDurationMs]);
+  }, [
+    attemptScore,
+    frames,
+    guideActiveSegmentIndices,
+    guidePlayheadMs,
+    size,
+    status,
+    targetSegments,
+    themeName,
+    toleranceCents,
+    totalDurationMs
+  ]);
 
   return (
     <div className="timeline-frame">
@@ -182,6 +199,10 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
   const maxMidi = Math.ceil(Math.max(...visibleMidis)) + 1;
   const centsAsMidi = options.toleranceCents / 100;
   const renderedTargetSpans = getRenderedTargetSpans(options);
+  const guidePlayheadMs = options.status === "promptPlaying" ? options.guidePlayheadMs : null;
+  const guideActiveSegmentIndices =
+    options.status === "promptPlaying" ? new Set(options.guideActiveSegmentIndices ?? []) : new Set<number>();
+  const hasGuideActivity = typeof guidePlayheadMs === "number" || guideActiveSegmentIndices.size > 0;
 
   const xForTime = (timeMs: number) =>
     padding.left +
@@ -192,37 +213,45 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
 
   drawGrid(
     context,
-    renderedTargetSpans,
     padding,
     plotWidth,
     plotHeight,
-    xForTime,
     yForMidi,
     minMidi,
     maxMidi,
     palette
   );
 
-  renderedTargetSpans.forEach(({ segment, startMs, endMs }) => {
+  renderedTargetSpans.forEach(({ segment, startMs, endMs }, index) => {
+    const guideActive =
+      guideActiveSegmentIndices.has(index) ||
+      (typeof guidePlayheadMs === "number" &&
+        guidePlayheadMs >= startMs - 80 &&
+        guidePlayheadMs <= endMs + 80);
+    const guideDimmed = hasGuideActivity && !guideActive;
     const x = xForTime(startMs);
     const width = Math.max(6, xForTime(endMs) - x);
-    context.fillStyle = palette.targetBand;
+    const previousAlpha = context.globalAlpha;
+    if (guideDimmed) {
+      context.globalAlpha = 0.42;
+    }
+    context.fillStyle = guideActive ? "rgba(74, 132, 166, 0.3)" : palette.targetBand;
     context.strokeStyle = palette.targetLine;
-    context.lineWidth = 2;
-    context.font = "600 12px system-ui, sans-serif";
+    context.lineWidth = 1.8;
 
     if (segment.kind === "note") {
       const yTop = yForMidi(segment.midi + centsAsMidi);
       const yBottom = yForMidi(segment.midi - centsAsMidi);
       const yCenter = yForMidi(segment.midi);
 
-      context.fillRect(x, yTop, width, yBottom - yTop);
+      drawRoundedRect(context, x, yTop, width, yBottom - yTop, 8);
+      context.fill();
       context.beginPath();
       context.moveTo(x, yCenter);
       context.lineTo(x + width, yCenter);
       context.stroke();
-      context.fillStyle = palette.targetText;
-      context.fillText(segment.noteName, x + 8, yCenter - 8);
+      drawTargetLabel(context, getSegmentMarker(segment), segment.noteName, x + 9, yTop - 14, palette);
+      context.globalAlpha = previousAlpha;
       return;
     }
 
@@ -234,27 +263,154 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
     context.lineTo(xEnd, yForMidi(segment.toMidi + centsAsMidi));
     context.lineTo(xEnd, yForMidi(segment.toMidi - centsAsMidi));
     context.lineTo(x, yForMidi(segment.fromMidi - centsAsMidi));
-    context.closePath();
+    context.lineTo(x, yForMidi(segment.fromMidi + centsAsMidi));
     context.fill();
     context.beginPath();
     context.moveTo(x, yStart);
     context.lineTo(xEnd, yEnd);
     context.stroke();
-    context.fillStyle = palette.targetText;
-    context.fillText(segment.shortLabel, x + 8, Math.min(yStart, yEnd) - 8);
+    drawTargetLabel(
+      context,
+      getSegmentMarker(segment),
+      `${segment.fromNoteName}-${segment.toNoteName}`,
+      x + 9,
+      Math.min(yStart, yEnd) - 28,
+      palette
+    );
+    context.globalAlpha = previousAlpha;
   });
 
   drawPitchLine(context, options.frames, xForTime, yForMidi, palette);
   drawIgnoredEvents(context, options.attemptScore, xForTime, yForMidi, palette);
   drawStablePlateaus(context, options.attemptScore, xForTime, yForMidi, palette);
+  if (typeof guidePlayheadMs === "number") {
+    drawGuidePlayhead(context, xForTime(guidePlayheadMs), padding.top, padding.top + plotHeight);
+  }
+}
 
-  context.fillStyle = palette.statusText;
-  context.font = "600 12px system-ui, sans-serif";
-  context.fillText(
-    getCanvasStatusLabel(options.status),
-    padding.left,
-    18
-  );
+function drawGuidePlayhead(
+  context: CanvasRenderingContext2D,
+  x: number,
+  top: number,
+  bottom: number
+) {
+  const previousStroke = context.strokeStyle;
+  const previousFill = context.fillStyle;
+  const previousLineWidth = context.lineWidth;
+  context.strokeStyle = "rgba(74, 132, 166, 0.82)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(x, top);
+  context.lineTo(x, bottom);
+  context.stroke();
+  context.fillStyle = "#4a84a6";
+  context.beginPath();
+  context.arc(x, top, 4.5, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = previousStroke;
+  context.fillStyle = previousFill;
+  context.lineWidth = previousLineWidth;
+}
+
+function drawTargetLabel(
+  context: CanvasRenderingContext2D,
+  marker: string,
+  label: string,
+  x: number,
+  y: number,
+  palette: TimelinePalette
+) {
+  const displayLabel = formatTimelineNoteLabel(label);
+  const labelWidth = Math.max(50, displayLabel.length * 8.5 + 30);
+  context.fillStyle = "rgba(222, 231, 232, 0.86)";
+  drawRoundedRect(context, x, y, labelWidth, 22, 7);
+  context.fill();
+
+  context.fillStyle = "#63ad7d";
+  context.beginPath();
+  context.arc(x + 12, y + 11, 8, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#fffdf9";
+  context.font = "700 10px system-ui, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(marker, x + 12, y + 11.5);
+
+  context.fillStyle = palette.targetText;
+  context.font = "700 12px system-ui, sans-serif";
+  context.textAlign = "left";
+  context.fillText(displayLabel, x + 27, y + 11.5);
+  context.textAlign = "start";
+  context.textBaseline = "alphabetic";
+}
+
+function formatTimelineNoteLabel(label: string) {
+  return label.replaceAll("#", "♯");
+}
+
+function getSegmentMarker(segment: TargetSegment) {
+  if (segment.kind === "glide") {
+    return segment.shortLabel;
+  }
+
+  return formatScaleDegreeMarker(segment.offsetSemitones) ?? segment.shortLabel;
+}
+
+function formatScaleDegreeMarker(offsetSemitones: number) {
+  const normalizedOffset = ((offsetSemitones % 12) + 12) % 12;
+  if (offsetSemitones !== 0 && offsetSemitones % 12 === 0) {
+    return "8";
+  }
+
+  const degreeByOffset: Record<number, string> = {
+    0: "1",
+    1: "2",
+    2: "2",
+    3: "3",
+    4: "3",
+    5: "4",
+    6: "5",
+    7: "5",
+    8: "6",
+    9: "6",
+    10: "7",
+    11: "7"
+  };
+
+  return degreeByOffset[normalizedOffset];
+}
+
+function drawRoundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  if (typeof context.quadraticCurveTo !== "function") {
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(x + width, y);
+    context.lineTo(x + width, y + height);
+    context.lineTo(x, y + height);
+    context.lineTo(x, y);
+    return;
+  }
+
+  const clampedRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + clampedRadius, y);
+  context.lineTo(x + width - clampedRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + clampedRadius);
+  context.lineTo(x + width, y + height - clampedRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - clampedRadius, y + height);
+  context.lineTo(x + clampedRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - clampedRadius);
+  context.lineTo(x, y + clampedRadius);
+  context.quadraticCurveTo(x, y, x + clampedRadius, y);
+  context.closePath();
 }
 
 export type RenderedTargetSpan = {
@@ -421,28 +577,11 @@ function median(values: number[]) {
   return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 }
 
-function getCanvasStatusLabel(status: LessonStatus) {
-  switch (status) {
-    case "awaitingVoice":
-      return "Waiting for voice";
-    case "listening":
-      return "Sing now";
-    case "retry":
-      return "Ready to retry";
-    case "passed":
-      return "Passed";
-    default:
-      return "Awaiting attempt";
-  }
-}
-
 function drawGrid(
   context: CanvasRenderingContext2D,
-  targetSpans: RenderedTargetSpan[],
   padding: { top: number; right: number; bottom: number; left: number },
   plotWidth: number,
   plotHeight: number,
-  xForTime: (timeMs: number) => number,
   yForMidi: (midi: number) => number,
   minMidi: number,
   maxMidi: number,
@@ -466,15 +605,6 @@ function drawGrid(
       context.fillText(midiToNoteName(midi), 10, y + 4);
     }
   }
-
-  targetSpans.forEach(({ startMs }) => {
-    const x = xForTime(startMs);
-    context.strokeStyle = palette.timeMarker;
-    context.beginPath();
-    context.moveTo(x, padding.top);
-    context.lineTo(x, padding.top + plotHeight);
-    context.stroke();
-  });
 }
 
 function drawIgnoredEvents(

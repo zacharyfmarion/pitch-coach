@@ -87,10 +87,13 @@ export type CoachSettings = {
   exerciseId: ExerciseId;
   saveLocalClips: boolean;
   timingMode: TimingMode;
+  practiceMode: PracticeMode;
   themePreference: ThemePreference;
 };
 
 export type TimingMode = "pitch-first";
+
+export type PracticeMode = "auto" | "manual";
 
 export type ThemePreference =
   | {
