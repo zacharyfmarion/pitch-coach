@@ -9,7 +9,8 @@ test("renders the pitch coach workspace", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Start practice/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Interval Training/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Sing a Song/ })).toBeVisible();
-  await expect(page.getByText("0 attempts logged")).toBeVisible();
+  await expect(page.getByText("Recently practiced")).toBeVisible();
+  await expect(page.getByText("0 / 12 done")).toBeVisible();
   await expect(page.getByText("Robin")).toHaveCount(0);
 
   await page.getByRole("button", { name: /Start practice/ }).click();

@@ -70,7 +70,10 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: /Start practice/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Interval Training/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Sing a Song/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("0 attempts logged");
+    expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("0 / 12 done");
+    expect(screen.getByText("Recently practiced")).toBeTruthy();
+    expect(screen.getByText("Major Third")).toBeTruthy();
+    expect(screen.getByText("Perfect Fifth")).toBeTruthy();
     expect(screen.queryByText("1,284")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Practice Library" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start lesson" })).toBeNull();
@@ -83,7 +86,7 @@ describe("PitchCoachApp", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("2 attempts logged")
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("2 / 12 done")
     );
     const stats = screen.getByLabelText("Practice stats").textContent ?? "";
     expect(stats).toContain("Accuracy50%");

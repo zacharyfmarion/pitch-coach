@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Activity,
+  ArrowRight,
   ArrowUpRight,
   ArrowLeft,
   Check,
@@ -964,6 +965,7 @@ function HomeScreen({
   const completedExerciseCount = countExercisesTried(exercises, exerciseProgress);
   const exerciseCoveragePercent =
     exercises.length > 0 ? Math.round((completedExerciseCount / exercises.length) * 100) : 0;
+  const intervalPracticeRows = createHomeIntervalPracticeRows(exercises, exerciseProgress);
   const hasRecommendedHistory = recommendedProgress.attemptCount > 0;
   const showRangeSetupPrompt = rangeSetupStatus !== "completed";
 
@@ -1021,7 +1023,7 @@ function HomeScreen({
       <section className="mock-mode-grid" aria-label="Practice modes">
         <Card
           as="button"
-          className="mock-mode-card mock-mode-card--practice"
+          className="mock-mode-card mock-mode-card--practice mock-interval-card"
           variant="mockInteractive"
           padding="none"
           type="button"
@@ -1029,32 +1031,65 @@ function HomeScreen({
         >
           <div className="mock-mode-card__header">
             <span className="mock-mode-icon mock-mode-icon--practice">
-              <Target size={26} aria-hidden="true" />
+              <Target size={23} strokeWidth={1.9} aria-hidden="true" />
             </span>
             <span className="mock-mode-copy">
               <strong>Interval Training</strong>
-              <span>{exercises.length} guided exercises · ear &amp; voice</span>
+              <span>{exercises.length} guided drills · ear &amp; voice</span>
             </span>
-            <ArrowUpRight size={27} aria-hidden="true" />
+            <ArrowRight size={20} aria-hidden="true" />
           </div>
-          <div className="mock-chip-row" aria-hidden="true">
-            <span>Warm-ups</span>
-            <span>Intervals</span>
-            <span>Triads</span>
-            <span>Scales</span>
+          <div className="mock-interval-recent" aria-label="Recently practiced interval drills">
+            <span className="mock-interval-recent__heading">Recently practiced</span>
+            <span className="mock-interval-recent__list">
+              {intervalPracticeRows.map((row) => (
+                <span
+                  key={row.exerciseId}
+                  className="mock-interval-row"
+                  aria-label={
+                    row.score === null
+                      ? `${row.title}, ${row.when}, not scored yet`
+                      : `${row.title}, ${row.when}, ${row.score}%`
+                  }
+                >
+                  <span className="mock-interval-row__icon" aria-hidden="true">
+                    <Target size={17} strokeWidth={1.9} />
+                  </span>
+                  <span className="mock-interval-row__copy">
+                    <strong>{row.title}</strong>
+                    <span>{row.when}</span>
+                  </span>
+                  <span
+                    className={`mock-interval-row__bar mock-interval-row__bar--${row.tone}`}
+                    style={
+                      {
+                        "--row-progress": `${row.score ?? 0}%`
+                      } as CSSProperties
+                    }
+                    aria-hidden="true"
+                  />
+                  <span className={`mock-interval-row__score mock-interval-row__score--${row.tone}`}>
+                    {row.score === null ? "New" : `${row.score}%`}
+                  </span>
+                </span>
+              ))}
+            </span>
           </div>
-          <div className="mock-practice-progress">
+          <div
+            className="mock-practice-progress"
+            aria-label={`${completedExerciseCount} of ${exercises.length} exercises done`}
+          >
             <span
+              className="mock-practice-progress__track"
               style={
                 {
                   "--practice-progress": `${exerciseCoveragePercent}%`
                 } as CSSProperties
               }
             />
-            <strong>
-              {formatInteger(practiceSummary.attemptCount)}{" "}
-              <span>{practiceSummary.attemptCount === 1 ? "attempt logged" : "attempts logged"}</span>
-            </strong>
+            <span className="mock-practice-progress__summary">
+              <b>{formatInteger(completedExerciseCount)}</b> / {formatInteger(exercises.length)} done
+            </span>
           </div>
         </Card>
 
@@ -1135,6 +1170,99 @@ function countExercisesTried(
   exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"]
 ) {
   return exercises.filter((exercise) => exerciseProgress[exercise.id].attemptCount > 0).length;
+}
+
+type HomeIntervalPracticeRow = {
+  exerciseId: ExerciseId;
+  title: string;
+  when: string;
+  score: number | null;
+  tone: "success" | "warning" | "muted";
+};
+
+const homeIntervalStarterIds: readonly ExerciseId[] = ["third-up-back", "fifth-glide", "major-triad"];
+
+const homeIntervalTitleOverrides: Partial<Record<ExerciseId, string>> = {
+  "third-up-back": "Major Third",
+  "minor-third-up-back": "Minor Third",
+  "fifth-glide": "Perfect Fifth"
+};
+
+function createHomeIntervalPracticeRows(
+  exercises: ReturnType<typeof usePitchCoachController>["exercises"],
+  exerciseProgress: ReturnType<typeof usePitchCoachController>["exerciseProgress"]
+): HomeIntervalPracticeRow[] {
+  const recentRows = exercises
+    .map((exercise) => ({
+      exercise,
+      progress: exerciseProgress[exercise.id]
+    }))
+    .filter(({ progress }) => progress.attemptCount > 0)
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.progress.lastPracticedAt ?? "");
+      const rightTime = Date.parse(right.progress.lastPracticedAt ?? "");
+      return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
+    });
+
+  const starterRows = homeIntervalStarterIds.flatMap((exerciseId) => {
+    if (recentRows.some(({ exercise }) => exercise.id === exerciseId)) {
+      return [];
+    }
+
+    const exercise = exercises.find((candidate) => candidate.id === exerciseId);
+    return exercise ? [{ exercise, progress: exerciseProgress[exercise.id] }] : [];
+  });
+
+  return [...recentRows, ...starterRows].slice(0, 3).map(({ exercise, progress }) => {
+    const score = progress.recentPassRate ?? null;
+    return {
+      exerciseId: exercise.id,
+      title: homeIntervalTitleOverrides[exercise.id] ?? exercise.title,
+      when: formatHomeIntervalPracticeTime(progress.lastPracticedAt),
+      score,
+      tone: getHomeIntervalPracticeTone(score)
+    };
+  });
+}
+
+function getHomeIntervalPracticeTone(score: number | null): HomeIntervalPracticeRow["tone"] {
+  if (score === null) {
+    return "muted";
+  }
+
+  return score >= 85 ? "success" : "warning";
+}
+
+function formatHomeIntervalPracticeTime(value?: string) {
+  if (!value) {
+    return "Ready";
+  }
+
+  const practicedAt = new Date(value);
+  const practicedTime = practicedAt.getTime();
+  if (Number.isNaN(practicedTime)) {
+    return "Ready";
+  }
+
+  const elapsedMs = Date.now() - practicedTime;
+  const elapsedMinutes = Math.floor(elapsedMs / 60000);
+  if (elapsedMinutes < 60) {
+    return `${Math.max(1, elapsedMinutes)}m ago`;
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) {
+    return `${elapsedHours}h ago`;
+  }
+
+  if (elapsedHours < 48) {
+    return "Yesterday";
+  }
+
+  return practicedAt.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
 }
 
 function createHomeIntroCopy(
