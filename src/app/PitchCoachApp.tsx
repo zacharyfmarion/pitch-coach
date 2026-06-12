@@ -16,6 +16,7 @@ import {
   Music2,
   Play,
   RotateCcw,
+  Settings as SettingsIcon,
   Sparkles,
   Target,
   TrendingUp,
@@ -28,6 +29,7 @@ import {
   RangeSetupModal,
   RangeSetupToast
 } from "../components/range/RangeSetupModal";
+import { SettingsDialog } from "../components/settings/SettingsDialog";
 import { AppShell } from "../components/ui/AppShell";
 import { Button } from "../components/ui/Button";
 import {
@@ -52,7 +54,7 @@ import type {
   SegmentAssessmentStatus,
   TargetSegment
 } from "../domain/contracts";
-import { isExerciseId } from "../domain/exercise";
+import { DEFAULT_SETTINGS, isExerciseId } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { getGuidePlaybackFrame, getPromptTimeline } from "../domain/promptTiming";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
@@ -80,7 +82,10 @@ type ExercisePracticeAppProps = {
   songServices?: SongModeServices;
 };
 
-type RangeSetupRequest = "start" | "edit";
+type RangeSetupRequest = {
+  intent: "start" | "edit";
+  initialMode?: "manual" | "sing";
+};
 
 function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePracticeAppProps) {
   const coach = usePitchCoachController({
@@ -95,6 +100,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const [transportProgress, setTransportProgress] = useState(0);
   const [guideProgress, setGuideProgress] = useState(0);
   const replayAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (
@@ -198,6 +204,10 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   }, [coach.localClip?.url]);
 
   useEffect(() => {
+    setSettingsOpen(false);
+  }, [router.route.screen]);
+
+  useEffect(() => {
     if (!activePracticeExerciseId) {
       return;
     }
@@ -246,7 +256,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   };
 
   const continueAfterRangeSetup = () => {
-    const shouldStart = rangeSetupRequest === "start";
+    const shouldStart = rangeSetupRequest?.intent === "start";
     void coach.stopRangeCapture();
     setRangeSetupRequest(null);
     if (shouldStart) {
@@ -256,7 +266,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   };
 
   const skipRangeSetup = () => {
-    const shouldStart = rangeSetupRequest === "start";
+    const shouldStart = rangeSetupRequest?.intent === "start";
     void coach.stopRangeCapture();
     coach.skipRangeSetup();
     setRangeSetupRequest(null);
@@ -273,7 +283,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     }
 
     if (coach.settings.rangeSetup.status === "unseen") {
-      setRangeSetupRequest("start");
+      setRangeSetupRequest({ intent: "start" });
       return;
     }
 
@@ -339,14 +349,57 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [coach.settings.practiceMode, router.route.screen, toggleAutoPractice]);
 
+  const updateDefaultTempo = useCallback((defaultTempoBpm: number) => {
+    const shouldSyncCurrentTempo = coach.settings.tempoBpm === coach.settings.defaultTempoBpm;
+    coach.setSettings({
+      ...coach.settings,
+      defaultTempoBpm,
+      tempoBpm: shouldSyncCurrentTempo ? defaultTempoBpm : coach.settings.tempoBpm
+    });
+  }, [coach.setSettings, coach.settings]);
+
+  const resetDialogSettings = useCallback(() => {
+    coach.setSettings({
+      ...coach.settings,
+      range: DEFAULT_SETTINGS.range,
+      rangeSetup: DEFAULT_SETTINGS.rangeSetup,
+      defaultTempoBpm: DEFAULT_SETTINGS.defaultTempoBpm,
+      tempoBpm: DEFAULT_SETTINGS.defaultTempoBpm,
+      toleranceCents: DEFAULT_SETTINGS.toleranceCents,
+      preferredAudioInput: undefined
+    });
+  }, [coach.setSettings, coach.settings]);
+
+  const retestRangeFromSettings = useCallback(() => {
+    setSettingsOpen(false);
+    setRangeSetupRequest({ intent: "edit", initialMode: "sing" });
+  }, []);
+
+  const closeSettingsDialog = useCallback(() => {
+    setSettingsOpen(false);
+  }, []);
+
+  const requestAudioInputPermission = useCallback(() => {
+    void coach.requestAudioInputPermission();
+  }, [coach.requestAudioInputPermission]);
+
+  const startInputLevelMonitor = useCallback(() => {
+    void coach.startInputLevelMonitor();
+  }, [coach.startInputLevelMonitor]);
+
+  const stopInputLevelMonitor = useCallback(() => {
+    void coach.stopInputLevelMonitor();
+  }, [coach.stopInputLevelMonitor]);
+
   const rangeSetupModal = (
     <RangeSetupModal
       open={rangeSetupRequest !== null}
       initialRange={coach.settings.range}
+      initialMode={rangeSetupRequest?.initialMode}
       captureState={coach.rangeCaptureState}
-      allowSkip={rangeSetupRequest === "start"}
-      savedContext={rangeSetupRequest === "edit" ? "edit" : "start"}
-      completionLabel={rangeSetupRequest === "edit" ? "Done" : "Start practicing"}
+      allowSkip={rangeSetupRequest?.intent === "start"}
+      savedContext={rangeSetupRequest?.intent === "edit" ? "edit" : "start"}
+      completionLabel={rangeSetupRequest?.intent === "edit" ? "Done" : "Start practicing"}
       onStartCapture={(target) => void coach.startRangeCapture(target)}
       onStopCapture={() => void coach.stopRangeCapture()}
       onSave={coach.saveRangeSetup}
@@ -356,11 +409,32 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     />
   );
 
+  const settingsDialog = (
+    <SettingsDialog
+      open={settingsOpen}
+      settings={coach.settings}
+      audioInputDevices={coach.audioInputDevices}
+      audioInputErrorMessage={coach.audioInputErrorMessage}
+      inputLevelState={coach.inputLevelState}
+      onClose={closeSettingsDialog}
+      onSettingsChange={coach.setSettings}
+      onDefaultTempoChange={updateDefaultTempo}
+      onRangeChange={(range) => coach.saveRangeSetup(range, "manual")}
+      onRetestRange={retestRangeFromSettings}
+      onPreferredAudioInputChange={coach.setPreferredAudioInput}
+      onRequestAudioInputPermission={requestAudioInputPermission}
+      onStartInputLevelMonitor={startInputLevelMonitor}
+      onStopInputLevelMonitor={stopInputLevelMonitor}
+      onResetSettings={resetDialogSettings}
+    />
+  );
+
   if (router.route.screen !== "practice") {
     return (
       <MainShell
         activeScreen={router.route.screen}
         onNavigate={navigateTopLevel}
+        onOpenSettings={() => setSettingsOpen(true)}
         practiceSummary={coach.practiceSummary}
       >
         {router.route.screen === "home" ? (
@@ -372,7 +446,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             recommendedExercise={coach.recommendedExercise}
             range={coach.settings.range}
             rangeSetupStatus={coach.settings.rangeSetup.status}
-            onOpenRangeSetup={() => setRangeSetupRequest("edit")}
+            onOpenRangeSetup={() => setRangeSetupRequest({ intent: "edit" })}
             onSelectExercise={openExercise}
             onNavigateToPractice={() => router.navigateToLibrary()}
             onNavigateToSongs={() => router.navigateToSongs()}
@@ -386,7 +460,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             practiceSummary={coach.practiceSummary}
             range={coach.settings.range}
             rangeSetupStatus={coach.settings.rangeSetup.status}
-            onOpenRangeSetup={() => setRangeSetupRequest("edit")}
+            onOpenRangeSetup={() => setRangeSetupRequest({ intent: "edit" })}
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
@@ -401,6 +475,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             onSelectExercise={openExercise}
           />
         )}
+        {settingsDialog}
         {rangeSetupModal}
       </MainShell>
     );
@@ -481,7 +556,12 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
         };
 
   return (
-    <MainShell activeScreen="library" onNavigate={navigateTopLevel} practiceSummary={coach.practiceSummary}>
+    <MainShell
+      activeScreen="library"
+      onNavigate={navigateTopLevel}
+      onOpenSettings={() => setSettingsOpen(true)}
+      practiceSummary={coach.practiceSummary}
+    >
       <main className="exercise-screen-page">
         <section className="exercise-screen" aria-label="Pitch coach exercise">
           <header className="exercise-screen__header">
@@ -721,6 +801,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             </div>
           ) : null}
         </section>
+        {settingsDialog}
         {rangeSetupModal}
       </main>
     </MainShell>
@@ -1438,24 +1519,27 @@ const navigationItems = [
 function MainShell({
   activeScreen,
   onNavigate,
+  onOpenSettings,
   practiceSummary,
   children
 }: {
   activeScreen: TopLevelScreen;
   onNavigate: (screen: TopLevelScreen) => void;
+  onOpenSettings: () => void;
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   children: ReactNode;
 }) {
   return (
     <AppShell
       className="pitch-shell"
+      header={<MobileSettingsBar onOpenSettings={onOpenSettings} />}
       sidebar={
         <SidebarNav
           brand={<PitchCoachBrand />}
           items={navigationItems}
           activeValue={activeScreen}
           onNavigate={onNavigate}
-          footer={<LocalSaveFooter practiceSummary={practiceSummary} />}
+          footer={<LocalSaveFooter practiceSummary={practiceSummary} onOpenSettings={onOpenSettings} />}
         />
       }
     >
@@ -1476,9 +1560,11 @@ function PitchCoachBrand() {
 }
 
 function LocalSaveFooter({
-  practiceSummary
+  practiceSummary,
+  onOpenSettings
 }: {
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+  onOpenSettings: () => void;
 }) {
   return (
     <div className="shell-local-footer">
@@ -1489,28 +1575,30 @@ function LocalSaveFooter({
           <span>practice streak</span>
         </span>
       </div>
-      <div className="shell-user-card">
+      <button className="shell-user-card" type="button" onClick={onOpenSettings}>
         <span className="shell-user-avatar" aria-hidden="true">
           L
         </span>
         <span className="shell-user-copy">
           <strong>Local practice</strong>
-          <span>Saved on this device</span>
+          <span>Settings & profile</span>
         </span>
         <span className="shell-user-sun" aria-hidden="true">
-          <SunGlyph />
+          <SettingsIcon size={18} />
         </span>
-      </div>
+      </button>
     </div>
   );
 }
 
-function SunGlyph() {
+function MobileSettingsBar({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" />
-    </svg>
+    <div className="shell-mobile-settings-bar">
+      <span>Local practice</span>
+      <IconButton variant="toolbar" size="md" title="Settings" onClick={onOpenSettings}>
+        <SettingsIcon size={17} />
+      </IconButton>
+    </div>
   );
 }
 

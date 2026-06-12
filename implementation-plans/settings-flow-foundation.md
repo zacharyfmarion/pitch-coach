@@ -172,7 +172,7 @@ The implementation should use this feature as the foundation for future settings
 - [x] Add preferred audio input service support.
 - [x] Extract reusable range components.
 - [x] Build the settings dialog and section components.
-- [ ] Wire the sidebar footer and mobile entrypoint.
-- [ ] Wire settings updates into exercise, range, audio, and song capture flows.
-- [ ] Add component and browser coverage.
+- [x] Wire the sidebar footer and mobile entrypoint.
+- [x] Wire settings updates into exercise, range, audio, and song capture flows.
+- [x] Add component and browser coverage.
 - [ ] Run deterministic validation.

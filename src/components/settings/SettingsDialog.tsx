@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Activity, Mic, RotateCcw, Settings, Target, X } from "lucide-react";
 import type { AudioInputDevice } from "../../audio/types";
 import type { CoachSettings, VocalRange } from "../../domain/contracts";
@@ -92,19 +92,22 @@ export function SettingsDialog({
   onResetSettings
 }: SettingsDialogProps) {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("voice");
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
-      setActiveSection("voice");
+    if (!open) {
+      wasOpenRef.current = false;
       return;
     }
 
-    onStopInputLevelMonitor();
-  }, [onStopInputLevelMonitor, open]);
+    if (!wasOpenRef.current) {
+      setActiveSection("voice");
+      wasOpenRef.current = true;
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open || activeSection !== "audio") {
-      onStopInputLevelMonitor();
       return;
     }
 

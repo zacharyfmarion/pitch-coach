@@ -37,6 +37,7 @@ type ModalView = "edit" | "saved";
 type RangeSetupModalProps = {
   open: boolean;
   initialRange: VocalRange;
+  initialMode?: RangeSetupModalMode;
   captureState: RangeCaptureState;
   allowSkip?: boolean;
   completionLabel?: string;
@@ -52,6 +53,7 @@ type RangeSetupModalProps = {
 export function RangeSetupModal({
   open,
   initialRange,
+  initialMode = "manual",
   captureState,
   allowSkip = true,
   completionLabel = "Start practicing",
@@ -77,14 +79,14 @@ export function RangeSetupModal({
     }
 
     if (!wasOpenRef.current) {
-      setMode("manual");
+      setMode(initialMode);
       setView("edit");
       setSingStep("idle");
       setDraftRange(normalizeSetupRange(initialRange));
       window.setTimeout(() => dialogRef.current?.focus(), 0);
     }
     wasOpenRef.current = true;
-  }, [initialRange, open]);
+  }, [initialMode, initialRange, open]);
 
   useEffect(() => {
     if (!open || captureState.status !== "captured") {

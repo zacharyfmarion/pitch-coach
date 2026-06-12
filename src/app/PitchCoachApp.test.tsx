@@ -1,6 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AudioCaptureConfig, AudioInputEngine, PitchDetectorAdapter, PromptPlayer } from "../audio/types";
+import type {
+  AudioCaptureConfig,
+  AudioInputDevice,
+  AudioInputDeviceService,
+  AudioInputEngine,
+  PitchDetectorAdapter,
+  PromptPlayer
+} from "../audio/types";
 import type {
   CoachSettings,
   PitchFrame,
@@ -62,7 +69,7 @@ describe("PitchCoachApp", () => {
 
     expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
     expect(screen.getByText("Your local practice stats will build as you sing.")).toBeTruthy();
-    expect(screen.getByText("Local practice")).toBeTruthy();
+    expect(screen.getAllByText("Local practice").length).toBeGreaterThan(0);
     const brandLogo = document.querySelector<HTMLImageElement>(".shell-brand__logo");
     expect(brandLogo?.getAttribute("src")).toBe("/pitch-coach-logo.png");
     expect(brandLogo?.getAttribute("alt")).toBe("");
@@ -1011,6 +1018,111 @@ describe("PitchCoachApp", () => {
     expect(screen.queryByLabelText("Attempt history")).toBeNull();
   });
 
+  it("opens settings from the local footer and applies practice defaults to new lessons", async () => {
+    vi.useFakeTimers();
+    const services = createServices(stableFrames(0));
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
+    expect(screen.getByRole("dialog", { name: "Voice" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Practice.*Tempo & strictness/i }));
+    expect(screen.getByRole("dialog", { name: "Practice" })).toBeTruthy();
+    expect(screen.getByText("Default guide tempo")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Slow" }));
+    fireEvent.click(screen.getByRole("button", { name: "Strict" }));
+    expect(screen.getByText(/within \+\/-22 cents/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+
+    expect(services.promptPlayer.playPrompt).toHaveBeenCalledWith(
+      expect.any(Array),
+      70,
+      "chord-then-sequence"
+    );
+    expect(screen.getByText("22 cents")).toBeTruthy();
+  });
+
+  it("resets dialog settings without clearing local practice history", async () => {
+    await saveAttemptHistoryRecord(historyRecord("major-triad", 0, true));
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        initialSettings={{
+          ...ONBOARDED_SETTINGS,
+          defaultTempoBpm: 70,
+          tempoBpm: 70,
+          toleranceCents: 22,
+          preferredAudioInput: {
+            deviceId: "studio-mic",
+            label: "Studio Mic"
+          }
+        }}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 attempt logged")
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Practice.*Tempo & strictness/i }));
+    expect(screen.getByText("70 BPM")).toBeTruthy();
+    expect(screen.getByText(/within \+\/-22 cents/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
+    expect(screen.getByText("90 BPM")).toBeTruthy();
+    expect(screen.getByText(/within \+\/-35 cents/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 attempt logged")
+    );
+  });
+
+  it("selects a preferred microphone in settings and routes capture through it", async () => {
+    const services = {
+      ...createServices([{ timeMs: 0, frequencyHz: midiToFrequency(60), clarity: 0.96, rms: 0.08 }]),
+      audioInputs: createAudioInputService([
+        { deviceId: "default", label: "Built-in Microphone", isDefault: true },
+        { deviceId: "studio-mic", label: "Studio Mic" }
+      ])
+    };
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
+
+    await waitFor(() => expect(services.audioInputs.listDevices).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Audio.*Mic & input/i }));
+    await waitFor(() => expect(screen.getByLabelText("Input level").textContent).toContain("Listening locally"));
+
+    await chooseDropdownOption(screen.getByRole("combobox", { name: "Microphone" }), "Studio Mic");
+    await waitFor(() => expect(services.audioEngine.lastConfig?.deviceId).toBe("studio-mic"));
+
+    fireEvent.click(screen.getByRole("button", { name: /Refresh inputs/i }));
+    await waitFor(() => expect(services.audioInputs.requestPermission).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+
+    await waitFor(() => expect(services.audioEngine.lastConfig?.deviceId).toBe("studio-mic"));
+  });
+
+  it("hands off from settings voice retest into the singing range setup flow", () => {
+    render(<PitchCoachApp services={createServices(rangeCaptureFrames())} initialSettings={ONBOARDED_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Re-test by singing" }));
+
+    expect(screen.queryByRole("dialog", { name: "Voice" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start - sing your lowest" })).toBeTruthy();
+  });
+
   it("replaces invalid exercise routes with the home route", async () => {
     window.history.replaceState(null, "", "/exercises/not-real");
 
@@ -1250,6 +1362,18 @@ function createDeferredPromptServices(frames: PitchFrame[] = []) {
   return {
     services,
     resolvePrompt: () => resolvePromptPromise()
+  };
+}
+
+function createAudioInputService(devices: AudioInputDevice[]): AudioInputDeviceService & {
+  listDevices: ReturnType<typeof vi.fn>;
+  requestPermission: ReturnType<typeof vi.fn>;
+  subscribe: ReturnType<typeof vi.fn>;
+} {
+  return {
+    listDevices: vi.fn(() => Promise.resolve(devices)),
+    requestPermission: vi.fn(() => Promise.resolve(devices)),
+    subscribe: vi.fn(() => () => {})
   };
 }
 
