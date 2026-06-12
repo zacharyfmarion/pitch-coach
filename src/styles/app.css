@@ -736,14 +736,30 @@
   text-align: right;
 }
 
+.practice-main-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.practice-target-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+}
+
 .target-checkpoint-strip {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
   gap: var(--space-2);
+  min-width: 0;
   padding: var(--space-2) var(--space-3);
   margin: 0;
   overflow-x: auto;
-  border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-secondary);
   list-style: none;
 }
@@ -751,6 +767,7 @@
 .target-checkpoint {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   align-items: center;
   gap: 3px var(--space-2);
   min-width: 0;
@@ -784,11 +801,28 @@
   white-space: nowrap;
 }
 
-.target-checkpoint > span:last-child {
+.target-checkpoint__label {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-tertiary);
   font-size: 0.68rem;
   font-weight: 760;
   line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkpoint-status-legacy {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
 }
 
 .target-checkpoint--pass,
@@ -832,6 +866,36 @@
 .target-checkpoint--unclear .target-checkpoint__chip,
 .target-checkpoint--missed .target-checkpoint__chip {
   background: var(--status-danger);
+}
+
+.practice-score-readout {
+  display: grid;
+  flex: 0 0 auto;
+  align-content: center;
+  justify-items: end;
+  gap: 2px;
+  min-width: 82px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1.1;
+  text-align: right;
+}
+
+.practice-score-readout strong {
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.practice-score-readout strong span {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 760;
 }
 
 .timeline-frame {
