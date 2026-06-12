@@ -109,11 +109,7 @@ export function isPitchFirstAttemptComplete(
   if (targetSegments.some((target) => target.kind === "glide")) {
     const lastContour = score.alignment.at(-1)?.contour;
     const latestTimeMs = score.durationMs;
-    return Boolean(
-      score.passed &&
-        lastContour &&
-        latestTimeMs >= lastContour.endMs + policy.finalNoteSettleMs
-    );
+    return Boolean(lastContour && latestTimeMs >= lastContour.endMs + policy.finalNoteSettleMs);
   }
 
   const lastEvent = score.alignment.at(-1)?.event;

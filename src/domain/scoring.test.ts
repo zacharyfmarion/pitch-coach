@@ -214,6 +214,26 @@ describe("pitch-first attempt scoring", () => {
     expect(score.segments[0].score.status).toBe("wrongDirection");
   });
 
+  it("completes failed glides after the singer stops", () => {
+    const wrongDirectionFrames = [
+      ...glideFrames(glideTargets[0].toMidi, glideTargets[0].fromMidi, 0, 1400),
+      trailingFrame(1760)
+    ];
+    const offContourFrames = [
+      ...glideTargetFrames(glideTargets[0], 0, 1400, 90),
+      trailingFrame(1760)
+    ];
+
+    expect(scoreAttempt(wrongDirectionFrames, glideTargets, policy, settings.range).passed).toBe(false);
+    expect(
+      isPitchFirstAttemptComplete(wrongDirectionFrames, glideTargets, policy, settings.range)
+    ).toBe(true);
+    expect(scoreAttempt(offContourFrames, glideTargets, policy, settings.range).passed).toBe(false);
+    expect(isPitchFirstAttemptComplete(offContourFrames, glideTargets, policy, settings.range)).toBe(
+      true
+    );
+  });
+
   it("flags a glide that drifts away from the contour", () => {
     const score = scoreAttempt(
       glideTargetFrames(glideTargets[0], 0, 1400, 90),
