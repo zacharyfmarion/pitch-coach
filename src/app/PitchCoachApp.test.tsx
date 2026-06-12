@@ -1112,6 +1112,22 @@ describe("PitchCoachApp", () => {
     await waitFor(() => expect(services.audioEngine.lastConfig?.deviceId).toBe("studio-mic"));
   });
 
+  it("does not stop an active exercise capture when closing settings from the voice section", async () => {
+    const services = createServices([]);
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
+
+    openMajorTriad();
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await waitFor(() => expect(services.audioEngine.lastConfig).not.toBeNull());
+    const stopCountBeforeSettings = services.audioEngine.stopCount;
+
+    fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
+    expect(screen.getByRole("dialog", { name: "Voice" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(services.audioEngine.stopCount).toBe(stopCountBeforeSettings);
+  });
+
   it("hands off from settings voice retest into the singing range setup flow", () => {
     render(<PitchCoachApp services={createServices(rangeCaptureFrames())} initialSettings={ONBOARDED_SETTINGS} />);
 
@@ -1529,6 +1545,7 @@ function createTestSongBuffer(): SongStereoBuffer {
 
 class MockAudioEngine implements AudioInputEngine {
   lastConfig: AudioCaptureConfig | null = null;
+  stopCount = 0;
 
   constructor(
     private readonly frames: PitchFrame[],
@@ -1544,7 +1561,9 @@ class MockAudioEngine implements AudioInputEngine {
     this.frames.forEach(config.onPitchFrame);
   }
 
-  async stop() {}
+  async stop() {
+    this.stopCount += 1;
+  }
 
   isRunning() {
     return false;

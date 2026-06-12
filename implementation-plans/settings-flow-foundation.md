@@ -175,4 +175,4 @@ The implementation should use this feature as the foundation for future settings
 - [x] Wire the sidebar footer and mobile entrypoint.
 - [x] Wire settings updates into exercise, range, audio, and song capture flows.
 - [x] Add component and browser coverage.
-- [ ] Run deterministic validation.
+- [x] Run deterministic validation.
