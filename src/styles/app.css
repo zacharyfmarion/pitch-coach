@@ -394,6 +394,27 @@
   background: var(--bg-primary);
 }
 
+.mock-home--with-range-prompt,
+.mock-practice-page--with-range-prompt {
+  padding-bottom: 92px;
+}
+
+.range-prompt-floating {
+  position: fixed;
+  right: 0;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  left: 212px;
+  z-index: calc(var(--z-portaled-popover) - 2);
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-6);
+  pointer-events: none;
+}
+
+.range-prompt-floating .range-setup-toast {
+  pointer-events: auto;
+}
+
 .library-heading h2 {
   margin-top: 1px;
   color: var(--text-primary);
@@ -1408,6 +1429,10 @@
     min-width: 92px;
   }
 
+  .range-prompt-floating {
+    left: 0;
+  }
+
   .shell-page {
     padding: var(--space-3);
   }
@@ -1509,6 +1534,16 @@
   .library-heading {
     align-items: start;
     flex-direction: column;
+  }
+
+  .mock-home--with-range-prompt,
+  .mock-practice-page--with-range-prompt {
+    padding-bottom: 112px;
+  }
+
+  .range-prompt-floating {
+    bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
+    padding: 0 var(--space-3);
   }
 
   .progress-exercise-list li {

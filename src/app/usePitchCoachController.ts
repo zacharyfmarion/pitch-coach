@@ -5,7 +5,9 @@ import type {
   CoachSettings,
   ExerciseId,
   PitchFrame,
-  PracticeSessionRecord
+  PracticeSessionRecord,
+  VocalRange,
+  VocalRangeSetupSource
 } from "../domain/contracts";
 import {
   buildTargetNotes,
@@ -13,7 +15,8 @@ import {
   createScoringPolicy,
   EXERCISES,
   formatExercisePattern,
-  getExerciseById
+  getExerciseById,
+  normalizeRange
 } from "../domain/exercise";
 import {
   advanceAfterPass,
@@ -25,7 +28,7 @@ import {
   resolveAttempt,
   startPrompt
 } from "../domain/lessonMachine";
-import { midiToFrequency, midiToNoteName } from "../domain/music";
+import { frequencyToMidi, midiToFrequency, midiToNoteName } from "../domain/music";
 import {
   createAttemptHistoryRecord,
   createPracticeSessionRecord,
@@ -54,10 +57,39 @@ import {
   saveLatestAttemptClip
 } from "../storage/clipStorage";
 import { loadSettings, normalizeSettings, saveSettings } from "../storage/settingsStorage";
+import {
+  normalizeSetupRange,
+  VOCAL_RANGE_MAX_MIDI,
+  VOCAL_RANGE_MIN_MIDI
+} from "../domain/vocalRange";
 
 const PASS_ADVANCE_DELAY_MS = 900;
 const VOICE_START_RMS = 0.006;
 const MAX_RENDERED_FRAMES = 1000;
+const RANGE_CAPTURE_MIN_DURATION_MS = 900;
+
+export type RangeCaptureTarget = "low" | "high";
+
+export type RangeCaptureState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "listening";
+      target: RangeCaptureTarget;
+      latestMidi?: number;
+    }
+  | {
+      status: "captured";
+      target: RangeCaptureTarget;
+      latestMidi: number;
+      capturedMidi: number;
+    }
+  | {
+      status: "error";
+      target?: RangeCaptureTarget;
+      errorMessage: string;
+    };
 
 export type PitchCoachControllerOptions = {
   services?: PitchCoachServices;
@@ -98,6 +130,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const [clipErrorMessage, setClipErrorMessage] = useState<string | null>(null);
   const [attemptHistory, setAttemptHistory] = useState<AttemptHistoryRecord[]>([]);
   const [practiceSessions, setPracticeSessions] = useState<PracticeSessionRecord[]>([]);
+  const [rangeCaptureState, setRangeCaptureState] = useState<RangeCaptureState>({ status: "idle" });
 
   const runIdRef = useRef(0);
   const activeSessionRef = useRef<PracticeSessionRecord | null>(null);
@@ -110,6 +143,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const lessonStateRef = useRef(lessonState);
   const listeningTimerRef = useRef<number | null>(null);
   const passTimerRef = useRef<number | null>(null);
+  const rangeCaptureMidisRef = useRef<number[]>([]);
 
   const currentRootMidi = getCurrentRootMidi(lessonState) ?? selectedExercise.startRootMidi;
   const targetNotes = useMemo(
@@ -423,7 +457,102 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     finishStartedRef.current = false;
     pendingClipRef.current = null;
     setLessonState((current) => ({ ...current, status: "idle" }));
+    setRangeCaptureState((current) => (current.status === "listening" ? { status: "idle" } : current));
   }, [clearTimers, services]);
+
+  const saveRangeSetup = useCallback((range: VocalRange, source: VocalRangeSetupSource) => {
+    const normalizedRange = normalizeRange(normalizeSetupRange(range));
+    setSettingsState((current) =>
+      normalizeSettings({
+        ...current,
+        range: normalizedRange,
+        rangeSetup: {
+          status: "completed",
+          source,
+          completedAt: new Date().toISOString()
+        }
+      })
+    );
+  }, []);
+
+  const skipRangeSetup = useCallback(() => {
+    const skippedAt = new Date().toISOString();
+    setSettingsState((current) =>
+      normalizeSettings({
+        ...current,
+        rangeSetup: {
+          status: "skipped",
+          source: "default",
+          skippedAt,
+          lastPromptedAt: skippedAt
+        }
+      })
+    );
+  }, []);
+
+  const stopRangeCapture = useCallback(async () => {
+    runIdRef.current += 1;
+    rangeCaptureMidisRef.current = [];
+    await services.audioEngine.stop();
+    setRangeCaptureState({ status: "idle" });
+  }, [services.audioEngine]);
+
+  const startRangeCapture = useCallback(
+    async (target: RangeCaptureTarget) => {
+      await stopAttempt();
+      const runId = runIdRef.current + 1;
+      runIdRef.current = runId;
+      rangeCaptureMidisRef.current = [];
+      setRangeCaptureState({ status: "listening", target });
+
+      try {
+        await services.audioEngine.startCapture({
+          detector: services.detector,
+          bounds: {
+            minFrequencyHz: midiToFrequency(VOCAL_RANGE_MIN_MIDI),
+            maxFrequencyHz: midiToFrequency(VOCAL_RANGE_MAX_MIDI)
+          },
+          onPitchFrame: (frame) => {
+            if (runId !== runIdRef.current || frame.frequencyHz === null || frame.rms < VOICE_START_RMS) {
+              return;
+            }
+
+            const latestMidi = Math.round(frequencyToMidi(frame.frequencyHz));
+            rangeCaptureMidisRef.current.push(latestMidi);
+            setRangeCaptureState({ status: "listening", target, latestMidi });
+
+            if (frame.timeMs < RANGE_CAPTURE_MIN_DURATION_MS) {
+              return;
+            }
+
+            const capturedMidi =
+              target === "low"
+                ? Math.min(...rangeCaptureMidisRef.current)
+                : Math.max(...rangeCaptureMidisRef.current);
+            setRangeCaptureState({
+              status: "captured",
+              target,
+              latestMidi: capturedMidi,
+              capturedMidi
+            });
+            void services.audioEngine.stop();
+          }
+        });
+      } catch (error) {
+        if (runId !== runIdRef.current) {
+          return;
+        }
+
+        await services.audioEngine.stop();
+        setRangeCaptureState({
+          status: "error",
+          target,
+          errorMessage: createAudioErrorMessage(error)
+        });
+      }
+    },
+    [services, stopAttempt]
+  );
 
   useEffect(() => {
     void stopAttempt();
@@ -489,6 +618,11 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     clipErrorMessage,
     clearLocalAttemptHistory,
     deleteLocalClip,
+    rangeCaptureState,
+    saveRangeSetup,
+    skipRangeSetup,
+    startRangeCapture,
+    stopRangeCapture,
     startPracticeSession,
     endPracticeSession,
     startAttempt,

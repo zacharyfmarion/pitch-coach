@@ -13,6 +13,46 @@ describe("settingsStorage", () => {
     expect(normalizeSettings({}).themePreference).toEqual({ mode: "system" });
   });
 
+  it("defaults vocal range setup to unseen", () => {
+    expect(loadSettings().rangeSetup).toEqual({ status: "unseen", source: "default" });
+    expect(normalizeSettings({}).rangeSetup).toEqual({ status: "unseen", source: "default" });
+  });
+
+  it("persists vocal range setup metadata", () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      rangeSetup: {
+        status: "completed",
+        source: "manual",
+        completedAt: "2026-06-11T20:00:00.000Z"
+      }
+    });
+
+    expect(loadSettings().rangeSetup).toEqual({
+      status: "completed",
+      source: "manual",
+      completedAt: "2026-06-11T20:00:00.000Z",
+      skippedAt: undefined,
+      lastPromptedAt: undefined
+    });
+  });
+
+  it("marks legacy custom ranges as already completed", () => {
+    const settings = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      rangeSetup: undefined,
+      range: {
+        lowestMidi: 41,
+        highestMidi: 65
+      }
+    });
+
+    expect(settings.rangeSetup).toEqual({
+      status: "completed",
+      source: "manual"
+    });
+  });
+
   it("normalizes invalid theme preferences to system", () => {
     const settings = normalizeSettings({
       ...DEFAULT_SETTINGS,

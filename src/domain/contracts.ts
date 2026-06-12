@@ -43,8 +43,21 @@ export type VocalRange = {
   highestMidi: number;
 };
 
+export type VocalRangeSetupStatus = "unseen" | "skipped" | "completed";
+
+export type VocalRangeSetupSource = "default" | "manual" | "sing";
+
+export type VocalRangeSetup = {
+  status: VocalRangeSetupStatus;
+  source: VocalRangeSetupSource;
+  completedAt?: string;
+  skippedAt?: string;
+  lastPromptedAt?: string;
+};
+
 export type CoachSettings = {
   range: VocalRange;
+  rangeSetup: VocalRangeSetup;
   tempoBpm: number;
   toleranceCents: number;
   exerciseId: ExerciseId;

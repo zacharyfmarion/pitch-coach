@@ -1,6 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test("renders the pitch coach workspace", async ({ page }) => {
+  await seedOnboardedSettings(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
   await expect(page.getByText("Your local practice stats will build as you sing.")).toBeVisible();
@@ -31,13 +32,84 @@ test("renders the pitch coach workspace", async ({ page }) => {
 });
 
 test("opens exercise routes directly", async ({ page }) => {
+  await seedOnboardedSettings(page);
   await page.goto("/exercises/major-triad");
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
   await expect(page.getByText("A3 major")).toBeVisible();
 });
 
+test("shows range setup from Start lesson without a detail-page prompt", async ({ page }) => {
+  await page.goto("/exercises/major-triad");
+
+  await expect(page.getByRole("status", { name: "Default vocal range" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Start lesson" }).click();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Range keyboard from C3 to C5" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Bass" }).click();
+  await expect(page.getByRole("img", { name: "Range keyboard from E2 to E4" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Save range" }).click();
+  await expect(page.getByRole("dialog", { name: "Range saved" })).toBeVisible();
+  await expect(page.getByText(/between E2 and E4/)).toBeVisible();
+});
+
+test("shows the compact default range prompt on home while range is unset", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toHaveCount(0);
+
+  const prompt = await expectBottomFloatingDefaultRangePrompt(page);
+
+  await prompt.getByRole("button", { name: "Set my range" }).click();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();
+});
+
+test("shows the compact default range prompt on the practice list while range is unset", async ({ page }) => {
+  await page.goto("/practice");
+
+  await expect(page.getByRole("heading", { name: "Practice Library" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toHaveCount(0);
+
+  const prompt = await expectBottomFloatingDefaultRangePrompt(page);
+
+  await prompt.getByRole("button", { name: "Set my range" }).click();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();
+});
+
+async function expectBottomFloatingDefaultRangePrompt(page: Page) {
+  const prompt = page.getByRole("status", { name: "Default vocal range" });
+  await expect(prompt).toBeVisible();
+  await expect(prompt).toContainText("Using a default range");
+  await expect(prompt).toContainText("C3");
+  await expect(prompt).toContainText("C5");
+  await expect(prompt.getByRole("button", { name: "Set my range" })).toBeVisible();
+  await expect(page.locator(".range-prompt-floating")).toHaveCount(1);
+
+  const box = await page.locator(".range-setup-toast").boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) {
+    throw new Error("Expected default range prompt bounds");
+  }
+  expect(box.width).toBeLessThanOrEqual(560);
+  expect(box.height).toBeLessThanOrEqual(70);
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  if (!viewport) {
+    throw new Error("Expected viewport dimensions");
+  }
+  expect(box.y).toBeGreaterThan(viewport.height * 0.7);
+  expect(viewport.height - (box.y + box.height)).toBeLessThanOrEqual(40);
+
+  return prompt;
+}
+
 test("navigates the shell and renders progress from local history", async ({ page }) => {
+  await seedOnboardedSettings(page);
   await page.goto("/");
   await seedAttemptHistory(page, [browserAttemptRecord()]);
 
@@ -63,6 +135,7 @@ test("navigates the shell and renders progress from local history", async ({ pag
 });
 
 test("groups repeated exercise attempts into one recent progress session", async ({ page }) => {
+  await seedOnboardedSettings(page);
   await page.goto("/");
   await seedAttemptHistory(page, [
     browserAttemptRecord({
@@ -123,6 +196,7 @@ test("opens song mode directly without starting model download on unsupported br
 });
 
 test("keeps the exercise usable on a mobile viewport", async ({ page }) => {
+  await seedOnboardedSettings(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
@@ -144,6 +218,7 @@ test("uses the mock theme without exposing theme choices", async ({ page }) => {
 });
 
 test("shows and clears local attempt history", async ({ page }) => {
+  await seedOnboardedSettings(page);
   await page.goto("/");
   await seedAttemptHistory(page, [browserAttemptRecord()]);
   await page.goto("/exercises/major-triad");
@@ -228,6 +303,33 @@ async function seedAttemptHistory(page: import("@playwright/test").Page, records
       }),
     records
   );
+}
+
+async function seedOnboardedSettings(page: import("@playwright/test").Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "pitch-coach-settings-v1",
+      JSON.stringify({
+        range: {
+          lowestMidi: 48,
+          highestMidi: 72
+        },
+        rangeSetup: {
+          status: "completed",
+          source: "manual",
+          completedAt: "2026-06-11T20:00:00.000Z"
+        },
+        tempoBpm: 80,
+        toleranceCents: 35,
+        exerciseId: "major-triad",
+        saveLocalClips: false,
+        timingMode: "pitch-first",
+        themePreference: {
+          mode: "system"
+        }
+      })
+    );
+  });
 }
 
 function browserAttemptRecord(

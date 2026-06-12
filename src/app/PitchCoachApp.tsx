@@ -27,6 +27,11 @@ import {
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { FeedbackList } from "../components/FeedbackList";
 import { PitchTimeline } from "../components/PitchTimeline";
+import {
+  RangeControlSummary,
+  RangeSetupModal,
+  RangeSetupToast
+} from "../components/range/RangeSetupModal";
 import { AppShell } from "../components/ui/AppShell";
 import { Button } from "../components/ui/Button";
 import {
@@ -44,6 +49,7 @@ import { StatusPill } from "../components/ui/StatusPill";
 import { Toggle } from "../components/ui/Toggle";
 import type {
   AttemptScore,
+  CoachSettings,
   ExerciseCategory,
   ExerciseDefinition,
   ExerciseId,
@@ -78,6 +84,8 @@ type ExercisePracticeAppProps = {
   songServices?: SongModeServices;
 };
 
+type RangeSetupRequest = "start" | "edit";
+
 function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePracticeAppProps) {
   const coach = usePitchCoachController({
     ...coachOptions,
@@ -86,6 +94,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const activeTheme = usePitchCoachTheme(coach.settings.themePreference);
   const activePracticeExerciseId =
     router.route.screen === "practice" ? router.route.exerciseId : null;
+  const [rangeSetupRequest, setRangeSetupRequest] = useState<RangeSetupRequest | null>(null);
 
   useEffect(() => {
     if (
@@ -101,6 +110,13 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
       void coach.stopAttempt();
     }
   }, [coach.stopAttempt, router.route.screen]);
+
+  useEffect(() => {
+    if (router.route.screen !== "practice") {
+      setRangeSetupRequest(null);
+      void coach.stopRangeCapture();
+    }
+  }, [coach.stopRangeCapture, router.route.screen]);
 
   useEffect(() => {
     if (!activePracticeExerciseId) {
@@ -145,6 +161,47 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     router.goBackToLibraryFallback();
   };
 
+  const closeRangeSetup = () => {
+    void coach.stopRangeCapture();
+    setRangeSetupRequest(null);
+  };
+
+  const continueAfterRangeSetup = () => {
+    const shouldStart = rangeSetupRequest === "start";
+    void coach.stopRangeCapture();
+    setRangeSetupRequest(null);
+    if (shouldStart) {
+      void coach.startAttempt();
+    }
+  };
+
+  const skipRangeSetup = () => {
+    const shouldStart = rangeSetupRequest === "start";
+    void coach.stopRangeCapture();
+    coach.skipRangeSetup();
+    setRangeSetupRequest(null);
+    if (shouldStart) {
+      void coach.startAttempt();
+    }
+  };
+
+  const rangeSetupModal = (
+    <RangeSetupModal
+      open={rangeSetupRequest !== null}
+      initialRange={coach.settings.range}
+      captureState={coach.rangeCaptureState}
+      allowSkip={rangeSetupRequest === "start"}
+      savedContext={rangeSetupRequest === "edit" ? "edit" : "start"}
+      completionLabel={rangeSetupRequest === "edit" ? "Done" : "Start practicing"}
+      onStartCapture={(target) => void coach.startRangeCapture(target)}
+      onStopCapture={() => void coach.stopRangeCapture()}
+      onSave={coach.saveRangeSetup}
+      onSkip={skipRangeSetup}
+      onDismiss={closeRangeSetup}
+      onContinue={continueAfterRangeSetup}
+    />
+  );
+
   if (router.route.screen !== "practice") {
     return (
       <MainShell
@@ -159,6 +216,9 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             exerciseProgress={coach.exerciseProgress}
             practiceSummary={coach.practiceSummary}
             recommendedExercise={coach.recommendedExercise}
+            range={coach.settings.range}
+            rangeSetupStatus={coach.settings.rangeSetup.status}
+            onOpenRangeSetup={() => setRangeSetupRequest("edit")}
             onSelectExercise={openExercise}
             onNavigateToPractice={() => router.navigateToLibrary()}
             onNavigateToSongs={() => router.navigateToSongs()}
@@ -170,6 +230,9 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             selectedExerciseId={coach.selectedExercise.id}
             exerciseProgress={coach.exerciseProgress}
             practiceSummary={coach.practiceSummary}
+            range={coach.settings.range}
+            rangeSetupStatus={coach.settings.rangeSetup.status}
+            onOpenRangeSetup={() => setRangeSetupRequest("edit")}
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
@@ -184,11 +247,24 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             onSelectExercise={openExercise}
           />
         )}
+        {rangeSetupModal}
       </MainShell>
     );
   }
 
-  const primaryAction = coach.lessonState.status === "complete" ? coach.resetLesson : coach.startAttempt;
+  const primaryAction = async () => {
+    if (coach.lessonState.status === "complete") {
+      await coach.resetLesson();
+      return;
+    }
+
+    if (coach.settings.rangeSetup.status === "unseen") {
+      setRangeSetupRequest("start");
+      return;
+    }
+
+    await coach.startAttempt();
+  };
   const primaryLabel =
     coach.lessonState.status === "retry"
       ? coach.selectedExercise.id === "major-triad"
@@ -201,10 +277,6 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
     value: exercise.id,
     label: exercise.title
   })) satisfies DropdownOption<(typeof coach.exercises)[number]["id"]>[];
-  const noteOptions = coach.noteOptions.map((note) => ({
-    value: note.midi,
-    label: note.label
-  })) satisfies DropdownOption<number>[];
   const practiceStatusView = createPracticeStatusView(coach.lessonState.status, coach.attemptScore);
   const coachGuidance = createCoachGuidance({
     status: coach.lessonState.status,
@@ -348,40 +420,11 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
                   <CardTitle>Range</CardTitle>
                 </CardHeader>
                 <CardContent className="control-group__body">
-                  <label>
-                    <span>Low</span>
-                    <Dropdown
-                      ariaLabel="Low"
-                      value={coach.settings.range.lowestMidi}
-                      options={noteOptions}
-                      onValueChange={(lowestMidi) =>
-                        coach.setSettings({
-                          ...coach.settings,
-                          range: {
-                            ...coach.settings.range,
-                            lowestMidi
-                          }
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>High</span>
-                    <Dropdown
-                      ariaLabel="High"
-                      value={coach.settings.range.highestMidi}
-                      options={noteOptions}
-                      onValueChange={(highestMidi) =>
-                        coach.setSettings({
-                          ...coach.settings,
-                          range: {
-                            ...coach.settings.range,
-                            highestMidi
-                          }
-                        })
-                      }
-                    />
-                  </label>
+                  <RangeControlSummary
+                    range={coach.settings.range}
+                    status={coach.settings.rangeSetup.status}
+                    onEdit={() => setRangeSetupRequest("edit")}
+                  />
                 </CardContent>
               </Card>
 
@@ -548,6 +591,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             </aside>
           </section>
         </section>
+        {rangeSetupModal}
       </main>
     </MainShell>
   );
@@ -887,18 +931,30 @@ type LibraryScreenProps = {
   disabled: boolean;
 };
 
-type HomeScreenProps = LibraryScreenProps & {
-  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
-  recommendedExercise: ReturnType<typeof usePitchCoachController>["recommendedExercise"];
-  onNavigateToPractice: () => void;
-  onNavigateToSongs: () => void;
+type RangeSetupPromptProps = {
+  range: CoachSettings["range"];
+  rangeSetupStatus: CoachSettings["rangeSetup"]["status"];
+  onOpenRangeSetup: () => void;
 };
+
+type PracticeLibraryScreenProps = LibraryScreenProps & RangeSetupPromptProps;
+
+type HomeScreenProps = LibraryScreenProps &
+  RangeSetupPromptProps & {
+    practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+    recommendedExercise: ReturnType<typeof usePitchCoachController>["recommendedExercise"];
+    onNavigateToPractice: () => void;
+    onNavigateToSongs: () => void;
+  };
 
 function HomeScreen({
   exercises,
   exerciseProgress,
   practiceSummary,
   recommendedExercise,
+  range,
+  rangeSetupStatus,
+  onOpenRangeSetup,
   onSelectExercise,
   onNavigateToPractice,
   onNavigateToSongs,
@@ -909,9 +965,13 @@ function HomeScreen({
   const exerciseCoveragePercent =
     exercises.length > 0 ? Math.round((completedExerciseCount / exercises.length) * 100) : 0;
   const hasRecommendedHistory = recommendedProgress.attemptCount > 0;
+  const showRangeSetupPrompt = rangeSetupStatus !== "completed";
 
   return (
-    <main className="mock-home" aria-label="Pitch coach home">
+    <main
+      className={`mock-home ${showRangeSetupPrompt ? "mock-home--with-range-prompt" : ""}`.trim()}
+      aria-label="Pitch coach home"
+    >
       <section className="mock-home__header">
         <div>
           <h1>Good evening</h1>
@@ -1065,6 +1125,7 @@ function HomeScreen({
           unit="min"
         />
       </section>
+      {showRangeSetupPrompt ? <RangeSetupFloatingPrompt range={range} onOpen={onOpenRangeSetup} /> : null}
     </main>
   );
 }
@@ -1231,11 +1292,36 @@ function AccuracySparkline({
   );
 }
 
-function PracticeLibraryScreen(props: LibraryScreenProps) {
+function PracticeLibraryScreen({
+  range,
+  rangeSetupStatus,
+  onOpenRangeSetup,
+  ...libraryProps
+}: PracticeLibraryScreenProps) {
+  const showRangeSetupPrompt = rangeSetupStatus !== "completed";
+
   return (
-    <main className="mock-practice-page" aria-label="Pitch coach exercises">
-      <ExerciseLibrary {...props} />
+    <main
+      className={`mock-practice-page ${showRangeSetupPrompt ? "mock-practice-page--with-range-prompt" : ""}`.trim()}
+      aria-label="Pitch coach exercises"
+    >
+      <ExerciseLibrary {...libraryProps} />
+      {showRangeSetupPrompt ? <RangeSetupFloatingPrompt range={range} onOpen={onOpenRangeSetup} /> : null}
     </main>
+  );
+}
+
+function RangeSetupFloatingPrompt({
+  range,
+  onOpen
+}: {
+  range: CoachSettings["range"];
+  onOpen: () => void;
+}) {
+  return (
+    <div className="range-prompt-floating">
+      <RangeSetupToast range={range} onOpen={onOpen} />
+    </div>
   );
 }
 
