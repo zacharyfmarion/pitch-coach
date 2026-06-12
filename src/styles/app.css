@@ -21,6 +21,8 @@
   height: 34px;
   flex: 0 0 auto;
   place-items: center;
+  padding: 2px;
+  border: 1px solid #fd9065;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: #fff;
@@ -31,6 +33,7 @@
   display: block;
   width: 100%;
   height: 100%;
+  border-radius: inherit;
   object-fit: cover;
 }
 
