@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pitch Coach</title>
+    <link rel="icon" type="image/png" href="%BASE_URL%favicon.png" />
+    <link rel="apple-touch-icon" href="%BASE_URL%pitch-coach-logo.png" />
     <style>
       :root {
         --mock-outer: #f6efe4;
@@ -97,15 +99,20 @@
       .shell-brand__mark {
         width: 48px !important;
         height: 48px !important;
+        padding: 2px !important;
+        border: 1px solid #fd9065 !important;
         border-radius: 14px !important;
-        background: linear-gradient(145deg, #fb9b72 0%, #ed7656 100%) !important;
-        box-shadow: 0 14px 26px rgba(238, 129, 93, 0.26) !important;
+        overflow: hidden !important;
+        background: #fff !important;
+        box-shadow: 0 14px 26px rgba(238, 129, 93, 0.18) !important;
       }
 
-      .shell-brand__mark svg {
-        width: 24px;
-        height: 24px;
-        stroke-width: 2.4;
+      .shell-brand__logo {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        object-fit: cover;
       }
 
       .shell-brand__name {
@@ -1467,11 +1474,6 @@
         border-radius: 12px !important;
       }
 
-      .shell-brand__mark svg {
-        width: 21px;
-        height: 21px;
-      }
-
       .shell-brand__name {
         font-size: 21px !important;
         letter-spacing: 0 !important;
@@ -2017,15 +2019,12 @@
       .shell-brand__mark {
         width: 34px !important;
         height: 34px !important;
+        padding: 2px !important;
+        border: 1px solid #fd9065 !important;
         border-radius: 11px !important;
-        background: linear-gradient(145deg, #ff9f6b, var(--mock-coral)) !important;
-        box-shadow: 0 6px 16px rgba(238, 108, 77, 0.32) !important;
-      }
-
-      .shell-brand__mark svg {
-        width: 19px !important;
-        height: 19px !important;
-        stroke-width: 2 !important;
+        overflow: hidden !important;
+        background: #fff !important;
+        box-shadow: 0 6px 16px rgba(238, 108, 77, 0.18) !important;
       }
 
       .shell-brand__name {
