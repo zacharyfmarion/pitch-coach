@@ -83,6 +83,8 @@ type ExercisePracticeAppProps = {
   songServices?: SongModeServices;
 };
 
+type RangeSetupRequest = "prompt" | "start" | "edit";
+
 function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePracticeAppProps) {
   const coach = usePitchCoachController({
     ...coachOptions,
@@ -91,7 +93,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const activeTheme = usePitchCoachTheme(coach.settings.themePreference);
   const activePracticeExerciseId =
     router.route.screen === "practice" ? router.route.exerciseId : null;
-  const [rangeSetupRequest, setRangeSetupRequest] = useState<"start" | "edit" | null>(null);
+  const [rangeSetupRequest, setRangeSetupRequest] = useState<RangeSetupRequest | null>(null);
 
   useEffect(() => {
     if (
@@ -114,6 +116,18 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
       void coach.stopRangeCapture();
     }
   }, [coach.stopRangeCapture, router.route.screen]);
+
+  useEffect(() => {
+    if (
+      router.route.screen !== "practice" ||
+      coach.settings.rangeSetup.status !== "unseen" ||
+      rangeSetupRequest !== null
+    ) {
+      return;
+    }
+
+    setRangeSetupRequest("prompt");
+  }, [coach.settings.rangeSetup.status, rangeSetupRequest, router.route.screen]);
 
   useEffect(() => {
     if (!activePracticeExerciseId) {
@@ -164,8 +178,18 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   };
 
   const continueAfterRangeSetup = () => {
+    const shouldStart = rangeSetupRequest === "start" || rangeSetupRequest === "prompt";
+    void coach.stopRangeCapture();
+    setRangeSetupRequest(null);
+    if (shouldStart) {
+      void coach.startAttempt();
+    }
+  };
+
+  const skipRangeSetup = () => {
     const shouldStart = rangeSetupRequest === "start";
     void coach.stopRangeCapture();
+    coach.skipRangeSetup();
     setRangeSetupRequest(null);
     if (shouldStart) {
       void coach.startAttempt();
@@ -558,17 +582,17 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
           open={rangeSetupRequest !== null}
           initialRange={coach.settings.range}
           captureState={coach.rangeCaptureState}
-          allowSkip={rangeSetupRequest === "start"}
-          savedContext={rangeSetupRequest === "start" ? "start" : "edit"}
-          completionLabel={rangeSetupRequest === "start" ? "Start practicing" : "Done"}
+          allowSkip={rangeSetupRequest !== "edit"}
+          savedContext={rangeSetupRequest === "edit" ? "edit" : "start"}
+          completionLabel={rangeSetupRequest === "edit" ? "Done" : "Start practicing"}
           onStartCapture={(target) => void coach.startRangeCapture(target)}
           onStopCapture={() => void coach.stopRangeCapture()}
           onSave={coach.saveRangeSetup}
-          onSkip={coach.skipRangeSetup}
+          onSkip={skipRangeSetup}
           onDismiss={closeRangeSetup}
           onContinue={continueAfterRangeSetup}
         />
-        {coach.settings.rangeSetup.status === "skipped" && rangeSetupRequest === null ? (
+        {coach.settings.rangeSetup.status !== "completed" && rangeSetupRequest === null ? (
           <RangeSetupToast range={coach.settings.range} onOpen={() => setRangeSetupRequest("edit")} />
         ) : null}
       </main>

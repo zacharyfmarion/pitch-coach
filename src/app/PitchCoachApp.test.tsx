@@ -194,14 +194,13 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
   });
 
-  it("opens first-run range setup before the first lesson and starts after saving", async () => {
+  it("opens first-run range setup when entering practice and starts after saving", async () => {
     const services = createServices(stableFrames(0));
     render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
 
-    expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
     expect(services.promptPlayer.playPrompt).not.toHaveBeenCalled();
     expect(screen.getAllByText("C3-C5").length).toBeGreaterThan(0);
 
@@ -218,19 +217,20 @@ describe("PitchCoachApp", () => {
     );
   });
 
-  it("can skip first-run setup and re-open it from the recovery banner", async () => {
+  it("can skip first-run setup and re-open it from the default range prompt", async () => {
     const services = createServices(stableFrames(0));
     render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    expect(await screen.findByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
 
     const skipButtons = screen.getAllByRole("button", { name: "Skip for now" });
     fireEvent.click(skipButtons.at(-1)!);
     await flushReact();
 
-    expect(services.promptPlayer.playPrompt).toHaveBeenCalled();
-    expect(screen.getByText(/Using a default range - C3-C5/)).toBeTruthy();
+    expect(services.promptPlayer.playPrompt).not.toHaveBeenCalled();
+    expect(screen.getByText(/Using a default range/).textContent).toContain("C3");
+    expect(screen.getByText(/Using a default range/).textContent).toContain("C5");
 
     fireEvent.click(screen.getByRole("button", { name: "Set my range" }));
     expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();

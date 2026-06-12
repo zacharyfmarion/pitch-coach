@@ -132,3 +132,6 @@ The production flow should use the refined range setup modal from `Pitch Coach R
 - [x] Wire exercise-start gating and range edit entry points.
 - [x] Add unit, component, browser, and visual verification coverage.
 - [x] Run deterministic validation.
+- [x] Follow-up: auto-open setup on first practice route entry.
+- [x] Follow-up: show the mock default-range prompt whenever setup is not completed.
+- [x] Follow-up: extend reference pitch playback duration in the modal.

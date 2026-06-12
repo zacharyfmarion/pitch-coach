@@ -151,7 +151,6 @@ export function RangeSetupModal({
   function handleSkip() {
     onStopCapture();
     onSkip();
-    onContinue();
   }
 
   function handleSave() {
@@ -725,13 +724,15 @@ export function RangeSetupToast({
   onOpen: () => void;
 }) {
   return (
-    <div className="range-setup-toast" role="status">
+    <div className="range-setup-toast" role="status" aria-label="Default vocal range">
       <span className="range-setup-toast__icon" aria-hidden="true">
         <Target size={17} />
       </span>
       <span className="range-setup-toast__copy">
         <strong>
-          Using a default range - {midiToNoteName(range.lowestMidi)}-{midiToNoteName(range.highestMidi)}
+          Using a default range {"\u00b7"} {midiToNoteName(range.lowestMidi)}
+          {"\u2013"}
+          {midiToNoteName(range.highestMidi)}
         </strong>
         <span>Set yours so drills fit your voice.</span>
       </span>
@@ -759,7 +760,7 @@ export function RangeControlSummary({
         </strong>
         <span>
           {formatOctaveSpan(range.lowestMidi, range.highestMidi)} oct - {guessVoiceType(range.lowestMidi, range.highestMidi)}
-          {status === "skipped" ? " - default" : ""}
+          {status !== "completed" ? " - default" : ""}
         </span>
       </div>
       <button type="button" onClick={onEdit}>
@@ -802,15 +803,18 @@ function playReferenceTone(midi: number) {
     const oscillator = referenceToneContext.createOscillator();
     const gain = referenceToneContext.createGain();
     const now = referenceToneContext.currentTime;
+    const sustainUntil = now + 2.35;
+    const stopAt = sustainUntil + 0.28;
     oscillator.type = "sine";
     oscillator.frequency.value = midiToFrequency(midi);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.62);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.04);
+    gain.gain.setValueAtTime(0.18, sustainUntil);
+    gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
     oscillator.connect(gain);
     gain.connect(referenceToneContext.destination);
     oscillator.start(now);
-    oscillator.stop(now + 0.66);
+    oscillator.stop(stopAt + 0.02);
   } catch {
     // Reference tones are an optional affordance; setup still works without Web Audio.
   }
