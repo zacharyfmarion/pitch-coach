@@ -394,11 +394,12 @@
   background: var(--bg-primary);
 }
 
+.mock-home--with-range-prompt,
 .mock-practice-page--with-range-prompt {
   padding-bottom: 92px;
 }
 
-.practice-range-floating {
+.range-prompt-floating {
   position: fixed;
   right: 0;
   bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
@@ -410,7 +411,7 @@
   pointer-events: none;
 }
 
-.practice-range-floating .range-setup-toast {
+.range-prompt-floating .range-setup-toast {
   pointer-events: auto;
 }
 
@@ -1428,7 +1429,7 @@
     min-width: 92px;
   }
 
-  .practice-range-floating {
+  .range-prompt-floating {
     left: 0;
   }
 
@@ -1535,11 +1536,12 @@
     flex-direction: column;
   }
 
+  .mock-home--with-range-prompt,
   .mock-practice-page--with-range-prompt {
     padding-bottom: 112px;
   }
 
-  .practice-range-floating {
+  .range-prompt-floating {
     bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
     padding: 0 var(--space-3);
   }

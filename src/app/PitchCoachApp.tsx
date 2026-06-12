@@ -216,6 +216,9 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             exerciseProgress={coach.exerciseProgress}
             practiceSummary={coach.practiceSummary}
             recommendedExercise={coach.recommendedExercise}
+            range={coach.settings.range}
+            rangeSetupStatus={coach.settings.rangeSetup.status}
+            onOpenRangeSetup={() => setRangeSetupRequest("edit")}
             onSelectExercise={openExercise}
             onNavigateToPractice={() => router.navigateToLibrary()}
             onNavigateToSongs={() => router.navigateToSongs()}
@@ -928,24 +931,30 @@ type LibraryScreenProps = {
   disabled: boolean;
 };
 
-type PracticeLibraryScreenProps = LibraryScreenProps & {
+type RangeSetupPromptProps = {
   range: CoachSettings["range"];
   rangeSetupStatus: CoachSettings["rangeSetup"]["status"];
   onOpenRangeSetup: () => void;
 };
 
-type HomeScreenProps = LibraryScreenProps & {
-  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
-  recommendedExercise: ReturnType<typeof usePitchCoachController>["recommendedExercise"];
-  onNavigateToPractice: () => void;
-  onNavigateToSongs: () => void;
-};
+type PracticeLibraryScreenProps = LibraryScreenProps & RangeSetupPromptProps;
+
+type HomeScreenProps = LibraryScreenProps &
+  RangeSetupPromptProps & {
+    practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
+    recommendedExercise: ReturnType<typeof usePitchCoachController>["recommendedExercise"];
+    onNavigateToPractice: () => void;
+    onNavigateToSongs: () => void;
+  };
 
 function HomeScreen({
   exercises,
   exerciseProgress,
   practiceSummary,
   recommendedExercise,
+  range,
+  rangeSetupStatus,
+  onOpenRangeSetup,
   onSelectExercise,
   onNavigateToPractice,
   onNavigateToSongs,
@@ -956,9 +965,13 @@ function HomeScreen({
   const exerciseCoveragePercent =
     exercises.length > 0 ? Math.round((completedExerciseCount / exercises.length) * 100) : 0;
   const hasRecommendedHistory = recommendedProgress.attemptCount > 0;
+  const showRangeSetupPrompt = rangeSetupStatus !== "completed";
 
   return (
-    <main className="mock-home" aria-label="Pitch coach home">
+    <main
+      className={`mock-home ${showRangeSetupPrompt ? "mock-home--with-range-prompt" : ""}`.trim()}
+      aria-label="Pitch coach home"
+    >
       <section className="mock-home__header">
         <div>
           <h1>Good evening</h1>
@@ -1112,6 +1125,7 @@ function HomeScreen({
           unit="min"
         />
       </section>
+      {showRangeSetupPrompt ? <RangeSetupFloatingPrompt range={range} onOpen={onOpenRangeSetup} /> : null}
     </main>
   );
 }
@@ -1292,12 +1306,22 @@ function PracticeLibraryScreen({
       aria-label="Pitch coach exercises"
     >
       <ExerciseLibrary {...libraryProps} />
-      {showRangeSetupPrompt ? (
-        <div className="practice-range-floating">
-          <RangeSetupToast range={range} onOpen={onOpenRangeSetup} />
-        </div>
-      ) : null}
+      {showRangeSetupPrompt ? <RangeSetupFloatingPrompt range={range} onOpen={onOpenRangeSetup} /> : null}
     </main>
+  );
+}
+
+function RangeSetupFloatingPrompt({
+  range,
+  onOpen
+}: {
+  range: CoachSettings["range"];
+  onOpen: () => void;
+}) {
+  return (
+    <div className="range-prompt-floating">
+      <RangeSetupToast range={range} onOpen={onOpen} />
+    </div>
   );
 }
 

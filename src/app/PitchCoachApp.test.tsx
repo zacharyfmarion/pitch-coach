@@ -194,6 +194,23 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
   });
 
+  it("shows the default range prompt on the home screen until range is set", () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Set your vocal range" })).toBeNull();
+    expect(screen.getByText(/Using a default range/).textContent).toContain("C3");
+    expect(screen.getByText(/Using a default range/).textContent).toContain("C5");
+
+    fireEvent.click(screen.getByRole("button", { name: "Set my range" }));
+    expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save range" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(screen.queryByText(/Using a default range/)).toBeNull();
+  });
+
   it("shows the default range prompt on the practice library until range is set", async () => {
     window.history.replaceState(null, "", "/practice");
 

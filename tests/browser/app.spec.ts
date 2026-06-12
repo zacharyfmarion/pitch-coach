@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test("renders the pitch coach workspace", async ({ page }) => {
   await seedOnboardedSettings(page);
@@ -57,18 +57,38 @@ test("shows range setup from Start lesson without a detail-page prompt", async (
   await expect(page.getByText(/between E2 and E4/)).toBeVisible();
 });
 
+test("shows the compact default range prompt on home while range is unset", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toHaveCount(0);
+
+  const prompt = await expectBottomFloatingDefaultRangePrompt(page);
+
+  await prompt.getByRole("button", { name: "Set my range" }).click();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();
+});
+
 test("shows the compact default range prompt on the practice list while range is unset", async ({ page }) => {
   await page.goto("/practice");
 
   await expect(page.getByRole("heading", { name: "Practice Library" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toHaveCount(0);
 
+  const prompt = await expectBottomFloatingDefaultRangePrompt(page);
+
+  await prompt.getByRole("button", { name: "Set my range" }).click();
+  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();
+});
+
+async function expectBottomFloatingDefaultRangePrompt(page: Page) {
   const prompt = page.getByRole("status", { name: "Default vocal range" });
   await expect(prompt).toBeVisible();
   await expect(prompt).toContainText("Using a default range");
   await expect(prompt).toContainText("C3");
   await expect(prompt).toContainText("C5");
   await expect(prompt.getByRole("button", { name: "Set my range" })).toBeVisible();
+  await expect(page.locator(".range-prompt-floating")).toHaveCount(1);
 
   const box = await page.locator(".range-setup-toast").boundingBox();
   expect(box).not.toBeNull();
@@ -85,9 +105,8 @@ test("shows the compact default range prompt on the practice list while range is
   expect(box.y).toBeGreaterThan(viewport.height * 0.7);
   expect(viewport.height - (box.y + box.height)).toBeLessThanOrEqual(40);
 
-  await prompt.getByRole("button", { name: "Set my range" }).click();
-  await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();
-});
+  return prompt;
+}
 
 test("navigates the shell and renders progress from local history", async ({ page }) => {
   await seedOnboardedSettings(page);
