@@ -383,6 +383,10 @@
   background: var(--bg-secondary);
 }
 
+.exercise-library--with-range-setup {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
 .library-heading {
   display: flex;
   align-items: center;
@@ -392,6 +396,16 @@
   padding: 7px var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-primary);
+}
+
+.library-range-setup {
+  display: flex;
+  justify-content: center;
+  padding: 12px var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent),
+    var(--bg-secondary);
 }
 
 .library-heading h2 {

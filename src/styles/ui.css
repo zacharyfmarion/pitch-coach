@@ -1832,44 +1832,39 @@ output {
 }
 
 .range-setup-toast {
-  position: fixed;
-  right: auto;
-  bottom: 32px;
-  left: 50%;
-  z-index: calc(var(--z-portaled-popover) - 2);
   display: flex;
   align-items: center;
-  gap: 30px;
-  width: min(786px, calc(100vw - 48px));
-  min-height: 123px;
-  padding: 26px 32px 26px 39px;
-  border-radius: 28px;
+  gap: 16px;
+  width: fit-content;
+  max-width: min(560px, 100%);
+  min-height: 56px;
+  padding: 13px 16px 13px 20px;
+  border-radius: 14px;
   color: var(--text-inverse);
   background: #2b221d;
-  box-shadow: 0 20px 54px rgba(29, 20, 14, 0.3);
-  transform: translateX(-50%);
-  animation: range-toast-in 0.26s ease;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  animation: range-setup-in 0.26s ease;
 }
 
 .range-setup-toast__icon {
   display: grid;
-  width: 53px;
-  height: 53px;
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.13);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .range-setup-toast__icon svg {
-  width: 26px;
-  height: 26px;
+  width: 17px;
+  height: 17px;
 }
 
 .range-setup-toast__copy {
   display: grid;
   flex: 1 1 auto;
-  gap: 4px;
+  gap: 1px;
   min-width: 0;
 }
 
@@ -1882,30 +1877,28 @@ output {
 
 .range-setup-toast__copy strong {
   color: #fffdf9;
-  font-family: var(--font-display);
-  font-size: 1.52rem;
+  font-size: 0.84rem;
   font-weight: 760;
   letter-spacing: 0;
-  line-height: 1.05;
+  line-height: 1.2;
 }
 
 .range-setup-toast__copy span {
   color: rgba(255, 253, 249, 0.72);
-  font-size: 1.42rem;
-  font-weight: 520;
-  line-height: 1.08;
+  font-size: 0.75rem;
+  font-weight: 620;
+  line-height: 1.2;
 }
 
 .range-setup-toast button {
   flex: 0 0 auto;
-  min-width: 219px;
-  min-height: 70px;
-  padding: 0 30px;
-  border-radius: 17px;
+  min-height: 36px;
+  padding: 0 15px;
+  border-radius: 10px;
   color: var(--text-inverse);
   background: var(--accent-primary);
   font: inherit;
-  font-size: 1.45rem;
+  font-size: 0.84rem;
   font-weight: 760;
   cursor: pointer;
 }
@@ -1961,18 +1954,6 @@ output {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes range-toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 8px) scale(0.99);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
   }
 }
 
@@ -2102,28 +2083,23 @@ output {
   }
 
   .range-setup-toast {
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
     align-items: stretch;
     flex-direction: column;
-    gap: 18px;
-    width: auto;
+    gap: 10px;
+    width: 100%;
     min-height: auto;
-    padding: 20px;
-    border-radius: 22px;
-    transform: none;
-    animation: range-setup-in 0.26s ease;
-  }
-
-  .range-setup-toast__icon {
-    width: 46px;
-    height: 46px;
+    padding: 14px;
     border-radius: 14px;
   }
 
+  .range-setup-toast__icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
   .range-setup-toast__copy {
-    gap: 5px;
+    gap: 2px;
   }
 
   .range-setup-toast__copy strong,
@@ -2132,19 +2108,19 @@ output {
   }
 
   .range-setup-toast__copy strong {
-    font-size: 1.15rem;
+    font-size: 0.9rem;
     line-height: 1.12;
   }
 
   .range-setup-toast__copy span {
-    font-size: 1rem;
+    font-size: 0.8rem;
     line-height: 1.18;
   }
 
   .range-setup-toast button {
     width: 100%;
     min-width: 0;
-    min-height: 52px;
-    font-size: 1rem;
+    min-height: 40px;
+    font-size: 0.86rem;
   }
 }

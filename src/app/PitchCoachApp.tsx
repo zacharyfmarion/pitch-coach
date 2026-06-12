@@ -49,6 +49,7 @@ import { StatusPill } from "../components/ui/StatusPill";
 import { Toggle } from "../components/ui/Toggle";
 import type {
   AttemptScore,
+  CoachSettings,
   ExerciseCategory,
   ExerciseDefinition,
   ExerciseId,
@@ -83,7 +84,7 @@ type ExercisePracticeAppProps = {
   songServices?: SongModeServices;
 };
 
-type RangeSetupRequest = "prompt" | "start" | "edit";
+type RangeSetupRequest = "start" | "edit";
 
 function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePracticeAppProps) {
   const coach = usePitchCoachController({
@@ -116,18 +117,6 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
       void coach.stopRangeCapture();
     }
   }, [coach.stopRangeCapture, router.route.screen]);
-
-  useEffect(() => {
-    if (
-      router.route.screen !== "practice" ||
-      coach.settings.rangeSetup.status !== "unseen" ||
-      rangeSetupRequest !== null
-    ) {
-      return;
-    }
-
-    setRangeSetupRequest("prompt");
-  }, [coach.settings.rangeSetup.status, rangeSetupRequest, router.route.screen]);
 
   useEffect(() => {
     if (!activePracticeExerciseId) {
@@ -178,7 +167,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   };
 
   const continueAfterRangeSetup = () => {
-    const shouldStart = rangeSetupRequest === "start" || rangeSetupRequest === "prompt";
+    const shouldStart = rangeSetupRequest === "start";
     void coach.stopRangeCapture();
     setRangeSetupRequest(null);
     if (shouldStart) {
@@ -195,6 +184,23 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
       void coach.startAttempt();
     }
   };
+
+  const rangeSetupModal = (
+    <RangeSetupModal
+      open={rangeSetupRequest !== null}
+      initialRange={coach.settings.range}
+      captureState={coach.rangeCaptureState}
+      allowSkip={rangeSetupRequest === "start"}
+      savedContext={rangeSetupRequest === "edit" ? "edit" : "start"}
+      completionLabel={rangeSetupRequest === "edit" ? "Done" : "Start practicing"}
+      onStartCapture={(target) => void coach.startRangeCapture(target)}
+      onStopCapture={() => void coach.stopRangeCapture()}
+      onSave={coach.saveRangeSetup}
+      onSkip={skipRangeSetup}
+      onDismiss={closeRangeSetup}
+      onContinue={continueAfterRangeSetup}
+    />
+  );
 
   if (router.route.screen !== "practice") {
     return (
@@ -221,6 +227,9 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             selectedExerciseId={coach.selectedExercise.id}
             exerciseProgress={coach.exerciseProgress}
             practiceSummary={coach.practiceSummary}
+            range={coach.settings.range}
+            rangeSetupStatus={coach.settings.rangeSetup.status}
+            onOpenRangeSetup={() => setRangeSetupRequest("edit")}
             onSelectExercise={openExercise}
             disabled={coach.isBusy}
           />
@@ -235,6 +244,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             onSelectExercise={openExercise}
           />
         )}
+        {rangeSetupModal}
       </MainShell>
     );
   }
@@ -578,23 +588,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
             </aside>
           </section>
         </section>
-        <RangeSetupModal
-          open={rangeSetupRequest !== null}
-          initialRange={coach.settings.range}
-          captureState={coach.rangeCaptureState}
-          allowSkip={rangeSetupRequest !== "edit"}
-          savedContext={rangeSetupRequest === "edit" ? "edit" : "start"}
-          completionLabel={rangeSetupRequest === "edit" ? "Done" : "Start practicing"}
-          onStartCapture={(target) => void coach.startRangeCapture(target)}
-          onStopCapture={() => void coach.stopRangeCapture()}
-          onSave={coach.saveRangeSetup}
-          onSkip={skipRangeSetup}
-          onDismiss={closeRangeSetup}
-          onContinue={continueAfterRangeSetup}
-        />
-        {coach.settings.rangeSetup.status !== "completed" && rangeSetupRequest === null ? (
-          <RangeSetupToast range={coach.settings.range} onOpen={() => setRangeSetupRequest("edit")} />
-        ) : null}
+        {rangeSetupModal}
       </main>
     </MainShell>
   );
@@ -932,6 +926,12 @@ type LibraryScreenProps = {
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
   disabled: boolean;
+};
+
+type PracticeLibraryScreenProps = LibraryScreenProps & {
+  range: CoachSettings["range"];
+  rangeSetupStatus: CoachSettings["rangeSetup"]["status"];
+  onOpenRangeSetup: () => void;
 };
 
 type HomeScreenProps = LibraryScreenProps & {
@@ -1278,10 +1278,22 @@ function AccuracySparkline({
   );
 }
 
-function PracticeLibraryScreen(props: LibraryScreenProps) {
+function PracticeLibraryScreen({
+  range,
+  rangeSetupStatus,
+  onOpenRangeSetup,
+  ...libraryProps
+}: PracticeLibraryScreenProps) {
   return (
     <main className="mock-practice-page" aria-label="Pitch coach exercises">
-      <ExerciseLibrary {...props} />
+      <ExerciseLibrary
+        {...libraryProps}
+        rangeSetupBanner={
+          rangeSetupStatus !== "completed" ? (
+            <RangeSetupToast range={range} onOpen={onOpenRangeSetup} />
+          ) : null
+        }
+      />
     </main>
   );
 }
@@ -1982,6 +1994,7 @@ type ExerciseLibraryProps = {
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
   disabled: boolean;
+  rangeSetupBanner?: ReactNode;
 };
 
 type ExerciseCategoryFilter = "all" | ExerciseCategory;
@@ -2007,7 +2020,8 @@ function ExerciseLibrary({
   exerciseProgress,
   practiceSummary,
   onSelectExercise,
-  disabled
+  disabled,
+  rangeSetupBanner
 }: ExerciseLibraryProps) {
   const [activeCategory, setActiveCategory] = useState<ExerciseCategoryFilter>("all");
   const categoryItems = useMemo(
@@ -2048,7 +2062,10 @@ function ExerciseLibrary({
   );
 
   return (
-    <section className="exercise-library" aria-label="Exercise library">
+    <section
+      className={`exercise-library ${rangeSetupBanner ? "exercise-library--with-range-setup" : ""}`.trim()}
+      aria-label="Exercise library"
+    >
       <div className="library-heading">
         <div>
           <h1>Practice Library</h1>
@@ -2071,6 +2088,7 @@ function ExerciseLibrary({
           </span>
         </div>
       </div>
+      {rangeSetupBanner ? <div className="library-range-setup">{rangeSetupBanner}</div> : null}
       <div className="library-filters">
         <SidebarTabs
           value={activeCategory}

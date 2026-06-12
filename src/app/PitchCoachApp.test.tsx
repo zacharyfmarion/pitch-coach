@@ -194,11 +194,34 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: "Start lesson" })).toBeTruthy();
   });
 
-  it("opens first-run range setup when entering practice and starts after saving", async () => {
+  it("shows the default range prompt on the practice library until range is set", async () => {
+    window.history.replaceState(null, "", "/practice");
+
+    render(<PitchCoachApp services={createServices([])} initialSettings={DEFAULT_SETTINGS} />);
+
+    expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Set your vocal range" })).toBeNull();
+    expect(screen.getByText(/Using a default range/).textContent).toContain("C3");
+    expect(screen.getByText(/Using a default range/).textContent).toContain("C5");
+
+    fireEvent.click(screen.getByRole("button", { name: "Set my range" }));
+    expect(screen.getByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save range" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(screen.queryByText(/Using a default range/)).toBeNull();
+  });
+
+  it("opens first-run range setup from Start lesson and starts after saving", async () => {
     const services = createServices(stableFrames(0));
     render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
+    expect(screen.queryByText(/Using a default range/)).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Set your vocal range" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
 
     expect(await screen.findByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
     expect(services.promptPlayer.playPrompt).not.toHaveBeenCalled();
@@ -217,18 +240,23 @@ describe("PitchCoachApp", () => {
     );
   });
 
-  it("can skip first-run setup and re-open it from the default range prompt", async () => {
-    const services = createServices(stableFrames(0));
-    render(<PitchCoachApp services={services} initialSettings={DEFAULT_SETTINGS} />);
+  it("shows the default range prompt on the library after skipping setup", async () => {
+    window.history.replaceState(null, "", "/practice");
+    render(
+      <PitchCoachApp
+        services={createServices([])}
+        initialSettings={{
+          ...DEFAULT_SETTINGS,
+          rangeSetup: {
+            status: "skipped",
+            source: "default",
+            skippedAt: "2026-06-12T15:00:00.000Z"
+          }
+        }}
+      />
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
-    expect(await screen.findByRole("dialog", { name: "Set your vocal range" })).toBeTruthy();
-
-    const skipButtons = screen.getAllByRole("button", { name: "Skip for now" });
-    fireEvent.click(skipButtons.at(-1)!);
-    await flushReact();
-
-    expect(services.promptPlayer.playPrompt).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
     expect(screen.getByText(/Using a default range/).textContent).toContain("C3");
     expect(screen.getByText(/Using a default range/).textContent).toContain("C5");
 

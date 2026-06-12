@@ -135,3 +135,4 @@ The production flow should use the refined range setup modal from `Pitch Coach R
 - [x] Follow-up: auto-open setup on first practice route entry.
 - [x] Follow-up: show the mock default-range prompt whenever setup is not completed.
 - [x] Follow-up: extend reference pitch playback duration in the modal.
+- [x] Follow-up: move the default-range prompt to the practice list and shrink it to mock scale.
