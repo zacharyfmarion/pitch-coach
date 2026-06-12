@@ -1284,16 +1284,19 @@ function PracticeLibraryScreen({
   onOpenRangeSetup,
   ...libraryProps
 }: PracticeLibraryScreenProps) {
+  const showRangeSetupPrompt = rangeSetupStatus !== "completed";
+
   return (
-    <main className="mock-practice-page" aria-label="Pitch coach exercises">
-      <ExerciseLibrary
-        {...libraryProps}
-        rangeSetupBanner={
-          rangeSetupStatus !== "completed" ? (
-            <RangeSetupToast range={range} onOpen={onOpenRangeSetup} />
-          ) : null
-        }
-      />
+    <main
+      className={`mock-practice-page ${showRangeSetupPrompt ? "mock-practice-page--with-range-prompt" : ""}`.trim()}
+      aria-label="Pitch coach exercises"
+    >
+      <ExerciseLibrary {...libraryProps} />
+      {showRangeSetupPrompt ? (
+        <div className="practice-range-floating">
+          <RangeSetupToast range={range} onOpen={onOpenRangeSetup} />
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -1994,7 +1997,6 @@ type ExerciseLibraryProps = {
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   onSelectExercise: (exerciseId: ReturnType<typeof usePitchCoachController>["selectedExercise"]["id"]) => void;
   disabled: boolean;
-  rangeSetupBanner?: ReactNode;
 };
 
 type ExerciseCategoryFilter = "all" | ExerciseCategory;
@@ -2020,8 +2022,7 @@ function ExerciseLibrary({
   exerciseProgress,
   practiceSummary,
   onSelectExercise,
-  disabled,
-  rangeSetupBanner
+  disabled
 }: ExerciseLibraryProps) {
   const [activeCategory, setActiveCategory] = useState<ExerciseCategoryFilter>("all");
   const categoryItems = useMemo(
@@ -2062,10 +2063,7 @@ function ExerciseLibrary({
   );
 
   return (
-    <section
-      className={`exercise-library ${rangeSetupBanner ? "exercise-library--with-range-setup" : ""}`.trim()}
-      aria-label="Exercise library"
-    >
+    <section className="exercise-library" aria-label="Exercise library">
       <div className="library-heading">
         <div>
           <h1>Practice Library</h1>
@@ -2088,7 +2086,6 @@ function ExerciseLibrary({
           </span>
         </div>
       </div>
-      {rangeSetupBanner ? <div className="library-range-setup">{rangeSetupBanner}</div> : null}
       <div className="library-filters">
         <SidebarTabs
           value={activeCategory}

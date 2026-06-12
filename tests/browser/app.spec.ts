@@ -77,6 +77,13 @@ test("shows the compact default range prompt on the practice list while range is
   }
   expect(box.width).toBeLessThanOrEqual(560);
   expect(box.height).toBeLessThanOrEqual(70);
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  if (!viewport) {
+    throw new Error("Expected viewport dimensions");
+  }
+  expect(box.y).toBeGreaterThan(viewport.height * 0.7);
+  expect(viewport.height - (box.y + box.height)).toBeLessThanOrEqual(40);
 
   await prompt.getByRole("button", { name: "Set my range" }).click();
   await expect(page.getByRole("dialog", { name: "Set your vocal range" })).toBeVisible();

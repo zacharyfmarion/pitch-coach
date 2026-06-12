@@ -383,10 +383,6 @@
   background: var(--bg-secondary);
 }
 
-.exercise-library--with-range-setup {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-}
-
 .library-heading {
   display: flex;
   align-items: center;
@@ -398,14 +394,24 @@
   background: var(--bg-primary);
 }
 
-.library-range-setup {
+.mock-practice-page--with-range-prompt {
+  padding-bottom: 92px;
+}
+
+.practice-range-floating {
+  position: fixed;
+  right: 0;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  left: 212px;
+  z-index: calc(var(--z-portaled-popover) - 2);
   display: flex;
   justify-content: center;
-  padding: 12px var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent),
-    var(--bg-secondary);
+  padding: 0 var(--space-6);
+  pointer-events: none;
+}
+
+.practice-range-floating .range-setup-toast {
+  pointer-events: auto;
 }
 
 .library-heading h2 {
@@ -1422,6 +1428,10 @@
     min-width: 92px;
   }
 
+  .practice-range-floating {
+    left: 0;
+  }
+
   .shell-page {
     padding: var(--space-3);
   }
@@ -1523,6 +1533,15 @@
   .library-heading {
     align-items: start;
     flex-direction: column;
+  }
+
+  .mock-practice-page--with-range-prompt {
+    padding-bottom: 112px;
+  }
+
+  .practice-range-floating {
+    bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
+    padding: 0 var(--space-3);
   }
 
   .progress-exercise-list li {
