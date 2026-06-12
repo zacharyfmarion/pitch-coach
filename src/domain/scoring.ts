@@ -1,13 +1,15 @@
 import type {
   AttemptAlignment,
   AttemptScore,
-  NoteAssessment,
-  NoteWarning,
+  SegmentWarning,
   PitchFrame,
-  ScoredTargetNote,
+  ScoredTargetSegment,
+  SegmentAssessment,
+  SungContourEvent,
   ScoringPolicy,
   SungNoteEvent,
-  TargetNote,
+  TargetNoteSegment,
+  TargetSegment,
   VocalRange
 } from "./contracts";
 import { frequencyToMidi, midiToFrequency, midiToNoteName } from "./music";
@@ -43,45 +45,71 @@ type AlignmentResult = {
 
 export function scoreAttempt(
   frames: PitchFrame[],
-  targetNotes: TargetNote[],
+  targetSegments: TargetSegment[],
+  policy: ScoringPolicy,
+  range: VocalRange
+): AttemptScore {
+  const noteTargets = targetSegments.filter(isTargetNoteSegment);
+  if (noteTargets.length === targetSegments.length) {
+    return scoreStableNoteAttempt(frames, noteTargets, policy, range);
+  }
+
+  return scoreContourAttempt(frames, targetSegments, policy, range);
+}
+
+function scoreStableNoteAttempt(
+  frames: PitchFrame[],
+  targetNotes: TargetNoteSegment[],
   policy: ScoringPolicy,
   range: VocalRange
 ): AttemptScore {
   const events = extractSungNoteEvents(frames, policy, range);
   const { alignment, ignoredEventIndices } = alignEventsToTargets(events, targetNotes, policy);
   const noEventAssessment = createNoEventAssessment(frames, range);
-  const notes = alignment.map(({ target, event }) => ({
-    ...target,
-    sungEvent: event,
-    score: event
-      ? scoreAlignedEvent(event, target, policy)
-      : events.length === 0
-        ? noEventAssessment
-        : unresolvedAssessment("missed", "No sung note was detected for this target.")
-  }));
-  const passed = notes.every((note) => isPassingStatus(note.score.status));
+  const segments = alignment.map(({ target, event }) => {
+    const noteTarget = target as TargetNoteSegment;
+    return {
+      ...noteTarget,
+      sungEvent: event,
+      score: event
+        ? scoreAlignedEvent(event, noteTarget, policy)
+        : events.length === 0
+          ? noEventAssessment
+          : unresolvedAssessment("missed", "No sung note was detected for this target.")
+    };
+  });
+  const passed = segments.every((segment) => isPassingStatus(segment.score.status));
 
   return {
     passed,
-    notes,
+    segments,
     events,
+    contourEvents: [],
     alignment,
     ignoredEventIndices,
     durationMs: Math.max(...frames.map((frame) => frame.timeMs), 0),
-    summary: createAttemptSummary(notes, passed)
+    summary: createAttemptSummary(segments, passed)
   };
 }
 
 export function isPitchFirstAttemptComplete(
   frames: PitchFrame[],
-  targetNotes: TargetNote[],
+  targetSegments: TargetSegment[],
   policy: ScoringPolicy,
   range: VocalRange
 ) {
-  const score = scoreAttempt(frames, targetNotes, policy, range);
-  const allTargetsHaveEvents = score.alignment.every((item) => item.event !== undefined);
+  const score = scoreAttempt(frames, targetSegments, policy, range);
+  const allTargetsHaveEvents = score.alignment.every((item) =>
+    item.target.kind === "glide" ? item.contour !== undefined : item.event !== undefined
+  );
   if (!allTargetsHaveEvents) {
     return false;
+  }
+
+  if (targetSegments.some((target) => target.kind === "glide")) {
+    const lastContour = score.alignment.at(-1)?.contour;
+    const latestTimeMs = score.durationMs;
+    return Boolean(lastContour && latestTimeMs >= lastContour.endMs + policy.finalNoteSettleMs);
   }
 
   const lastEvent = score.alignment.at(-1)?.event;
@@ -118,12 +146,12 @@ export function extractSungNoteEvents(
 
 function scoreAlignedEvent(
   event: SungNoteEvent,
-  target: TargetNote,
+  target: TargetNoteSegment,
   policy: ScoringPolicy
-): NoteAssessment {
+): SegmentAssessment {
   const medianCents = (event.medianMidi - target.midi) * 100;
   const warnings = collectEventWarnings(event, medianCents, policy);
-  const base: Omit<NoteAssessment, "status" | "instruction"> = {
+  const base: Omit<SegmentAssessment, "status" | "instruction"> = {
     medianCents,
     stableStartMs: event.stableStartMs,
     stableEndMs: event.stableEndMs,
@@ -140,7 +168,7 @@ function scoreAlignedEvent(
       status,
       instruction:
         status === "pass"
-          ? `${target.label} centered.`
+          ? `${target.noteName} centered.`
           : createWarningInstruction(warnings, medianCents)
     };
   }
@@ -149,7 +177,7 @@ function scoreAlignedEvent(
     return {
       ...base,
       status: "wrongNote",
-      instruction: `${target.label} landed closer to ${midiToNoteName(
+      instruction: `${target.noteName} landed closer to ${midiToNoteName(
         Math.round(event.medianMidi)
       )}. Check the target and retry.`
     };
@@ -158,7 +186,7 @@ function scoreAlignedEvent(
   return {
     ...base,
     status: medianCents < 0 ? "flat" : "sharp",
-    instruction: `${target.label} was ${Math.abs(Math.round(medianCents))} cents ${
+    instruction: `${target.noteName} was ${Math.abs(Math.round(medianCents))} cents ${
       medianCents < 0 ? "flat" : "sharp"
     }.`
   };
@@ -365,9 +393,208 @@ function expandEventEnd(
   return index;
 }
 
+function scoreContourAttempt(
+  frames: PitchFrame[],
+  targetSegments: TargetSegment[],
+  policy: ScoringPolicy,
+  range: VocalRange
+): AttemptScore {
+  const voicedFrames = buildVoicedFrames(frames, range);
+  const noEventAssessment = createNoEventAssessment(frames, range);
+  const { alignment, contourEvents } = alignContoursToTargets(voicedFrames, targetSegments, policy);
+  const segments = alignment.map(({ target, contour }) => ({
+    ...target,
+    sungContour: contour,
+    score:
+      target.kind === "glide"
+        ? scoreGlideContour(target, contour, noEventAssessment, policy)
+        : unresolvedAssessment("missed", "No sung note was detected for this target.")
+  }));
+  const passed = segments.every((segment) => isPassingStatus(segment.score.status));
+
+  return {
+    passed,
+    segments,
+    events: [],
+    contourEvents,
+    alignment,
+    ignoredEventIndices: [],
+    durationMs: Math.max(...frames.map((frame) => frame.timeMs), 0),
+    summary: createAttemptSummary(segments, passed)
+  };
+}
+
+function alignContoursToTargets(
+  voicedFrames: VoicedFrame[],
+  targetSegments: TargetSegment[],
+  policy: ScoringPolicy
+) {
+  const contourEvents: SungContourEvent[] = [];
+  const alignment: AttemptAlignment[] = [];
+  const totalTargetDurationMs = targetSegments.reduce(
+    (total, target) => total + Math.max(1, target.endMs - target.startMs),
+    0
+  );
+  const firstFrame = voicedFrames[0];
+  const lastFrame = voicedFrames.at(-1);
+  const sungDurationMs =
+    firstFrame && lastFrame ? Math.max(1, lastFrame.timeMs - firstFrame.timeMs) : 0;
+  let targetCursorMs = 0;
+
+  targetSegments.forEach((target, targetIndex) => {
+    if (target.kind !== "glide" || !firstFrame || !lastFrame || voicedFrames.length < MIN_EVENT_FRAMES) {
+      alignment.push({ targetIndex, target });
+      targetCursorMs += Math.max(1, target.endMs - target.startMs);
+      return;
+    }
+
+    const targetDurationMs = Math.max(1, target.endMs - target.startMs);
+    const startRatio = targetCursorMs / Math.max(1, totalTargetDurationMs);
+    const endRatio = (targetCursorMs + targetDurationMs) / Math.max(1, totalTargetDurationMs);
+    const contourStartMs = firstFrame.timeMs + sungDurationMs * startRatio;
+    const contourEndMs = firstFrame.timeMs + sungDurationMs * endRatio;
+    const contourFrames = voicedFrames.filter((frame) => {
+      if (targetIndex === targetSegments.length - 1) {
+        return frame.timeMs >= contourStartMs && frame.timeMs <= contourEndMs;
+      }
+      return frame.timeMs >= contourStartMs && frame.timeMs < contourEndMs;
+    });
+    const contour = createContourEvent(target, contourFrames, contourEvents.length, policy);
+    if (contour) {
+      contourEvents.push(contour);
+      alignment.push({
+        targetIndex,
+        target,
+        contourIndex: contourEvents.length - 1,
+        contour
+      });
+    } else {
+      alignment.push({ targetIndex, target });
+    }
+    targetCursorMs += targetDurationMs;
+  });
+
+  return { alignment, contourEvents };
+}
+
+function createContourEvent(
+  target: Extract<TargetSegment, { kind: "glide" }>,
+  frames: VoicedFrame[],
+  eventIndex: number,
+  policy: ScoringPolicy
+): SungContourEvent | null {
+  if (frames.length < MIN_EVENT_FRAMES) {
+    return null;
+  }
+
+  const startMs = frames[0].timeMs;
+  const endMs = frames.at(-1)!.timeMs;
+  const durationMs = Math.max(1, endMs - startMs);
+  if (durationMs < policy.minStableDurationMs) {
+    return null;
+  }
+
+  const expectedDeltaMidi = target.toMidi - target.fromMidi;
+  const errorCents = frames.map((frame, index) => {
+    const progress =
+      durationMs <= 1
+        ? index / Math.max(1, frames.length - 1)
+        : (frame.timeMs - startMs) / durationMs;
+    const expectedMidi = target.fromMidi + expectedDeltaMidi * Math.min(1, Math.max(0, progress));
+    return (frame.smoothedMidi - expectedMidi) * 100;
+  });
+  const voicedDurationMs = frames.reduce((total, frame, index) => {
+    const next = frames[index + 1];
+    return total + (next ? Math.min(policy.maxDropoutMs, Math.max(0, next.timeMs - frame.timeMs)) : 0);
+  }, 0);
+
+  return {
+    id: `contour-${eventIndex}`,
+    startMs,
+    endMs,
+    fromMidi: frames[0].smoothedMidi,
+    toMidi: frames.at(-1)!.smoothedMidi,
+    voicedCoverage: Math.min(1, voicedDurationMs / durationMs),
+    medianErrorCents: median(errorCents),
+    medianAbsErrorCents: median(errorCents.map(Math.abs)),
+    startCents: (frames[0].smoothedMidi - target.fromMidi) * 100,
+    endCents: (frames.at(-1)!.smoothedMidi - target.toMidi) * 100,
+    contourSpreadCents: robustSpread(errorCents)
+  };
+}
+
+function scoreGlideContour(
+  target: Extract<TargetSegment, { kind: "glide" }>,
+  contour: SungContourEvent | undefined,
+  noEventAssessment: SegmentAssessment,
+  policy: ScoringPolicy
+): SegmentAssessment {
+  if (!contour) {
+    return {
+      ...noEventAssessment,
+      instruction:
+        noEventAssessment.status === "missed"
+          ? `${target.label} was missed. Try the glide again.`
+          : `${target.label} was not clear enough to score.`
+    };
+  }
+
+  const expectedDirection = Math.sign(target.toMidi - target.fromMidi);
+  const actualDirection = Math.sign(contour.toMidi - contour.fromMidi);
+  const warnings = collectContourWarnings(contour, policy);
+  const base: Omit<SegmentAssessment, "status" | "instruction"> = {
+    medianCents: contour.medianErrorCents,
+    contourErrorCents: contour.medianAbsErrorCents,
+    startCents: contour.startCents,
+    endCents: contour.endCents,
+    stableStartMs: contour.startMs,
+    stableEndMs: contour.endMs,
+    voicedCoverage: contour.voicedCoverage,
+    stabilityCents: contour.contourSpreadCents,
+    warnings
+  };
+
+  if (contour.voicedCoverage < policy.minVoicedCoverage) {
+    return {
+      ...base,
+      status: "unclear",
+      instruction: `${target.label} dropped out before there was enough clear pitch to score.`
+    };
+  }
+
+  if (expectedDirection !== 0 && actualDirection !== 0 && expectedDirection !== actualDirection) {
+    return {
+      ...base,
+      status: "wrongDirection",
+      instruction: `${target.label} moved the wrong direction. Follow the guide line and try again.`
+    };
+  }
+
+  const endpointErrorCents = Math.max(Math.abs(contour.startCents), Math.abs(contour.endCents));
+  if (contour.medianAbsErrorCents > policy.toleranceCents || endpointErrorCents > policy.toleranceCents) {
+    return {
+      ...base,
+      status: "offContour",
+      instruction: `${target.label} drifted ${Math.round(
+        Math.max(contour.medianAbsErrorCents, endpointErrorCents)
+      )} cents from the guide.`
+    };
+  }
+
+  const status = warnings.length > 0 ? "passWithWarning" : "pass";
+  return {
+    ...base,
+    status,
+    instruction:
+      status === "pass"
+        ? `${target.label} followed the guide.`
+        : createContourWarningInstruction(warnings, contour)
+  };
+}
+
 function alignEventsToTargets(
   events: SungNoteEvent[],
-  targetNotes: TargetNote[],
+  targetNotes: TargetNoteSegment[],
   policy: ScoringPolicy
 ): AlignmentResult {
   const targetCount = targetNotes.length;
@@ -449,7 +676,7 @@ function alignEventsToTargets(
   return { alignment, ignoredEventIndices: [...ignoredEventIndices].sort((a, b) => a - b) };
 }
 
-function assignmentCost(event: SungNoteEvent, target: TargetNote, policy: ScoringPolicy) {
+function assignmentCost(event: SungNoteEvent, target: TargetNoteSegment, policy: ScoringPolicy) {
   const cents = Math.abs((event.medianMidi - target.midi) * 100);
   const wrongNotePenalty = cents >= policy.wrongNoteCents ? 35 : 0;
   return Math.min(cents, 240) + wrongNotePenalty;
@@ -459,8 +686,8 @@ function collectEventWarnings(
   event: SungNoteEvent,
   medianCents: number,
   policy: ScoringPolicy
-): NoteWarning[] {
-  const warnings = new Set<NoteWarning>();
+): SegmentWarning[] {
+  const warnings = new Set<SegmentWarning>();
   const stableDurationMs = event.stableEndMs - event.stableStartMs;
 
   if (event.stableStartMs - event.startMs > 80) {
@@ -486,11 +713,30 @@ function collectEventWarnings(
   return sortWarnings([...warnings]);
 }
 
+function collectContourWarnings(contour: SungContourEvent, policy: ScoringPolicy): SegmentWarning[] {
+  const warnings = new Set<SegmentWarning>();
+  const endpointErrorCents = Math.max(Math.abs(contour.startCents), Math.abs(contour.endCents));
+
+  if (endpointErrorCents > policy.toleranceCents * 0.7 && endpointErrorCents <= policy.toleranceCents) {
+    warnings.add("endpointDrift");
+  }
+
+  if (contour.contourSpreadCents > policy.mildWobbleCents) {
+    warnings.add("unevenGlide");
+  }
+
+  if (contour.voicedCoverage < 0.72) {
+    warnings.add("dropout");
+  }
+
+  return sortWarnings([...warnings]);
+}
+
 function unresolvedAssessment(
   status: "missed" | "unclear" | "unstable",
   instruction: string,
   voicedCoverage = 0
-): NoteAssessment {
+): SegmentAssessment {
   return {
     status,
     voicedCoverage,
@@ -499,7 +745,7 @@ function unresolvedAssessment(
   };
 }
 
-function createNoEventAssessment(frames: PitchFrame[], range: VocalRange): NoteAssessment {
+function createNoEventAssessment(frames: PitchFrame[], range: VocalRange): SegmentAssessment {
   if (frames.length === 0) {
     return unresolvedAssessment("missed", "No sung note was detected for this target.");
   }
@@ -532,53 +778,63 @@ function createNoEventAssessment(frames: PitchFrame[], range: VocalRange): NoteA
   );
 }
 
-function createAttemptSummary(notes: ScoredTargetNote[], passed: boolean) {
-  const firstIssue = notes.find((note) => !isPassingStatus(note.score.status));
+function createAttemptSummary(segments: ScoredTargetSegment[], passed: boolean) {
+  const firstIssue = segments.find((segment) => !isPassingStatus(segment.score.status));
   if (firstIssue) {
     return createFailureSummary(firstIssue);
   }
 
-  const firstWarning = notes.find((note) => note.score.status === "passWithWarning");
+  const firstWarning = segments.find((segment) => segment.score.status === "passWithWarning");
   if (passed && firstWarning) {
-    return `${firstWarning.label} was in tune, with a ${describeWarning(firstWarning.score.warnings[0])}. Moving on.`;
+    return `${describeSegmentTarget(firstWarning)} passed, with a ${describeWarning(
+      firstWarning.score.warnings[0]
+    )}. Moving on.`;
   }
 
-  return isMajorTriadScore(notes)
+  return isMajorTriadScore(segments)
     ? "Nice triad. Moving up a half step."
     : "Nice work. Moving up a half step.";
 }
 
-function createFailureSummary(note: ScoredTargetNote) {
-  const score = note.score;
+function createFailureSummary(segment: ScoredTargetSegment) {
+  const score = segment.score;
+  const targetName = describeSegmentTarget(segment);
   switch (score.status) {
     case "flat":
-      return `${note.label} was ${Math.abs(Math.round(score.medianCents ?? 0))} cents flat.`;
+      return `${targetName} was ${Math.abs(Math.round(score.medianCents ?? 0))} cents flat.`;
     case "sharp":
-      return `${note.label} was ${Math.round(score.medianCents ?? 0)} cents sharp.`;
+      return `${targetName} was ${Math.round(score.medianCents ?? 0)} cents sharp.`;
     case "wrongNote":
-      return `${note.label} landed closer to another note. Check the target and retry.`;
+      return `${targetName} landed closer to another note. Check the target and retry.`;
+    case "wrongDirection":
+      return `${targetName} moved the wrong direction.`;
+    case "offContour":
+      return `${targetName} drifted away from the guide contour.`;
     case "unstable":
-      return `${note.label} never settled into a clear center.`;
+      return `${targetName} never settled into a clear center.`;
     case "unclear":
-      return `${note.label} was unclear. Sing a bit more directly into the mic.`;
+      return `${targetName} was unclear. Sing a bit more directly into the mic.`;
     case "missed":
-      return `${note.label} was missed. Try the exercise again.`;
+      return `${targetName} was missed. Try the exercise again.`;
     case "pass":
     case "passWithWarning":
       return "Try that again.";
   }
 }
 
-function isMajorTriadScore(notes: ScoredTargetNote[]) {
+function isMajorTriadScore(segments: ScoredTargetSegment[]) {
   return (
-    notes.length === 3 &&
-    notes[0]?.degree === 1 &&
-    notes[1]?.degree === 3 &&
-    notes[2]?.degree === 5
+    segments.length === 3 &&
+    segments[0]?.kind === "note" &&
+    segments[0].offsetSemitones === 0 &&
+    segments[1]?.kind === "note" &&
+    segments[1].offsetSemitones === 4 &&
+    segments[2]?.kind === "note" &&
+    segments[2].offsetSemitones === 7
   );
 }
 
-function createWarningInstruction(warnings: NoteWarning[], medianCents: number) {
+function createWarningInstruction(warnings: SegmentWarning[], medianCents: number) {
   const primaryWarning = warnings[0];
   switch (primaryWarning) {
     case "scoop":
@@ -592,16 +848,45 @@ function createWarningInstruction(warnings: NoteWarning[], medianCents: number) 
       return `Centered at ${formatCents(medianCents)}, with a little wobble.`;
     case "dropout":
       return `Centered at ${formatCents(medianCents)}, but the mic lost parts of the note.`;
+    case "unevenGlide":
+    case "endpointDrift":
+      return `Centered at ${formatCents(medianCents)}.`;
     default:
       return `Centered at ${formatCents(medianCents)}.`;
   }
 }
 
-function isPassingStatus(status: NoteAssessment["status"]) {
+function createContourWarningInstruction(warnings: SegmentWarning[], contour: SungContourEvent) {
+  const primaryWarning = warnings[0];
+  switch (primaryWarning) {
+    case "endpointDrift":
+      return `The glide shape worked, but the endpoints drifted by ${Math.round(
+        Math.max(Math.abs(contour.startCents), Math.abs(contour.endCents))
+      )} cents.`;
+    case "unevenGlide":
+      return "The glide reached the target, with a little unevenness through the line.";
+    case "dropout":
+      return "The glide reached the target, but the mic lost parts of the line.";
+    default:
+      return "The glide reached the target with a small warning.";
+  }
+}
+
+function isPassingStatus(status: SegmentAssessment["status"]) {
   return status === "pass" || status === "passWithWarning";
 }
 
-function describeWarning(warning: NoteWarning | undefined) {
+function isTargetNoteSegment(target: TargetSegment): target is TargetNoteSegment {
+  return target.kind === "note";
+}
+
+function describeSegmentTarget(segment: ScoredTargetSegment) {
+  return segment.kind === "note"
+    ? segment.noteName
+    : `${segment.fromNoteName} to ${segment.toNoteName}`;
+}
+
+function describeWarning(warning: SegmentWarning | undefined) {
   switch (warning) {
     case "scoop":
       return "scoop";
@@ -615,18 +900,24 @@ function describeWarning(warning: NoteWarning | undefined) {
       return "little wobble";
     case "dropout":
       return "mic dropout";
+    case "unevenGlide":
+      return "uneven glide";
+    case "endpointDrift":
+      return "endpoint drift";
     default:
       return "small warning";
   }
 }
 
-function sortWarnings(warnings: NoteWarning[]) {
-  const priority: Record<NoteWarning, number> = {
+function sortWarnings(warnings: SegmentWarning[]) {
+  const priority: Record<SegmentWarning, number> = {
     scoop: 0,
     late: 1,
     early: 1,
     shortSustain: 2,
     mildWobble: 3,
+    unevenGlide: 3,
+    endpointDrift: 3,
     dropout: 4
   };
 

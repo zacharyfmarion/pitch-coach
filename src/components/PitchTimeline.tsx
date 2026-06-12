@@ -1,5 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { AttemptScore, LessonStatus, PitchFrame, TargetNote } from "../domain/contracts";
+import type {
+  AttemptScore,
+  LessonStatus,
+  PitchFrame,
+  TargetNoteSegment,
+  TargetSegment
+} from "../domain/contracts";
 import { frequencyToMidi, midiToNoteName } from "../domain/music";
 
 const LIVE_SILENCE_RMS = 0.006;
@@ -9,7 +15,7 @@ const LIVE_TARGET_SWITCH_CONFIRM_MS = 80;
 
 type PitchTimelineProps = {
   frames: PitchFrame[];
-  targetNotes: TargetNote[];
+  targetSegments: TargetSegment[];
   attemptScore: AttemptScore | null;
   totalDurationMs: number;
   toleranceCents: number;
@@ -19,7 +25,7 @@ type PitchTimelineProps = {
 
 export function PitchTimeline({
   frames,
-  targetNotes,
+  targetSegments,
   attemptScore,
   totalDurationMs,
   toleranceCents,
@@ -53,7 +59,7 @@ export function PitchTimeline({
 
     drawTimeline(canvas, {
       frames,
-      targetNotes,
+      targetSegments,
       attemptScore,
       totalDurationMs,
       toleranceCents,
@@ -62,7 +68,7 @@ export function PitchTimeline({
       width: size.width,
       height: size.height
     });
-  }, [attemptScore, frames, size, status, targetNotes, themeName, toleranceCents, totalDurationMs]);
+  }, [attemptScore, frames, size, status, targetSegments, themeName, toleranceCents, totalDurationMs]);
 
   return (
     <div className="timeline-frame">
@@ -166,7 +172,7 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
   const plotWidth = Math.max(options.width - padding.left - padding.right, 1);
   const plotHeight = Math.max(options.height - padding.top - padding.bottom, 1);
   const visibleMidis = [
-    ...options.targetNotes.map((note) => note.midi),
+    ...options.targetSegments.flatMap(getSegmentMidis),
     ...options.frames
       .filter((frame) => frame.frequencyHz !== null)
       .map((frame) => frequencyToMidi(frame.frequencyHz!)),
@@ -197,24 +203,45 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
     palette
   );
 
-  renderedTargetSpans.forEach(({ note, startMs, endMs }) => {
+  renderedTargetSpans.forEach(({ segment, startMs, endMs }) => {
     const x = xForTime(startMs);
     const width = Math.max(6, xForTime(endMs) - x);
-    const yTop = yForMidi(note.midi + centsAsMidi);
-    const yBottom = yForMidi(note.midi - centsAsMidi);
-    const yCenter = yForMidi(note.midi);
-
     context.fillStyle = palette.targetBand;
-    context.fillRect(x, yTop, width, yBottom - yTop);
     context.strokeStyle = palette.targetLine;
     context.lineWidth = 2;
+    context.font = "600 12px system-ui, sans-serif";
+
+    if (segment.kind === "note") {
+      const yTop = yForMidi(segment.midi + centsAsMidi);
+      const yBottom = yForMidi(segment.midi - centsAsMidi);
+      const yCenter = yForMidi(segment.midi);
+
+      context.fillRect(x, yTop, width, yBottom - yTop);
+      context.beginPath();
+      context.moveTo(x, yCenter);
+      context.lineTo(x + width, yCenter);
+      context.stroke();
+      context.fillStyle = palette.targetText;
+      context.fillText(segment.noteName, x + 8, yCenter - 8);
+      return;
+    }
+
+    const xEnd = xForTime(endMs);
+    const yStart = yForMidi(segment.fromMidi);
+    const yEnd = yForMidi(segment.toMidi);
     context.beginPath();
-    context.moveTo(x, yCenter);
-    context.lineTo(x + width, yCenter);
+    context.moveTo(x, yForMidi(segment.fromMidi + centsAsMidi));
+    context.lineTo(xEnd, yForMidi(segment.toMidi + centsAsMidi));
+    context.lineTo(xEnd, yForMidi(segment.toMidi - centsAsMidi));
+    context.lineTo(x, yForMidi(segment.fromMidi - centsAsMidi));
+    context.closePath();
+    context.fill();
+    context.beginPath();
+    context.moveTo(x, yStart);
+    context.lineTo(xEnd, yEnd);
     context.stroke();
     context.fillStyle = palette.targetText;
-    context.font = "600 12px system-ui, sans-serif";
-    context.fillText(note.label, x + 8, yCenter - 8);
+    context.fillText(segment.shortLabel, x + 8, Math.min(yStart, yEnd) - 8);
   });
 
   drawPitchLine(context, options.frames, xForTime, yForMidi, palette);
@@ -231,41 +258,43 @@ function drawTimeline(canvas: HTMLCanvasElement, options: DrawTimelineOptions) {
 }
 
 export type RenderedTargetSpan = {
-  note: TargetNote;
+  segment: TargetSegment;
   startMs: number;
   endMs: number;
 };
 
 function getRenderedTargetSpans(options: DrawTimelineOptions): RenderedTargetSpan[] {
   if (!options.attemptScore) {
+    const noteTargets = options.targetSegments.filter(isTargetNoteSegment);
     const liveSpans =
-      options.status === "listening" || options.status === "awaitingVoice"
-        ? getLiveTargetSpans(options.frames, options.targetNotes)
+      noteTargets.length === options.targetSegments.length &&
+      (options.status === "listening" || options.status === "awaitingVoice")
+        ? getLiveTargetSpans(options.frames, noteTargets)
         : [];
 
     if (liveSpans.length > 0) {
       return liveSpans;
     }
 
-    return options.targetNotes.map((note) => ({
-      note,
-      startMs: note.startMs,
-      endMs: note.endMs
+    return options.targetSegments.map((segment) => ({
+      segment,
+      startMs: segment.startMs,
+      endMs: segment.endMs
     }));
   }
 
-  return options.attemptScore.notes.map((note) => {
-    const startMs = note.sungEvent?.startMs ?? note.score.stableStartMs ?? note.startMs;
-    const endMs = note.sungEvent?.endMs ?? note.score.stableEndMs ?? note.endMs;
+  return options.attemptScore.segments.map((segment) => {
+    const startMs = segment.sungEvent?.startMs ?? segment.sungContour?.startMs ?? segment.score.stableStartMs ?? segment.startMs;
+    const endMs = segment.sungEvent?.endMs ?? segment.sungContour?.endMs ?? segment.score.stableEndMs ?? segment.endMs;
     return {
-      note,
+      segment,
       startMs,
       endMs: Math.max(endMs, startMs + 180)
     };
   });
 }
 
-export function getLiveTargetSpans(frames: PitchFrame[], targetNotes: TargetNote[]): RenderedTargetSpan[] {
+export function getLiveTargetSpans(frames: PitchFrame[], targetNotes: TargetNoteSegment[]): RenderedTargetSpan[] {
   const assignments = assignLiveFramesToTargets(frames, targetNotes);
   const guideDurationMs = Math.max(360, targetNotes[0] ? targetNotes[0].endMs - targetNotes[0].startMs : 600);
   let cursorMs = 0;
@@ -275,7 +304,7 @@ export function getLiveTargetSpans(frames: PitchFrame[], targetNotes: TargetNote
     if (assignment) {
       cursorMs = Math.max(cursorMs, assignment.endMs + 120);
       return {
-        note,
+        segment: note,
         startMs: assignment.startMs,
         endMs: Math.max(assignment.endMs, assignment.startMs + 180)
       };
@@ -284,7 +313,7 @@ export function getLiveTargetSpans(frames: PitchFrame[], targetNotes: TargetNote
     const startMs = Math.max(note.startMs, cursorMs);
     cursorMs = startMs + guideDurationMs;
     return {
-      note,
+      segment: note,
       startMs,
       endMs: cursorMs
     };
@@ -298,7 +327,7 @@ type LiveTargetAssignment = {
 
 function assignLiveFramesToTargets(
   frames: PitchFrame[],
-  targetNotes: TargetNote[]
+  targetNotes: TargetNoteSegment[]
 ): Array<LiveTargetAssignment | null> {
   const assignments: Array<LiveTargetAssignment | null> = targetNotes.map(() => null);
   const voicedFrames = smoothLiveFrames(frames.filter(isLiveVoicedFrame));
@@ -363,7 +392,7 @@ function smoothLiveFrames(frames: PitchFrame[]): LiveVoicedFrame[] {
   });
 }
 
-function chooseLiveTargetIndex(midi: number, activeTargetIndex: number, targetNotes: TargetNote[]) {
+function chooseLiveTargetIndex(midi: number, activeTargetIndex: number, targetNotes: TargetNoteSegment[]) {
   let targetIndex = activeTargetIndex;
   while (targetIndex < targetNotes.length - 1) {
     const currentDistanceCents = Math.abs(midi - targetNotes[targetIndex].midi) * 100;
@@ -531,20 +560,21 @@ function drawStablePlateaus(
     return;
   }
 
-  attemptScore.notes.forEach((note) => {
+  attemptScore.segments.forEach((segment) => {
     if (
-      note.score.stableStartMs === undefined ||
-      note.score.stableEndMs === undefined ||
-      note.score.medianCents === undefined
+      segment.kind !== "note" ||
+      segment.score.stableStartMs === undefined ||
+      segment.score.stableEndMs === undefined ||
+      segment.score.medianCents === undefined
     ) {
       return;
     }
 
-    const xStart = xForTime(note.score.stableStartMs);
-    const xEnd = xForTime(note.score.stableEndMs);
-    const y = yForMidi(note.midi + note.score.medianCents / 100);
+    const xStart = xForTime(segment.score.stableStartMs);
+    const xEnd = xForTime(segment.score.stableEndMs);
+    const y = yForMidi(segment.midi + segment.score.medianCents / 100);
     context.strokeStyle =
-      note.score.status === "pass" || note.score.status === "passWithWarning"
+      segment.score.status === "pass" || segment.score.status === "passWithWarning"
         ? palette.passLine
         : palette.errorLine;
     context.lineWidth = 5;
@@ -554,4 +584,12 @@ function drawStablePlateaus(
     context.lineTo(xEnd, y);
     context.stroke();
   });
+}
+
+function getSegmentMidis(segment: TargetSegment) {
+  return segment.kind === "note" ? [segment.midi] : [segment.fromMidi, segment.toMidi];
+}
+
+function isTargetNoteSegment(segment: TargetSegment): segment is TargetNoteSegment {
+  return segment.kind === "note";
 }

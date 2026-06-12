@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   AttemptHistoryRecord,
   ExerciseId,
-  NoteAssessmentStatus,
+  SegmentAssessmentStatus,
   PracticeSessionRecord
 } from "./contracts";
 import { EXERCISES } from "./exercise";
@@ -35,9 +35,9 @@ describe("progress aggregation", () => {
     expect(summary.attemptCount).toBe(3);
     expect(summary.passedAttemptCount).toBe(2);
     expect(summary.recentPassRate).toBe(67);
-    expect(summary.noteCount).toBe(5);
-    expect(summary.notesInTune).toBe(4);
-    expect(summary.noteAccuracy).toBe(80);
+    expect(summary.segmentCount).toBe(5);
+    expect(summary.segmentsInTune).toBe(4);
+    expect(summary.segmentAccuracy).toBe(80);
     expect(summary.practiceMinutes).toBe(4);
     expect(summary.streakDays).toBe(3);
     expect(summary.lastPracticedAt).toBe("2026-06-10T16:00:00.000Z");
@@ -46,8 +46,8 @@ describe("progress aggregation", () => {
       date: "2026-06-10",
       attemptCount: 1,
       passedAttemptCount: 1,
-      noteCount: 2,
-      notesInTune: 2,
+      segmentCount: 2,
+      segmentsInTune: 2,
       durationMs: 60000
     });
   });
@@ -102,9 +102,9 @@ describe("progress aggregation", () => {
       exerciseId: "step-up-back",
       attemptCount: 2,
       passedAttemptCount: 1,
-      noteCount: 4,
-      notesInTune: 3,
-      noteAccuracy: 75,
+      segmentCount: 4,
+      segmentsInTune: 3,
+      segmentAccuracy: 75,
       commonIssue: "flat"
     });
   });
@@ -146,7 +146,7 @@ function historyRecord(
   createdAt: string,
   passed: boolean,
   durationMs: number,
-  noteStatuses: NoteAssessmentStatus[],
+  segmentStatuses: SegmentAssessmentStatus[],
   sessionId = `${exerciseId}-session-${createdAt}`
 ): AttemptHistoryRecord {
   return {
@@ -160,10 +160,14 @@ function historyRecord(
     passed,
     summary: passed ? "Nice work." : "Try again.",
     durationMs,
-    notes: noteStatuses.map((status, index) => ({
-      degree: index + 1,
-      label: "A3",
+    segments: segmentStatuses.map((status, index) => ({
+      id: `segment-${index}`,
+      kind: "note",
+      label: "Root",
+      shortLabel: "R",
+      noteName: "A3",
       midi: parseNoteName("A3"),
+      offsetSemitones: 0,
       status,
       medianCents: status === "flat" ? -42 : 0,
       stabilityCents: 8,

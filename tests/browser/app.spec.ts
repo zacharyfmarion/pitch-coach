@@ -131,7 +131,7 @@ test("navigates the shell and renders progress from local history", async ({ pag
   await page.getByRole("tab", { name: "Practice" }).click();
   await expect(page).toHaveURL(/\/practice$/);
   await expect(page.getByRole("heading", { name: "Practice Library", level: 1 })).toBeVisible();
-  await expect(page.getByText(/1 \/ 8 exercises tried/)).toBeVisible();
+  await expect(page.getByText(/1 \/ 12 exercises tried/)).toBeVisible();
 });
 
 test("groups repeated exercise attempts into one recent progress session", async ({ page }) => {
@@ -243,10 +243,14 @@ type BrowserAttemptSeed = {
   passed: boolean;
   summary: string;
   durationMs: number;
-  notes: Array<{
-    degree: number;
+  segments: Array<{
+    id: string;
+    kind: "note";
     label: string;
+    shortLabel: string;
+    noteName: string;
     midi: number;
+    offsetSemitones: number;
     status: string;
     medianCents: number;
     warnings: string[];
@@ -356,11 +360,15 @@ function browserAttemptRecord(
     passed,
     summary: passed ? "Nice triad." : "A3 was flat.",
     durationMs: 2400,
-    notes: [
+    segments: [
       {
-        degree: 1,
-        label: "A3",
+        id: "root",
+        kind: "note",
+        label: "Root",
+        shortLabel: "R",
+        noteName: "A3",
         midi: 57,
+        offsetSemitones: 0,
         status,
         medianCents: status === "flat" ? -42 : 0,
         warnings: []

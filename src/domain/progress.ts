@@ -4,7 +4,7 @@ import type {
   ExerciseDefinition,
   ExerciseId,
   ExerciseProgressSummary,
-  NoteAssessmentStatus,
+  SegmentAssessmentStatus,
   PracticeSessionRecord
 } from "./contracts";
 import { EXERCISES } from "./exercise";
@@ -19,8 +19,8 @@ export type WeekActivityBucket = {
   date: string;
   attemptCount: number;
   passedAttemptCount: number;
-  noteCount: number;
-  notesInTune: number;
+  segmentCount: number;
+  segmentsInTune: number;
   durationMs: number;
 };
 
@@ -28,9 +28,9 @@ export type PracticeSummary = {
   attemptCount: number;
   passedAttemptCount: number;
   recentPassRate?: number;
-  noteCount: number;
-  notesInTune: number;
-  noteAccuracy?: number;
+  segmentCount: number;
+  segmentsInTune: number;
+  segmentAccuracy?: number;
   practiceMinutes: number;
   totalDurationMs: number;
   streakDays: number;
@@ -51,10 +51,10 @@ export type PracticeSessionSummary = {
   attemptCount: number;
   passedAttemptCount: number;
   totalDurationMs: number;
-  noteCount: number;
-  notesInTune: number;
-  noteAccuracy: number;
-  commonIssue?: NoteAssessmentStatus;
+  segmentCount: number;
+  segmentsInTune: number;
+  segmentAccuracy: number;
+  commonIssue?: SegmentAssessmentStatus;
 };
 
 type CreateAttemptHistoryRecordOptions = {
@@ -114,14 +114,32 @@ export function createAttemptHistoryRecord({
     passed: score.passed,
     summary: score.summary,
     durationMs: score.durationMs,
-    notes: score.notes.map((note) => ({
-      degree: note.degree,
-      label: note.label,
-      midi: note.midi,
-      status: note.score.status,
-      medianCents: note.score.medianCents,
-      stabilityCents: note.score.stabilityCents,
-      warnings: note.score.warnings
+    segments: score.segments.map((segment) => ({
+      id: segment.id,
+      kind: segment.kind,
+      label: segment.label,
+      shortLabel: segment.shortLabel,
+      ...(segment.kind === "note"
+        ? {
+            noteName: segment.noteName,
+            midi: segment.midi,
+            offsetSemitones: segment.offsetSemitones
+          }
+        : {
+            fromNoteName: segment.fromNoteName,
+            toNoteName: segment.toNoteName,
+            fromMidi: segment.fromMidi,
+            toMidi: segment.toMidi,
+            fromOffsetSemitones: segment.fromOffsetSemitones,
+            toOffsetSemitones: segment.toOffsetSemitones
+          }),
+      status: segment.score.status,
+      medianCents: segment.score.medianCents,
+      contourErrorCents: segment.score.contourErrorCents,
+      startCents: segment.score.startCents,
+      endCents: segment.score.endCents,
+      stabilityCents: segment.score.stabilityCents,
+      warnings: segment.score.warnings
     }))
   };
 }
@@ -147,9 +165,9 @@ export function summarizePracticeSessions(
         return [];
       }
 
-      const noteCount = attempts.reduce((total, attempt) => total + attempt.notes.length, 0);
-      const notesInTune = attempts.reduce(
-        (total, attempt) => total + attempt.notes.filter(isInTuneHistoryNote).length,
+      const segmentCount = attempts.reduce((total, attempt) => total + attempt.segments.length, 0);
+      const segmentsInTune = attempts.reduce(
+        (total, attempt) => total + attempt.segments.filter(isInTuneHistorySegment).length,
         0
       );
       const passedAttemptCount = attempts.filter((attempt) => attempt.passed).length;
@@ -167,11 +185,11 @@ export function summarizePracticeSessions(
           attemptCount: attempts.length,
           passedAttemptCount,
           totalDurationMs,
-          noteCount,
-          notesInTune,
-          noteAccuracy:
-            noteCount > 0
-              ? Math.round((notesInTune / noteCount) * 100)
+          segmentCount,
+          segmentsInTune,
+          segmentAccuracy:
+            segmentCount > 0
+              ? Math.round((segmentsInTune / segmentCount) * 100)
               : Math.round((passedAttemptCount / attempts.length) * 100),
           commonIssue: findCommonIssue(attempts)
         }
@@ -226,9 +244,9 @@ export function summarizePracticeHistory(
     (total, record) => total + Math.max(0, record.durationMs),
     0
   );
-  const noteCount = records.reduce((total, record) => total + record.notes.length, 0);
-  const notesInTune = records.reduce(
-    (total, record) => total + record.notes.filter(isInTuneHistoryNote).length,
+  const segmentCount = records.reduce((total, record) => total + record.segments.length, 0);
+  const segmentsInTune = records.reduce(
+    (total, record) => total + record.segments.filter(isInTuneHistorySegment).length,
     0
   );
 
@@ -239,9 +257,9 @@ export function summarizePracticeHistory(
       recentAttempts.length > 0
         ? Math.round((recentPassedAttemptCount / recentAttempts.length) * 100)
         : undefined,
-    noteCount,
-    notesInTune,
-    noteAccuracy: noteCount > 0 ? Math.round((notesInTune / noteCount) * 100) : undefined,
+    segmentCount,
+    segmentsInTune,
+    segmentAccuracy: segmentCount > 0 ? Math.round((segmentsInTune / segmentCount) * 100) : undefined,
     practiceMinutes:
       totalDurationMs > 0 ? Math.max(1, Math.round(totalDurationMs / 60000)) : 0,
     totalDurationMs,
@@ -328,12 +346,12 @@ export function getRecentPracticeSessions(
 }
 
 export function calculateAttemptNoteAccuracy(attempt: AttemptHistoryRecord) {
-  if (attempt.notes.length === 0) {
+  if (attempt.segments.length === 0) {
     return attempt.passed ? 100 : 0;
   }
 
-  const inTuneCount = attempt.notes.filter(isInTuneHistoryNote).length;
-  return Math.round((inTuneCount / attempt.notes.length) * 100);
+  const inTuneCount = attempt.segments.filter(isInTuneHistorySegment).length;
+  return Math.round((inTuneCount / attempt.segments.length) * 100);
 }
 
 function compareRecommendationCandidates(
@@ -360,19 +378,19 @@ function createIssueRecommendationReason(progress: ExerciseProgressSummary) {
   return `Recent pass rate is ${progress.recentPassRate ?? 0}%.`;
 }
 
-function isInTuneHistoryNote(note: AttemptHistoryRecord["notes"][number]) {
-  return note.status === "pass" || note.status === "passWithWarning";
+function isInTuneHistorySegment(segment: AttemptHistoryRecord["segments"][number]) {
+  return segment.status === "pass" || segment.status === "passWithWarning";
 }
 
 function findCommonIssue(records: AttemptHistoryRecord[]) {
-  const issueCounts = new Map<NoteAssessmentStatus, number>();
+  const issueCounts = new Map<SegmentAssessmentStatus, number>();
   records.forEach((record) => {
-    record.notes.forEach((note) => {
-      if (note.status === "pass" || note.status === "passWithWarning") {
+    record.segments.forEach((segment) => {
+      if (segment.status === "pass" || segment.status === "passWithWarning") {
         return;
       }
 
-      issueCounts.set(note.status, (issueCounts.get(note.status) ?? 0) + 1);
+      issueCounts.set(segment.status, (issueCounts.get(segment.status) ?? 0) + 1);
     });
   });
 
@@ -434,8 +452,8 @@ function createWeekActivity(records: AttemptHistoryRecord[], now: Date) {
       date: toLocalDateKey(date),
       attemptCount: 0,
       passedAttemptCount: 0,
-      noteCount: 0,
-      notesInTune: 0,
+      segmentCount: 0,
+      segmentsInTune: 0,
       durationMs: 0
     };
   });
@@ -454,8 +472,8 @@ function createWeekActivity(records: AttemptHistoryRecord[], now: Date) {
 
     bucket.attemptCount += 1;
     bucket.passedAttemptCount += record.passed ? 1 : 0;
-    bucket.noteCount += record.notes.length;
-    bucket.notesInTune += record.notes.filter(isInTuneHistoryNote).length;
+    bucket.segmentCount += record.segments.length;
+    bucket.segmentsInTune += record.segments.filter(isInTuneHistorySegment).length;
     bucket.durationMs += Math.max(0, record.durationMs);
   });
 
@@ -491,7 +509,7 @@ function toLocalDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function describePracticeIssue(status: NoteAssessmentStatus) {
+function describePracticeIssue(status: SegmentAssessmentStatus) {
   switch (status) {
     case "flat":
       return "flat";
@@ -499,6 +517,10 @@ function describePracticeIssue(status: NoteAssessmentStatus) {
       return "sharp";
     case "wrongNote":
       return "wrong-note";
+    case "wrongDirection":
+      return "wrong-direction";
+    case "offContour":
+      return "off-contour";
     case "unstable":
       return "unstable";
     case "unclear":

@@ -1,4 +1,4 @@
-import type { PitchFrame, PromptStyle, TargetNote } from "../domain/contracts";
+import type { PitchFrame, PromptStyle, TargetSegment } from "../domain/contracts";
 
 export type PitchDetectionBounds = {
   minFrequencyHz: number;
@@ -36,6 +36,6 @@ export interface AudioInputEngine {
 }
 
 export interface PromptPlayer {
-  playPrompt(targetNotes: TargetNote[], tempoBpm: number, promptStyle: PromptStyle): Promise<void>;
+  playPrompt(targetSegments: TargetSegment[], tempoBpm: number, promptStyle: PromptStyle): Promise<void>;
   cancel(): void;
 }

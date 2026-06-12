@@ -10,16 +10,40 @@ export type ExerciseId =
   | "single-note-sustain"
   | "step-up-back"
   | "third-up-back"
+  | "minor-third-up-back"
+  | "descending-fourth-return"
   | "major-triad"
   | "descending-triad"
   | "five-note-scale"
-  | "octave-arpeggio";
+  | "octave-arpeggio"
+  | "fifth-glide"
+  | "octave-siren";
 
-export type ExerciseCategory = "pitch" | "interval" | "arpeggio" | "scale";
+export type ExerciseCategory = "pitch" | "interval" | "arpeggio" | "scale" | "glide";
 
 export type ScoringProfile = "pitch-first" | "sustain" | "sequence";
 
 export type PromptStyle = "sequence-only" | "chord-then-sequence";
+
+export type ExercisePatternSegment =
+  | {
+      kind: "note";
+      id: string;
+      label: string;
+      shortLabel: string;
+      offsetSemitones: number;
+      durationBeats?: number;
+    }
+  | {
+      kind: "glide";
+      id: string;
+      label: string;
+      shortLabel: string;
+      fromOffsetSemitones: number;
+      toOffsetSemitones: number;
+      durationBeats: number;
+      curve: "linear";
+    };
 
 export type ExerciseDefinition = {
   id: ExerciseId;
@@ -28,7 +52,7 @@ export type ExerciseDefinition = {
   difficulty: 1 | 2 | 3 | 4 | 5;
   category: ExerciseCategory;
   focus: string;
-  patternDegrees: readonly number[];
+  patternSegments: readonly ExercisePatternSegment[];
   startRootMidi: number;
   stepSemitones: number;
   direction: "up-then-down" | "ascending" | "static";
@@ -99,33 +123,40 @@ export type ScoringPolicy = {
   missingTargetCost: number;
 };
 
-export type NoteAssessmentStatus =
+export type SegmentAssessmentStatus =
   | "pass"
   | "passWithWarning"
   | "flat"
   | "sharp"
   | "wrongNote"
+  | "wrongDirection"
+  | "offContour"
   | "unstable"
   | "unclear"
   | "missed";
 
-export type NoteWarning =
+export type SegmentWarning =
   | "scoop"
   | "late"
   | "early"
   | "shortSustain"
   | "mildWobble"
-  | "dropout";
+  | "dropout"
+  | "unevenGlide"
+  | "endpointDrift";
 
-export type NoteAssessment = {
-  status: NoteAssessmentStatus;
+export type SegmentAssessment = {
+  status: SegmentAssessmentStatus;
   medianCents?: number;
+  contourErrorCents?: number;
+  startCents?: number;
+  endCents?: number;
   stableStartMs?: number;
   stableEndMs?: number;
   stabilityCents?: number;
   voicedCoverage: number;
   timingOffsetMs?: number;
-  warnings: NoteWarning[];
+  warnings: SegmentWarning[];
   instruction: string;
 };
 
@@ -141,31 +172,72 @@ export type SungNoteEvent = {
   voicedCoverage: number;
 };
 
-export type TargetNote = {
-  degree: number;
-  midi: number;
+export type TargetSegmentBase = {
+  id: string;
+  kind: "note" | "glide";
   label: string;
-  frequencyHz: number;
+  shortLabel: string;
   startMs: number;
   endMs: number;
 };
 
-export type ScoredTargetNote = TargetNote & {
-  score: NoteAssessment;
+export type TargetNoteSegment = TargetSegmentBase & {
+  kind: "note";
+  offsetSemitones: number;
+  midi: number;
+  noteName: string;
+  frequencyHz: number;
+};
+
+export type TargetGlideSegment = TargetSegmentBase & {
+  kind: "glide";
+  fromOffsetSemitones: number;
+  toOffsetSemitones: number;
+  fromMidi: number;
+  toMidi: number;
+  fromNoteName: string;
+  toNoteName: string;
+  fromFrequencyHz: number;
+  toFrequencyHz: number;
+  curve: "linear";
+};
+
+export type TargetSegment = TargetNoteSegment | TargetGlideSegment;
+
+export type SungContourEvent = {
+  id: string;
+  startMs: number;
+  endMs: number;
+  fromMidi: number;
+  toMidi: number;
+  voicedCoverage: number;
+  medianErrorCents: number;
+  medianAbsErrorCents: number;
+  startCents: number;
+  endCents: number;
+  contourSpreadCents: number;
+};
+
+export type ScoredTargetSegment = TargetSegment & {
+  score: SegmentAssessment;
   sungEvent?: SungNoteEvent;
+  sungContour?: SungContourEvent;
 };
 
 export type AttemptAlignment = {
   targetIndex: number;
-  target: TargetNote;
+  target: TargetSegment;
   eventIndex?: number;
   event?: SungNoteEvent;
+  contourIndex?: number;
+  contour?: SungContourEvent;
 };
 
 export type AttemptScore = {
   passed: boolean;
-  notes: ScoredTargetNote[];
+  segments: ScoredTargetSegment[];
   events: SungNoteEvent[];
+  contourEvents: SungContourEvent[];
   alignment: AttemptAlignment[];
   ignoredEventIndices: number[];
   durationMs: number;
@@ -190,14 +262,27 @@ export type LessonState = {
   lastScore?: AttemptScore;
 };
 
-export type AttemptHistoryNote = {
-  degree: number;
+export type AttemptHistorySegment = {
+  id: string;
+  kind: TargetSegment["kind"];
   label: string;
-  midi: number;
-  status: NoteAssessmentStatus;
+  shortLabel: string;
+  noteName?: string;
+  midi?: number;
+  offsetSemitones?: number;
+  fromNoteName?: string;
+  toNoteName?: string;
+  fromMidi?: number;
+  toMidi?: number;
+  fromOffsetSemitones?: number;
+  toOffsetSemitones?: number;
+  status: SegmentAssessmentStatus;
   medianCents?: number;
+  contourErrorCents?: number;
+  startCents?: number;
+  endCents?: number;
   stabilityCents?: number;
-  warnings: NoteWarning[];
+  warnings: SegmentWarning[];
 };
 
 export type AttemptHistoryRecord = {
@@ -211,7 +296,7 @@ export type AttemptHistoryRecord = {
   passed: boolean;
   summary: string;
   durationMs: number;
-  notes: AttemptHistoryNote[];
+  segments: AttemptHistorySegment[];
 };
 
 export type PracticeSessionRecord = {
@@ -226,5 +311,5 @@ export type ExerciseProgressSummary = {
   attemptCount: number;
   lastPracticedAt?: string;
   recentPassRate?: number;
-  commonIssue?: NoteAssessmentStatus;
+  commonIssue?: SegmentAssessmentStatus;
 };

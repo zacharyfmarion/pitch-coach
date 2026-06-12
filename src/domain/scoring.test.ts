@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { PitchFrame, TargetNote } from "./contracts";
+import type { PitchFrame, TargetGlideSegment, TargetNoteSegment, TargetSegment } from "./contracts";
 import {
   buildTargetNotes,
   createScoringPolicy,
   DEFAULT_SETTINGS,
+  getExerciseById,
   MAJOR_TRIAD_EXERCISE
 } from "./exercise";
 import { midiToFrequency, parseNoteName } from "./music";
@@ -11,14 +12,15 @@ import { extractSungNoteEvents, isPitchFirstAttemptComplete, scoreAttempt } from
 
 const settings = DEFAULT_SETTINGS;
 const policy = createScoringPolicy(settings);
-const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80);
+const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80).filter(isNoteSegment);
+const glideTargets = buildTargetNotes(parseNoteName("A3"), getExerciseById("fifth-glide"), 60).filter(isGlideSegment);
 
 describe("pitch-first attempt scoring", () => {
   it("passes a clean triad without depending on tempo windows", () => {
     const score = scoreAttempt(triadFrames(), targets, policy, settings.range);
 
     expect(score.passed).toBe(true);
-    expect(score.notes.map((note) => note.score.status)).toEqual(["pass", "pass", "pass"]);
+    expect(score.segments.map((note) => note.score.status)).toEqual(["pass", "pass", "pass"]);
     expect(score.alignment.map((item) => item.eventIndex)).toEqual([0, 1, 2]);
   });
 
@@ -33,7 +35,7 @@ describe("pitch-first attempt scoring", () => {
     );
 
     expect(score.passed).toBe(true);
-    expect(score.notes.map((note) => note.score.status)).toEqual(["pass", "pass", "pass"]);
+    expect(score.segments.map((note) => note.score.status)).toEqual(["pass", "pass", "pass"]);
     expect(score.events[1].startMs).toBeGreaterThan(2400);
   });
 
@@ -48,8 +50,8 @@ describe("pitch-first attempt scoring", () => {
     );
 
     expect(score.passed).toBe(false);
-    expect(score.notes.map((note) => note.score.status)).toEqual(["pass", "wrongNote", "pass"]);
-    expect(score.notes[2].sungEvent).toBeDefined();
+    expect(score.segments.map((note) => note.score.status)).toEqual(["pass", "wrongNote", "pass"]);
+    expect(score.segments[2].sungEvent).toBeDefined();
   });
 
   it("ignores extra stable transition notes when a better ordered match follows", () => {
@@ -88,8 +90,8 @@ describe("pitch-first attempt scoring", () => {
       settings.range
     );
 
-    expect(["pass", "passWithWarning"]).toContain(score.notes[0].score.status);
-    expect(score.notes[1].score.status).toBe("pass");
+    expect(["pass", "passWithWarning"]).toContain(score.segments[0].score.status);
+    expect(score.segments[1].score.status).toBe("pass");
     expect(score.ignoredEventIndices.length).toBe(1);
   });
 
@@ -102,7 +104,7 @@ describe("pitch-first attempt scoring", () => {
     );
 
     expect(score.passed).toBe(false);
-    expect(score.notes.map((note) => note.score.status)).toEqual(["pass", "missed", "pass"]);
+    expect(score.segments.map((note) => note.score.status)).toEqual(["pass", "missed", "pass"]);
   });
 
   it("splits legato pitch changes into separate sung events", () => {
@@ -124,7 +126,7 @@ describe("pitch-first attempt scoring", () => {
     const score = scoreAttempt(noteFrames(targets[0], 0), targets, policy, settings.range);
 
     expect(score.passed).toBe(false);
-    expect(score.notes.map((note) => note.score.status)).toEqual(["pass", "missed", "missed"]);
+    expect(score.segments.map((note) => note.score.status)).toEqual(["pass", "missed", "missed"]);
     expect(isPitchFirstAttemptComplete(noteFrames(targets[0], 0), targets, policy, settings.range)).toBe(
       false
     );
@@ -135,7 +137,7 @@ describe("pitch-first attempt scoring", () => {
     const score = scoreAttempt(longHold, targets, policy, settings.range);
 
     expect(score.events).toHaveLength(1);
-    expect(score.notes.map((note) => note.score.status)).toEqual(["pass", "missed", "missed"]);
+    expect(score.segments.map((note) => note.score.status)).toEqual(["pass", "missed", "missed"]);
   });
 
   it("passes scoops and moderate vibrato as coachable warnings", () => {
@@ -150,8 +152,8 @@ describe("pitch-first attempt scoring", () => {
     );
 
     expect(scooped.passed).toBe(true);
-    expect(scooped.notes[0].score.status).toBe("passWithWarning");
-    expect(scooped.notes[0].score.warnings).toContain("scoop");
+    expect(scooped.segments[0].score.status).toBe("passWithWarning");
+    expect(scooped.segments[0].score.warnings).toContain("scoop");
     expect(vibrato.passed).toBe(true);
   });
 
@@ -167,18 +169,97 @@ describe("pitch-first attempt scoring", () => {
     const missed = scoreAttempt([], targets, policy, settings.range);
     const unstable = scoreAttempt(unstableFrames(), targets, policy, settings.range);
 
-    expect(flat.notes[0].score.status).toBe("flat");
-    expect(sharp.notes[0].score.status).toBe("sharp");
-    expect(unclear.notes[0].score.status).toBe("unclear");
-    expect(missed.notes[0].score.status).toBe("missed");
-    expect(unstable.notes[0].score.status).toBe("unstable");
+    expect(flat.segments[0].score.status).toBe("flat");
+    expect(sharp.segments[0].score.status).toBe("sharp");
+    expect(unclear.segments[0].score.status).toBe("unclear");
+    expect(missed.segments[0].score.status).toBe("missed");
+    expect(unstable.segments[0].score.status).toBe("unstable");
   });
 
   it("does not mark screenshot-like stable traces as unstable", () => {
     const score = scoreAttempt(screenshotLikeFrames(), targets, policy, settings.range);
 
-    expect(score.notes.map((note) => note.score.status)).not.toContain("unstable");
+    expect(score.segments.map((note) => note.score.status)).not.toContain("unstable");
     expect(score.passed).toBe(true);
+  });
+
+  it("scores a clean flexible glide contour", () => {
+    const score = scoreAttempt(
+      [...glideTargetFrames(glideTargets[0], 0, 1400), trailingFrame(1760)],
+      glideTargets,
+      policy,
+      settings.range
+    );
+
+    expect(score.passed).toBe(true);
+    expect(score.segments[0].score.status).toBe("pass");
+    expect(score.contourEvents).toHaveLength(1);
+    expect(isPitchFirstAttemptComplete(
+      [...glideTargetFrames(glideTargets[0], 0, 1400), trailingFrame(1760)],
+      glideTargets,
+      policy,
+      settings.range
+    )).toBe(true);
+  });
+
+  it("flags a glide that moves the wrong direction", () => {
+    const score = scoreAttempt(
+      glideFrames(glideTargets[0].toMidi, glideTargets[0].fromMidi, 0, 1400),
+      glideTargets,
+      policy,
+      settings.range
+    );
+
+    expect(score.passed).toBe(false);
+    expect(score.segments[0].score.status).toBe("wrongDirection");
+  });
+
+  it("completes failed glides after the singer stops", () => {
+    const wrongDirectionFrames = [
+      ...glideFrames(glideTargets[0].toMidi, glideTargets[0].fromMidi, 0, 1400),
+      trailingFrame(1760)
+    ];
+    const offContourFrames = [
+      ...glideTargetFrames(glideTargets[0], 0, 1400, 90),
+      trailingFrame(1760)
+    ];
+
+    expect(scoreAttempt(wrongDirectionFrames, glideTargets, policy, settings.range).passed).toBe(false);
+    expect(
+      isPitchFirstAttemptComplete(wrongDirectionFrames, glideTargets, policy, settings.range)
+    ).toBe(true);
+    expect(scoreAttempt(offContourFrames, glideTargets, policy, settings.range).passed).toBe(false);
+    expect(isPitchFirstAttemptComplete(offContourFrames, glideTargets, policy, settings.range)).toBe(
+      true
+    );
+  });
+
+  it("flags a glide that drifts away from the contour", () => {
+    const score = scoreAttempt(
+      glideTargetFrames(glideTargets[0], 0, 1400, 90),
+      glideTargets,
+      policy,
+      settings.range
+    );
+
+    expect(score.passed).toBe(false);
+    expect(score.segments[0].score.status).toBe("offContour");
+  });
+
+  it("flags sparse glide coverage as unclear", () => {
+    const score = scoreAttempt(
+      [
+        frameForMidi(glideTargets[0].fromMidi, 0),
+        frameForMidi((glideTargets[0].fromMidi + glideTargets[0].toMidi) / 2, 900),
+        frameForMidi(glideTargets[0].toMidi, 1400)
+      ],
+      glideTargets,
+      policy,
+      settings.range
+    );
+
+    expect(score.passed).toBe(false);
+    expect(score.segments[0].score.status).toBe("unclear");
   });
 });
 
@@ -195,7 +276,7 @@ function triadFrames(options: {
 }
 
 function noteFrames(
-  target: TargetNote,
+  target: TargetNoteSegment,
   startMs: number,
   durationMs = 620,
   offsetCents = 0,
@@ -215,7 +296,7 @@ function noteFrames(
   return frames;
 }
 
-function longHeldNoteFrames(target: TargetNote, durationMs: number): PitchFrame[] {
+function longHeldNoteFrames(target: TargetNoteSegment, durationMs: number): PitchFrame[] {
   const frames: PitchFrame[] = [];
   for (let timeMs = 0; timeMs <= durationMs; timeMs += 16) {
     frames.push({
@@ -240,6 +321,47 @@ function glideFrames(startMidi: number, endMidi: number, startMs: number, durati
     });
   }
   return frames;
+}
+
+function glideTargetFrames(
+  target: TargetGlideSegment,
+  startMs: number,
+  durationMs: number,
+  offsetCents = 0
+) {
+  const frames: PitchFrame[] = [];
+  for (let timeMs = startMs; timeMs <= startMs + durationMs; timeMs += 70) {
+    const progress = Math.min(1, (timeMs - startMs) / durationMs);
+    const midi = target.fromMidi + (target.toMidi - target.fromMidi) * progress;
+    frames.push(frameForMidi(midi, timeMs, offsetCents));
+  }
+  return frames;
+}
+
+function frameForMidi(midi: number, timeMs: number, offsetCents = 0): PitchFrame {
+  return {
+    timeMs,
+    frequencyHz: midiToFrequency(midi + offsetCents / 100),
+    clarity: 0.96,
+    rms: 0.08
+  };
+}
+
+function trailingFrame(timeMs: number): PitchFrame {
+  return {
+    timeMs,
+    frequencyHz: null,
+    clarity: 0,
+    rms: 0
+  };
+}
+
+function isNoteSegment(segment: TargetSegment): segment is TargetNoteSegment {
+  return segment.kind === "note";
+}
+
+function isGlideSegment(segment: TargetSegment): segment is TargetGlideSegment {
+  return segment.kind === "glide";
 }
 
 function scoopedFrames(): PitchFrame[] {

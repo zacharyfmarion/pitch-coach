@@ -1,7 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AudioCaptureConfig, AudioInputEngine, PitchDetectorAdapter, PromptPlayer } from "../audio/types";
-import type { CoachSettings, PitchFrame, PracticeSessionRecord } from "../domain/contracts";
+import type {
+  CoachSettings,
+  PitchFrame,
+  PracticeSessionRecord,
+  TargetNoteSegment,
+  TargetSegment
+} from "../domain/contracts";
 import {
   buildTargetNotes,
   DEFAULT_SCORING_POLICY,
@@ -78,7 +84,7 @@ describe("PitchCoachApp", () => {
     );
     const stats = screen.getByLabelText("Practice stats").textContent ?? "";
     expect(stats).toContain("Accuracy50%");
-    expect(stats).toContain("Notes in tune1");
+    expect(stats).toContain("Targets in tune1");
     expect(stats).toContain("Practiced1min");
   });
 
@@ -113,7 +119,7 @@ describe("PitchCoachApp", () => {
 
     expect(screen.getByRole("tab", { name: "Practice" }).getAttribute("data-state")).toBe("active");
     expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
-    expect(document.querySelector(".library-heading")?.textContent).toContain("0 / 8 exercises tried");
+    expect(document.querySelector(".library-heading")?.textContent).toContain("0 / 12 exercises tried");
     expect(screen.getByLabelText("No accuracy yet").textContent).toContain("New");
     expect(screen.getByRole("button", { name: /Major Triad/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("New");
@@ -138,7 +144,7 @@ describe("PitchCoachApp", () => {
     expect(screen.queryByText("Local stats")).toBeNull();
     expect(screen.getByText("Day streak")).toBeTruthy();
     expect(screen.getByText("Accuracy over time")).toBeTruthy();
-    expect(screen.getByText("Notes in tune")).toBeTruthy();
+    expect(screen.getByText("Targets in tune")).toBeTruthy();
     expect(screen.getByText("Exercises done")).toBeTruthy();
     expect(screen.getByText("Time practiced")).toBeTruthy();
     expect(screen.getByText("This week")).toBeTruthy();
@@ -699,7 +705,7 @@ describe("PitchCoachApp", () => {
   it("opens a selected exercise detail screen from the library", async () => {
     vi.useFakeTimers();
     const exercise = getExerciseById("single-note-match");
-    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm);
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm).filter(isNoteSegment);
     render(
       <PitchCoachApp
         services={createServices(stableFramesForTargets(targets, 0))}
@@ -724,8 +730,8 @@ describe("PitchCoachApp", () => {
 
     openMajorTriad();
     expect(screen.getByLabelText("Practice guidance").textContent).toContain("Listen to the guide");
-    expect(screen.getByLabelText("Target notes").textContent).toContain("Target");
-    expect(screen.getByLabelText("Target notes").textContent).toContain("A3");
+    expect(screen.getByLabelText("Target segments").textContent).toContain("Target");
+    expect(screen.getByLabelText("Target segments").textContent).toContain("A3");
 
     fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
     await flushReact();
@@ -733,7 +739,7 @@ describe("PitchCoachApp", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("Practice guidance").textContent).toContain("Nice pass");
-      expect(screen.getByLabelText("Target notes").textContent).toContain("Pass");
+      expect(screen.getByLabelText("Target segments").textContent).toContain("Pass");
     });
   });
 
@@ -912,7 +918,7 @@ describe("PitchCoachApp", () => {
   it("uses a sequence-only prompt for scale exercises", async () => {
     vi.useFakeTimers();
     const exercise = getExerciseById("five-note-scale");
-    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm);
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, exercise.defaultTempoBpm).filter(isNoteSegment);
     const services = createServices(stableFramesForTargets(targets, 0));
     render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
 
@@ -949,7 +955,7 @@ function triadFrames(options: {
   starts?: [number, number, number];
   rawStartMs?: number;
 } = {}): PitchFrame[] {
-  const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80);
+  const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80).filter(isNoteSegment);
   const offsets = options.offsets ?? [0, 0, 0];
   const starts = options.starts ?? targets.map((target) => target.startMs);
   const rawStartMs = options.rawStartMs ?? 0;
@@ -973,7 +979,7 @@ function triadFrames(options: {
   return [...sungFrames, ...silenceFrames];
 }
 
-function stableFramesForTargets(targets: ReturnType<typeof buildTargetNotes>, offsetCents: number): PitchFrame[] {
+function stableFramesForTargets(targets: TargetNoteSegment[], offsetCents: number): PitchFrame[] {
   const sungFrames = targets.flatMap((target) =>
     [0, 100, 200, 300, 400, 500, 620].map((offsetMs) => ({
       timeMs: target.startMs + offsetMs,
@@ -1010,11 +1016,15 @@ function historyRecord(
     passed,
     summary: passed ? "Scale felt good." : "A3 was flat.",
     durationMs: 2400,
-    notes: [
+    segments: [
       {
-        degree: 1,
-        label: "A3",
+        id: "root",
+        kind: "note",
+        label: "Root",
+        shortLabel: "R",
+        noteName: "A3",
         midi: parseNoteName("A3"),
+        offsetSemitones: 0,
         status: passed ? "pass" : "flat",
         medianCents: passed ? 0 : -45,
         warnings: []
@@ -1038,7 +1048,7 @@ function sessionRecord(
 }
 
 function scoopedFrames(): PitchFrame[] {
-  const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80);
+  const targets = buildTargetNotes(parseNoteName("A3"), MAJOR_TRIAD_EXERCISE, 80).filter(isNoteSegment);
   const sungFrames = targets.flatMap((target, targetIndex) => {
     if (targetIndex > 0) {
       return [0, 100, 200, 300, 400, 500, 620].map((offsetMs) => ({
@@ -1338,6 +1348,10 @@ async function chooseDropdownOption(trigger: HTMLElement, optionName: string) {
   fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1, pointerType: "mouse" });
   const option = await screen.findByRole("option", { name: optionName });
   fireEvent.click(option);
+}
+
+function isNoteSegment(segment: TargetSegment): segment is TargetNoteSegment {
+  return segment.kind === "note";
 }
 
 async function flushReact() {
