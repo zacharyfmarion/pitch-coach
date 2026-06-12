@@ -64,6 +64,7 @@ export type PitchCoachAppProps = PitchCoachControllerOptions & {
 };
 
 const APP_BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
+const PITCH_COACH_LOGO_URL = `${import.meta.env.BASE_URL}pitch-coach-logo.png`;
 
 export function PitchCoachApp(props: PitchCoachAppProps) {
   const router = usePitchCoachRouter();
@@ -832,7 +833,7 @@ function PitchCoachBrand() {
   return (
     <div className="shell-brand">
       <span className="shell-brand__mark" aria-hidden="true">
-        <Target size={24} />
+        <img className="shell-brand__logo" src={PITCH_COACH_LOGO_URL} alt="" />
       </span>
       <span className="shell-brand__name">Pitch Coach</span>
     </div>

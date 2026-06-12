@@ -48,6 +48,9 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("heading", { name: "Good evening" })).toBeTruthy();
     expect(screen.getByText("Your local practice stats will build as you sing.")).toBeTruthy();
     expect(screen.getByText("Local practice")).toBeTruthy();
+    const brandLogo = document.querySelector<HTMLImageElement>(".shell-brand__logo");
+    expect(brandLogo?.getAttribute("src")).toBe("/pitch-coach-logo.png");
+    expect(brandLogo?.getAttribute("alt")).toBe("");
     expect(screen.queryByText("Robin")).toBeNull();
     expect(screen.getByRole("button", { name: /Start practice/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Interval Training/i })).toBeTruthy();
