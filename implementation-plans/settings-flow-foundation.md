@@ -170,8 +170,8 @@ The implementation should use this feature as the foundation for future settings
 - [x] Add pure settings helpers and type changes.
 - [x] Add settings storage migration and tests.
 - [x] Add preferred audio input service support.
-- [ ] Extract reusable range components.
-- [ ] Build the settings dialog and section components.
+- [x] Extract reusable range components.
+- [x] Build the settings dialog and section components.
 - [ ] Wire the sidebar footer and mobile entrypoint.
 - [ ] Wire settings updates into exercise, range, audio, and song capture flows.
 - [ ] Add component and browser coverage.
