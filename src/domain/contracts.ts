@@ -79,9 +79,16 @@ export type VocalRangeSetup = {
   lastPromptedAt?: string;
 };
 
+export type PreferredAudioInput = {
+  deviceId?: string;
+  label?: string;
+  selectedAt?: string;
+};
+
 export type CoachSettings = {
   range: VocalRange;
   rangeSetup: VocalRangeSetup;
+  defaultTempoBpm: number;
   tempoBpm: number;
   toleranceCents: number;
   exerciseId: ExerciseId;
@@ -89,6 +96,7 @@ export type CoachSettings = {
   timingMode: TimingMode;
   practiceMode: PracticeMode;
   themePreference: ThemePreference;
+  preferredAudioInput?: PreferredAudioInput;
 };
 
 export type TimingMode = "pitch-first";

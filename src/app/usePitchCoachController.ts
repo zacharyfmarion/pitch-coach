@@ -112,11 +112,10 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       return loadedSettings;
     }
 
-    const exercise = getExerciseById(options.initialExerciseId);
     return normalizeSettings({
       ...loadedSettings,
       exerciseId: options.initialExerciseId,
-      tempoBpm: exercise.defaultTempoBpm
+      tempoBpm: loadedSettings.defaultTempoBpm
     });
   });
   const selectedExercise = useMemo(() => getExerciseById(settings.exerciseId), [settings.exerciseId]);
@@ -256,12 +255,11 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   }, []);
 
   const selectExercise = useCallback((exerciseId: ExerciseId) => {
-    const exercise = getExerciseById(exerciseId);
     setSettingsState((current) =>
       normalizeSettings({
         ...current,
         exerciseId,
-        tempoBpm: exercise.defaultTempoBpm
+        tempoBpm: current.defaultTempoBpm
       })
     );
   }, []);

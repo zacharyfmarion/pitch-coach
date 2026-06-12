@@ -14,6 +14,7 @@ import {
   midiToNoteName,
   parseNoteName
 } from "./music";
+import { DEFAULT_GUIDE_TEMPO_BPM } from "./settings";
 import { DEFAULT_RANGE_SETUP } from "./vocalRange";
 
 const ROOT_SEGMENT = noteSegment("root", "Root", "R", 0);
@@ -283,7 +284,8 @@ export const DEFAULT_SETTINGS: CoachSettings = {
     highestMidi: parseNoteName("C5")
   },
   rangeSetup: DEFAULT_RANGE_SETUP,
-  tempoBpm: 80,
+  defaultTempoBpm: DEFAULT_GUIDE_TEMPO_BPM,
+  tempoBpm: DEFAULT_GUIDE_TEMPO_BPM,
   toleranceCents: 35,
   exerciseId: "major-triad",
   saveLocalClips: false,

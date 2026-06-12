@@ -167,8 +167,8 @@ The implementation should use this feature as the foundation for future settings
 - [x] Define the settings entrypoint and responsive access strategy.
 - [x] Define the proposed settings data model changes.
 - [x] Create this implementation plan.
-- [ ] Add pure settings helpers and type changes.
-- [ ] Add settings storage migration and tests.
+- [x] Add pure settings helpers and type changes.
+- [x] Add settings storage migration and tests.
 - [ ] Add preferred audio input service support.
 - [ ] Extract reusable range components.
 - [ ] Build the settings dialog and section components.
