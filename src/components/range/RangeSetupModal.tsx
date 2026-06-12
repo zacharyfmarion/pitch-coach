@@ -803,8 +803,8 @@ function playReferenceTone(midi: number) {
     const oscillator = referenceToneContext.createOscillator();
     const gain = referenceToneContext.createGain();
     const now = referenceToneContext.currentTime;
-    const sustainUntil = now + 2.35;
-    const stopAt = sustainUntil + 0.28;
+    const sustainUntil = now + 1.15;
+    const stopAt = sustainUntil + 0.18;
     oscillator.type = "sine";
     oscillator.frequency.value = midiToFrequency(midi);
     gain.gain.setValueAtTime(0.0001, now);
