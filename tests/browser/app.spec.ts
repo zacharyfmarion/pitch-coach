@@ -146,6 +146,192 @@ async function expectBottomFloatingDefaultRangePrompt(page: Page) {
   return prompt;
 }
 
+async function expectMobileViewportToFit(page: Page) {
+  const metrics = await page.evaluate(() => ({
+    bodyScrollWidth: document.body.scrollWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth
+  }));
+
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+  expect(metrics.documentScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+}
+
+async function expectMobileNavToMatchMock(page: Page) {
+  const metrics = await page.evaluate(() => {
+    const nav = document.querySelector(".pc-app-shell__mobile-nav");
+    const list = document.querySelector(".bottom-nav__list");
+    const triggers = [...document.querySelectorAll(".bottom-nav__trigger")];
+    const activeTrigger = document.querySelector(".bottom-nav__trigger[data-state='active']");
+    const firstLabel = document.querySelector(".bottom-nav__label");
+    if (!nav || !list || triggers.length === 0 || !activeTrigger || !firstLabel) {
+      return null;
+    }
+
+    const navBox = nav.getBoundingClientRect();
+    const triggerBoxes = triggers.map((trigger) => trigger.getBoundingClientRect());
+    const activeStyles = window.getComputedStyle(activeTrigger);
+    const labelStyles = window.getComputedStyle(firstLabel);
+
+    return {
+      activeBackground: activeStyles.backgroundColor,
+      labelFontSize: labelStyles.fontSize,
+      listClientWidth: list.clientWidth,
+      listScrollWidth: list.scrollWidth,
+      navLeft: navBox.left,
+      navRight: navBox.right,
+      triggerCount: triggers.length,
+      triggerWidths: triggerBoxes.map((box) => box.width),
+      viewportWidth: window.innerWidth
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  if (!metrics) {
+    throw new Error("Expected mobile navigation metrics");
+  }
+
+  expect(metrics.triggerCount).toBe(4);
+  expect(metrics.listScrollWidth).toBeLessThanOrEqual(metrics.listClientWidth + 1);
+  expect(metrics.navLeft).toBeGreaterThanOrEqual(-1);
+  expect(metrics.navRight).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+  expect(metrics.activeBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.labelFontSize).toBe("10.5px");
+  metrics.triggerWidths.forEach((width) => {
+    expect(width).toBeLessThanOrEqual(metrics.viewportWidth / 4 + 1);
+  });
+}
+
+async function expectMobileHomeToMatchMock(page: Page) {
+  await expect(page.locator(".mobile-home")).toBeVisible();
+  await expect(page.locator(".mock-home")).toHaveCount(0);
+  await expect(page.locator(".mock-week-streak")).toHaveCount(0);
+  await expect(page.locator(".mobile-streak-chip")).toBeVisible();
+  await expect(page.locator(".mobile-resume-card .mock-pitch-preview")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Practice modes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await expect(page.locator(".mobile-mode-card")).toHaveCount(2);
+  await expect(page.locator(".mobile-stat-card")).toHaveCount(4);
+
+  const metrics = await page.evaluate(() => {
+    const home = document.querySelector(".mobile-home");
+    const header = document.querySelector(".mobile-home__header");
+    const resume = document.querySelector(".mobile-resume-card");
+    const preview = document.querySelector(".mobile-resume-card .mock-pitch-preview");
+    const modeList = document.querySelector(".mobile-mode-list");
+    const modeCards = [...document.querySelectorAll(".mobile-mode-card")];
+    const statGrid = document.querySelector(".mobile-stat-grid");
+    const statCards = [...document.querySelectorAll(".mobile-stat-card")];
+    if (!home || !header || !resume || !preview || !modeList || !statGrid) {
+      return null;
+    }
+
+    const homeBox = home.getBoundingClientRect();
+    const headerBox = header.getBoundingClientRect();
+    const resumeBox = resume.getBoundingClientRect();
+    const previewBox = preview.getBoundingClientRect();
+    const modeListStyles = window.getComputedStyle(modeList);
+    const statGridStyles = window.getComputedStyle(statGrid);
+    const statCardBoxes = statCards.map((card) => card.getBoundingClientRect());
+
+    return {
+      headerAboveResume: headerBox.bottom < resumeBox.top,
+      modeCardCount: modeCards.length,
+      modeDirection: modeListStyles.flexDirection,
+      previewHeight: previewBox.height,
+      resumeWidth: resumeBox.width,
+      statCardCount: statCards.length,
+      statColumnCount: statGridStyles.gridTemplateColumns.split(" ").filter(Boolean).length,
+      statWidths: statCardBoxes.map((box) => box.width),
+      viewportWidth: window.innerWidth,
+      width: homeBox.width
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  if (!metrics) {
+    throw new Error("Expected mobile home metrics");
+  }
+
+  expect(metrics.headerAboveResume).toBe(true);
+  expect(metrics.previewHeight).toBeGreaterThanOrEqual(90);
+  expect(metrics.previewHeight).toBeLessThanOrEqual(104);
+  expect(metrics.resumeWidth).toBeLessThanOrEqual(metrics.viewportWidth - 32);
+  expect(metrics.modeDirection).toBe("column");
+  expect(metrics.modeCardCount).toBe(2);
+  expect(metrics.statColumnCount).toBe(2);
+  expect(metrics.statCardCount).toBe(4);
+  metrics.statWidths.forEach((width) => {
+    expect(width).toBeLessThanOrEqual(metrics.width / 2);
+  });
+}
+
+async function expectMobileExerciseToMatchLatestMock(page: Page) {
+  await expect(page.locator(".mobile-exercise-screen")).toBeVisible();
+  await expect(page.locator(".exercise-screen")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toHaveCount(0);
+  await expect(page.locator(".mobile-exercise-header")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Practice mode" })).toBeVisible();
+  await expect(page.locator(".mobile-exercise-coach")).toBeVisible();
+  await expect(page.locator(".mobile-exercise-roll-card")).toBeVisible();
+  await expect(page.getByLabel("Pitch timeline")).toBeVisible();
+  await expect(page.locator(".mobile-exercise-dock-chip")).toHaveCount(3);
+
+  const metrics = await page.evaluate(() => {
+    const screen = document.querySelector(".mobile-exercise-screen");
+    const header = document.querySelector(".mobile-exercise-header");
+    const mode = document.querySelector(".mobile-exercise-mode-segment");
+    const coach = document.querySelector(".mobile-exercise-coach");
+    const roll = document.querySelector(".mobile-exercise-roll-card");
+    const timeline = document.querySelector(".mobile-exercise-roll-card .timeline-frame");
+    const action = document.querySelector(".mobile-exercise-action");
+    const dock = document.querySelector(".mobile-exercise-dock");
+    if (!screen || !header || !mode || !coach || !roll || !timeline || !action || !dock) {
+      return null;
+    }
+
+    const screenBox = screen.getBoundingClientRect();
+    const headerBox = header.getBoundingClientRect();
+    const modeBox = mode.getBoundingClientRect();
+    const coachBox = coach.getBoundingClientRect();
+    const rollBox = roll.getBoundingClientRect();
+    const timelineBox = timeline.getBoundingClientRect();
+    const actionBox = action.getBoundingClientRect();
+    const dockBox = dock.getBoundingClientRect();
+
+    return {
+      actionAfterRoll: actionBox.top >= rollBox.bottom - 1,
+      bodyScrollWidth: document.body.scrollWidth,
+      coachAfterMode: coachBox.top >= modeBox.bottom - 1,
+      dockBottom: dockBox.bottom,
+      dockWidth: dockBox.width,
+      headerAboveMode: headerBox.bottom <= modeBox.top + 1,
+      rollAfterCoach: rollBox.top >= coachBox.bottom - 1,
+      rollHeight: rollBox.height,
+      screenWidth: screenBox.width,
+      timelineHeight: timelineBox.height,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  if (!metrics) {
+    throw new Error("Expected mobile exercise metrics");
+  }
+
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+  expect(metrics.screenWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+  expect(metrics.headerAboveMode).toBe(true);
+  expect(metrics.coachAfterMode).toBe(true);
+  expect(metrics.rollAfterCoach).toBe(true);
+  expect(metrics.actionAfterRoll).toBe(true);
+  expect(metrics.rollHeight).toBeGreaterThanOrEqual(220);
+  expect(metrics.timelineHeight).toBeGreaterThanOrEqual(130);
+  expect(metrics.dockWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+  expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
+}
+
 test("navigates the shell and renders progress from local history", async ({ page }) => {
   await seedOnboardedSettings(page);
   await page.goto("/");
@@ -238,12 +424,126 @@ test("keeps the exercise usable on a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
+  await expectMobileViewportToFit(page);
+  await expectMobileHomeToMatchMock(page);
+  await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Start practice/ })).toBeVisible();
   await page.getByRole("button", { name: /Start practice/ }).click();
   await expect(page).toHaveURL(/\/exercises\/major-triad$/);
+  await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toHaveCount(0);
+  await expectMobileExerciseToMatchLatestMock(page);
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
+  await expectMobileViewportToFit(page);
+});
+
+test("uses the latest mobile exercise screen components", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/exercises/major-triad");
+
+  await expectMobileExerciseToMatchLatestMock(page);
+  await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
+
+  await page.locator(".mobile-exercise-dock-chip", { hasText: "Strictness" }).click();
+  await expect(page.getByRole("dialog", { name: "Strictness" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Gentle ±50¢" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Standard ±35¢" })).toBeVisible();
+  await page.getByRole("button", { name: "Close settings" }).click();
+
+  await page.locator(".mobile-exercise-dock-chip", { hasText: "Tempo" }).click();
+  await expect(page.getByRole("dialog", { name: "Guide tempo" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Guide tempo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Medium 90 BPM" })).toBeVisible();
+  await page.getByRole("button", { name: "Close settings" }).click();
+
+  await page.locator(".mobile-exercise-dock-chip", { hasText: "Key" }).click();
+  await expect(page.getByRole("dialog", { name: "Key & range" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Lower key" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Raise key" })).toBeVisible();
+  await expectMobileViewportToFit(page);
+});
+
+test("uses the mock mobile home components", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  await expectMobileHomeToMatchMock(page);
+  await expect(page.getByText("Start with one short drill today.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Interval Training 12 drills · 0 of 12 tried" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sing a Song Upload a track, sing the real vocal" })).toBeVisible();
+  await expectMobileViewportToFit(page);
+});
+
+test("uses bottom navigation across mobile top-level routes", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const mobileNav = page.getByRole("navigation", { name: "Mobile navigation" });
+  await expect(mobileNav).toBeVisible();
+  await expect(page.locator(".pc-app-shell__sidebar")).toBeHidden();
+  await expect(mobileNav.getByRole("tab", { name: "Home" })).toHaveAttribute("data-state", "active");
+  await expectMobileHomeToMatchMock(page);
+  await expectMobileNavToMatchMock(page);
+  await expectMobileViewportToFit(page);
+
+  await mobileNav.getByRole("tab", { name: "Practice" }).click();
+  await expect(page).toHaveURL(/\/practice$/);
+  await expect(page.getByRole("heading", { name: "Practice Library", level: 1 })).toBeVisible();
+  await expect(mobileNav.getByRole("tab", { name: "Practice" })).toHaveAttribute("data-state", "active");
+  await expectMobileNavToMatchMock(page);
+  await expectMobileViewportToFit(page);
+
+  await mobileNav.getByRole("tab", { name: "Sing" }).click();
+  await expect(page).toHaveURL(/\/songs$/);
+  await expect(page.getByRole("heading", { name: "Sing a Song" })).toBeVisible();
+  await expect(mobileNav.getByRole("tab", { name: "Sing" })).toHaveAttribute("data-state", "active");
+  await expectMobileNavToMatchMock(page);
+  await expectMobileViewportToFit(page);
+
+  await mobileNav.getByRole("tab", { name: "Progress" }).click();
+  await expect(page).toHaveURL(/\/progress$/);
+  await expect(page.getByRole("heading", { name: "Your Progress" })).toBeVisible();
+  await expect(mobileNav.getByRole("tab", { name: "Progress" })).toHaveAttribute("data-state", "active");
+  await expectMobileNavToMatchMock(page);
+  await expectMobileViewportToFit(page);
+});
+
+test("keeps the mobile range prompt above bottom navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const prompt = page.getByRole("status", { name: "Default vocal range" });
+  const mobileNav = page.getByRole("navigation", { name: "Mobile navigation" });
+  await expect(prompt).toBeVisible();
+  await expect(mobileNav).toBeVisible();
+
+  const bounds = await page.evaluate(() => {
+    const promptBox = document.querySelector(".range-setup-toast")?.getBoundingClientRect();
+    const navBox = document.querySelector(".pc-app-shell__mobile-nav")?.getBoundingClientRect();
+    if (!promptBox || !navBox) {
+      return null;
+    }
+    return {
+      navBottom: navBox.bottom,
+      navTop: navBox.top,
+      promptBottom: promptBox.bottom,
+      promptWidth: promptBox.width,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth
+    };
+  });
+  expect(bounds).not.toBeNull();
+  if (!bounds) {
+    throw new Error("Expected mobile prompt and navigation bounds");
+  }
+  expect(bounds.promptBottom).toBeLessThanOrEqual(bounds.navTop);
+  expect(bounds.promptWidth).toBeLessThanOrEqual(bounds.viewportWidth);
+  expect(bounds.viewportHeight - bounds.navBottom).toBeLessThanOrEqual(1);
+  await expectMobileViewportToFit(page);
 });
 
 test("keeps settings reachable on a mobile viewport", async ({ page }) => {
