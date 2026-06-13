@@ -286,6 +286,7 @@ async function expectMobileExerciseToMatchLatestMock(page: Page) {
     const timeline = document.querySelector(".mobile-exercise-roll-card .timeline-frame");
     const action = document.querySelector(".mobile-exercise-action");
     const dock = document.querySelector(".mobile-exercise-dock");
+    const checkpoints = Array.from(document.querySelectorAll(".mobile-exercise-stones .note-checkpoint"));
     if (!screen || !header || !mode || !coach || !roll || !timeline || !action || !dock) {
       return null;
     }
@@ -298,11 +299,15 @@ async function expectMobileExerciseToMatchLatestMock(page: Page) {
     const timelineBox = timeline.getBoundingClientRect();
     const actionBox = action.getBoundingClientRect();
     const dockBox = dock.getBoundingClientRect();
+    const checkpointBoxes = checkpoints.map((checkpoint) => checkpoint.getBoundingClientRect());
 
     return {
       actionAfterRoll: actionBox.top >= rollBox.bottom - 1,
       bodyScrollWidth: document.body.scrollWidth,
       coachAfterMode: coachBox.top >= modeBox.bottom - 1,
+      checkpointCount: checkpoints.length,
+      checkpointMaxWidth: Math.max(...checkpointBoxes.map((box) => box.width)),
+      checkpointMinWidth: Math.min(...checkpointBoxes.map((box) => box.width)),
       dockBottom: dockBox.bottom,
       dockWidth: dockBox.width,
       headerAboveMode: headerBox.bottom <= modeBox.top + 1,
@@ -326,10 +331,46 @@ async function expectMobileExerciseToMatchLatestMock(page: Page) {
   expect(metrics.coachAfterMode).toBe(true);
   expect(metrics.rollAfterCoach).toBe(true);
   expect(metrics.actionAfterRoll).toBe(true);
+  expect(metrics.checkpointCount).toBe(3);
+  expect(metrics.checkpointMinWidth).toBeGreaterThanOrEqual(96);
+  expect(metrics.checkpointMaxWidth).toBeLessThanOrEqual(122);
   expect(metrics.rollHeight).toBeGreaterThanOrEqual(220);
   expect(metrics.timelineHeight).toBeGreaterThanOrEqual(130);
   expect(metrics.dockWidth).toBeLessThanOrEqual(metrics.viewportWidth);
   expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
+}
+
+async function expectMobileCheckpointStonesToStayCompact(page: Page) {
+  await expect(page.locator(".mobile-exercise-stones .note-checkpoint")).toHaveCount(1);
+
+  const metrics = await page.evaluate(() => {
+    const strip = document.querySelector(".mobile-exercise-stones .note-checkpoint-strip");
+    const checkpoint = document.querySelector(".mobile-exercise-stones .note-checkpoint");
+    if (!strip || !checkpoint) {
+      return null;
+    }
+
+    const stripBox = strip.getBoundingClientRect();
+    const checkpointBox = checkpoint.getBoundingClientRect();
+    const marker = checkpoint.querySelector(".note-checkpoint__degree");
+    const markerStyles = marker ? window.getComputedStyle(marker) : null;
+    return {
+      checkpointWidth: checkpointBox.width,
+      markerColor: markerStyles?.color ?? "",
+      markerFontSize: markerStyles?.fontSize ?? "",
+      stripWidth: stripBox.width
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  if (!metrics) {
+    throw new Error("Expected compact mobile checkpoint metrics");
+  }
+
+  expect(metrics.checkpointWidth).toBeLessThanOrEqual(122);
+  expect(metrics.checkpointWidth).toBeLessThan(metrics.stripWidth * 0.45);
+  expect(metrics.markerColor).toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.markerFontSize).toBe("0px");
 }
 
 async function expectMobileExerciseSheetToAnimate(page: Page, name: string) {
@@ -492,6 +533,16 @@ test("uses the latest mobile exercise screen components", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Lower key" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Raise key" })).toBeVisible();
   await expectMobileExerciseSheetToAnimate(page, "Key & range");
+  await expectMobileViewportToFit(page);
+});
+
+test("keeps mobile checkpoint stones compact for one-note exercises", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/exercises/single-note-match");
+
+  await expect(page.locator(".mobile-exercise-screen")).toBeVisible();
+  await expectMobileCheckpointStonesToStayCompact(page);
   await expectMobileViewportToFit(page);
 });
 
