@@ -2799,8 +2799,13 @@ button.exercise-auto-pill {
   }
 
   .pitch-shell .pc-app-shell__main {
-    grid-template-rows: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
     min-height: 0 !important;
+  }
+
+  .pitch-shell .pc-app-shell__header {
+    position: relative;
+    z-index: 6;
   }
 
   .pitch-shell .pc-app-shell__content {
@@ -4311,6 +4316,14 @@ button.exercise-auto-pill {
 
   .pitch-shell:not(.pc-app-shell--with-mobile-nav) .pc-app-shell__content {
     padding-bottom: 0 !important;
+  }
+
+  .pitch-shell:not(.pc-app-shell--with-mobile-nav) .pc-app-shell__main {
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .pitch-shell:not(.pc-app-shell--with-mobile-nav) .pc-app-shell__header {
+    display: none !important;
   }
 
   .exercise-screen-page {
