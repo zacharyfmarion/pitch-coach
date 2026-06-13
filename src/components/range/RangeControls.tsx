@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent
 } from "react";
 import { Mic, Minus, Plus, Volume2 } from "lucide-react";
+import { preparePlaybackAudioSession, resumeAudioContext } from "../../audio/audioSession";
 import type { VocalRange } from "../../domain/contracts";
 import { midiToFrequency, midiToNoteName } from "../../domain/music";
 import {
@@ -341,12 +342,11 @@ function isSharp(midi: number) {
 
 let referenceToneContext: AudioContext | null = null;
 
-function playReferenceTone(midi: number) {
+async function playReferenceTone(midi: number) {
   try {
+    preparePlaybackAudioSession();
     referenceToneContext = referenceToneContext ?? new AudioContext();
-    if (referenceToneContext.state === "suspended") {
-      void referenceToneContext.resume();
-    }
+    await resumeAudioContext(referenceToneContext);
 
     const oscillator = referenceToneContext.createOscillator();
     const gain = referenceToneContext.createGain();
@@ -374,7 +374,7 @@ function ReferenceToneButton({ midi, label }: { midi: number; label: string }) {
       className="range-tone-button"
       type="button"
       aria-label={`Hear ${label}`}
-      onClick={() => playReferenceTone(midi)}
+      onClick={() => void playReferenceTone(midi)}
     >
       <Volume2 size={15} />
     </button>

@@ -1,6 +1,7 @@
 import * as Tone from "tone";
 import type { PromptStyle, TargetSegment } from "../domain/contracts";
 import { getPromptTimeline } from "../domain/promptTiming";
+import { preparePlaybackAudioSession } from "./audioSession";
 import type { PromptPlayer } from "./types";
 
 export class TonePromptPlayer implements PromptPlayer {
@@ -10,6 +11,8 @@ export class TonePromptPlayer implements PromptPlayer {
 
   async playPrompt(targetSegments: TargetSegment[], tempoBpm: number, promptStyle: PromptStyle) {
     this.cancel();
+    preparePlaybackAudioSession();
+    Tone.getContext();
     await Tone.start();
     const synth = this.getSynth();
     const glideSynth = this.getGlideSynth();

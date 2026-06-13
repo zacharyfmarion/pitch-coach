@@ -1,4 +1,5 @@
 import type { AudioCaptureConfig, AudioInputEngine } from "./types";
+import { preparePlayAndRecordAudioSession, resumeAudioContext } from "./audioSession";
 import { createAudioInputConstraints } from "./inputConstraints";
 
 const DEFAULT_FRAME_SIZE = 4096;
@@ -44,12 +45,14 @@ export class BrowserAudioEngine implements AudioInputEngine {
       throw new Error("This browser does not support microphone AudioWorklet capture.");
     }
 
+    preparePlayAndRecordAudioSession();
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: createAudioInputConstraints(config.deviceId)
     });
     this.startRecorderIfRequested(config);
 
     this.context = new AudioContext({ latencyHint: "interactive" });
+    await resumeAudioContext(this.context);
     await this.context.audioWorklet.addModule(WORKLET_URL);
 
     this.source = this.context.createMediaStreamSource(this.stream);

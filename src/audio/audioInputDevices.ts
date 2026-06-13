@@ -1,4 +1,5 @@
 import type { AudioInputDevice, AudioInputDeviceService } from "./types";
+import { preparePlayAndRecordAudioSession } from "./audioSession";
 import { createAudioInputConstraints } from "./inputConstraints";
 
 export class BrowserAudioInputDeviceService implements AudioInputDeviceService {
@@ -24,6 +25,7 @@ export class BrowserAudioInputDeviceService implements AudioInputDeviceService {
       return [createDefaultDevice()];
     }
 
+    preparePlayAndRecordAudioSession();
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: createAudioInputConstraints()
     });
