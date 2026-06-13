@@ -62,11 +62,11 @@ test("opens settings from the footer and applies practice defaults", async ({ pa
   await page.getByRole("group", { name: "Strictness" }).getByRole("button", { name: "Strict" }).click();
   await expect(page.getByText(/within \+\/-22 cents/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Done" }).click();
+  await page.getByRole("dialog", { name: "Practice" }).getByRole("button", { name: "Done", exact: true }).click();
   await page.getByRole("button", { name: /Start practice/ }).click();
   await expect(page).toHaveURL(/\/exercises\/major-triad$/);
   await expect(page.getByText("70 BPM")).toBeVisible();
-  await expect(page.getByText("22 cents")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Strictness" })).toContainText("Strict");
 });
 
 test("opens exercise routes directly", async ({ page }) => {

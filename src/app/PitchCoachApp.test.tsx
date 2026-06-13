@@ -342,9 +342,8 @@ describe("PitchCoachApp", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Start practice/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.click(screen.getByRole("button", { name: "Find it by singing" }));
+    fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Re-test by singing" }));
     fireEvent.click(screen.getByRole("button", { name: "Start - sing your lowest" }));
 
     await waitFor(() => expect(services.audioEngine.lastConfig?.deviceId).toBe("studio-mic"));
@@ -1044,7 +1043,7 @@ describe("PitchCoachApp", () => {
       70,
       "chord-then-sequence"
     );
-    expect(screen.getByText("22 cents")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Strictness" }).textContent).toContain("Strict");
   });
 
   it("resets dialog settings without clearing local practice history", async () => {
@@ -1066,7 +1065,7 @@ describe("PitchCoachApp", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 attempt logged")
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 / 12 done")
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
@@ -1080,7 +1079,7 @@ describe("PitchCoachApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 attempt logged")
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 / 12 done")
     );
   });
 
