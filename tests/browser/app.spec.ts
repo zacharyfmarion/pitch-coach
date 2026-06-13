@@ -202,6 +202,47 @@ async function expectMobileNavToMatchMock(page: Page) {
   });
 }
 
+async function expectMobilePracticeBottomContentAboveNav(page: Page) {
+  await page.evaluate(() => {
+    const shellContent = document.querySelector(".pc-app-shell__content");
+    const practicePage = document.querySelector(".mock-practice-page");
+    if (shellContent) {
+      shellContent.scrollTop = shellContent.scrollHeight;
+    }
+    if (practicePage) {
+      practicePage.scrollTop = practicePage.scrollHeight;
+    }
+  });
+
+  const metrics = await page.evaluate(() => {
+    const shellContent = document.querySelector(".pc-app-shell__content");
+    const practicePage = document.querySelector(".mock-practice-page");
+    const nav = document.querySelector(".pc-app-shell__mobile-nav");
+    const lastExercise = [...document.querySelectorAll(".exercise-option")].at(-1);
+    if (!shellContent || !practicePage || !nav || !lastExercise) {
+      return null;
+    }
+
+    const navBox = nav.getBoundingClientRect();
+    const exerciseBox = lastExercise.getBoundingClientRect();
+    return {
+      clearance: navBox.top - exerciseBox.bottom,
+      contentScrollTop: shellContent.scrollTop,
+      lastExerciseBottom: exerciseBox.bottom,
+      navTop: navBox.top,
+      pageScrollTop: practicePage.scrollTop
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  if (!metrics) {
+    throw new Error("Expected mobile practice bottom spacing metrics");
+  }
+
+  expect(metrics.contentScrollTop).toBeGreaterThan(0);
+  expect(metrics.clearance).toBeGreaterThanOrEqual(18);
+}
+
 async function expectMobileHomeToMatchMock(page: Page) {
   await expect(page.locator(".mobile-home")).toBeVisible();
   await expect(page.locator(".mock-home")).toHaveCount(0);
@@ -576,6 +617,7 @@ test("uses bottom navigation across mobile top-level routes", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Practice Library", level: 1 })).toBeVisible();
   await expect(mobileNav.getByRole("tab", { name: "Practice" })).toHaveAttribute("data-state", "active");
   await expectMobileNavToMatchMock(page);
+  await expectMobilePracticeBottomContentAboveNav(page);
   await expectMobileViewportToFit(page);
 
   await mobileNav.getByRole("tab", { name: "Sing" }).click();

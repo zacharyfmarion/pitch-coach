@@ -4118,9 +4118,9 @@ button.exercise-auto-pill {
   }
 
   .mock-practice-page {
-    height: 100% !important;
+    height: auto !important;
     min-height: 100% !important;
-    overflow: auto !important;
+    overflow: visible !important;
     padding: 18px 18px calc(22px + var(--pc-mobile-nav-height, 84px)) !important;
   }
 

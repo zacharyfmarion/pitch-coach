@@ -66,3 +66,4 @@ The key mock direction is not the phone bezel or fake status bar. It is the app 
 - [x] Add browser coverage for the latest mobile exercise screen structure and sheets.
 - [x] Animate the mobile exercise bottom sheets with the mock slide-up and backdrop fade timing.
 - [x] Keep mobile exercise checkpoint stones compact for one-note and triad exercises.
+- [x] Keep the mobile Practice list bottom content clear of the fixed tab bar.
