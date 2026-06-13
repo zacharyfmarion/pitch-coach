@@ -1111,6 +1111,17 @@ describe("PitchCoachApp", () => {
     await waitFor(() => expect(services.audioEngine.lastConfig?.deviceId).toBe("studio-mic"));
   });
 
+  it("opens audio settings with the default microphone fallback without crashing", async () => {
+    render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Audio.*Mic & input/i }));
+
+    const microphoneDropdown = await screen.findByRole("combobox", { name: "Microphone" });
+    expect(microphoneDropdown.textContent).toContain("Default microphone");
+    expect(screen.getByRole("dialog", { name: "Audio" })).toBeTruthy();
+  });
+
   it("does not stop an active exercise capture when closing settings from the voice section", async () => {
     const services = createServices([]);
     render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
