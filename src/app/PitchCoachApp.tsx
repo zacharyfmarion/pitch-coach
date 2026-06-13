@@ -31,6 +31,7 @@ import {
 } from "../components/range/RangeSetupModal";
 import { SettingsDialog } from "../components/settings/SettingsDialog";
 import { AppShell } from "../components/ui/AppShell";
+import { BottomNav } from "../components/ui/BottomNav";
 import { Button } from "../components/ui/Button";
 import {
   Card,
@@ -101,6 +102,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   const [guideProgress, setGuideProgress] = useState(0);
   const replayAudioRef = useRef<HTMLAudioElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const isMobileViewport = useMediaQuery(MOBILE_NAV_MEDIA_QUERY);
 
   useEffect(() => {
     if (
@@ -555,12 +557,73 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
           activeSegmentIndices: []
         };
 
+  if (isMobileViewport) {
+    return (
+      <MainShell
+        activeScreen="library"
+        onNavigate={navigateTopLevel}
+        onOpenSettings={() => setSettingsOpen(true)}
+        practiceSummary={coach.practiceSummary}
+        showMobileNav={false}
+      >
+        <main className="mobile-exercise-page">
+          <MobileExerciseScreen
+            coach={coach}
+            mode={mode}
+            strictness={strictness}
+            activeTempoPreset={activeTempoPreset}
+            practiceStatusView={practiceStatusView}
+            coachGuidance={coachGuidance}
+            targetsInTuneCount={targetsInTuneCount}
+            guidePlaybackFrame={guidePlaybackFrame}
+            transportProgress={transportProgress}
+            practicePaused={practicePaused}
+            canStepKeyDown={canStepKeyDown}
+            canStepKeyUp={canStepKeyUp}
+            autoToggleLabel={autoToggleLabel}
+            themeName={activeTheme.name}
+            onBack={() => void backToLibrary()}
+            onToggleAutoPractice={toggleAutoPractice}
+            onSetMode={(practiceMode) =>
+              coach.setSettings({
+                ...coach.settings,
+                practiceMode
+              })
+            }
+            onSetStrictness={(option) =>
+              coach.setSettings({
+                ...coach.settings,
+                toleranceCents: option.cents
+              })
+            }
+            onSetTempo={(tempoBpm) =>
+              coach.setSettings({
+                ...coach.settings,
+                tempoBpm
+              })
+            }
+            onStepKey={(rootIndex) => void coach.setCurrentRootIndex(rootIndex)}
+            onPrimaryAction={runPrimaryAction}
+            onPlayGuide={() => void coach.playGuide()}
+            onReplayTake={replayLatestTake}
+            onScrub={scrubManualTransport}
+            onResume={runPrimaryAction}
+            onRestart={() => void restartAutoPractice()}
+            onAdvance={() => void coach.advanceLesson()}
+          />
+          {rangeSetupModal}
+        </main>
+      </MainShell>
+    );
+  }
+
   return (
     <MainShell
       activeScreen="library"
       onNavigate={navigateTopLevel}
       onOpenSettings={() => setSettingsOpen(true)}
       practiceSummary={coach.practiceSummary}
+      showMobileNav={false}
     >
       <main className="exercise-screen-page">
         <section className="exercise-screen" aria-label="Pitch coach exercise">
@@ -1297,6 +1360,587 @@ function ExerciseTransport({
   );
 }
 
+type MobileExerciseSheetKind = "key" | "strictness" | "tempo";
+
+type MobileExerciseScreenProps = {
+  coach: ReturnType<typeof usePitchCoachController>;
+  mode: PracticeMode;
+  strictness: StrictnessOption;
+  activeTempoPreset: (typeof TEMPO_PRESETS)[number];
+  practiceStatusView: PracticeStatusView;
+  coachGuidance: CoachGuidanceView;
+  targetsInTuneCount: number;
+  guidePlaybackFrame: {
+    playheadMs: number | null;
+    activeSegmentIndices: number[];
+  };
+  transportProgress: number;
+  practicePaused: boolean;
+  canStepKeyDown: boolean;
+  canStepKeyUp: boolean;
+  autoToggleLabel: string;
+  themeName: string;
+  onBack: () => void;
+  onToggleAutoPractice: () => void;
+  onSetMode: (mode: PracticeMode) => void;
+  onSetStrictness: (option: StrictnessOption) => void;
+  onSetTempo: (tempoBpm: number) => void;
+  onStepKey: (rootIndex: number) => void;
+  onPrimaryAction: () => void;
+  onPlayGuide: () => void;
+  onReplayTake: () => void;
+  onScrub: (progress: number) => void;
+  onResume: () => void;
+  onRestart: () => void;
+  onAdvance: () => void;
+};
+
+function MobileExerciseScreen({
+  coach,
+  mode,
+  strictness,
+  activeTempoPreset,
+  practiceStatusView,
+  coachGuidance,
+  targetsInTuneCount,
+  guidePlaybackFrame,
+  transportProgress,
+  practicePaused,
+  canStepKeyDown,
+  canStepKeyUp,
+  autoToggleLabel,
+  themeName,
+  onBack,
+  onToggleAutoPractice,
+  onSetMode,
+  onSetStrictness,
+  onSetTempo,
+  onStepKey,
+  onPrimaryAction,
+  onPlayGuide,
+  onReplayTake,
+  onScrub,
+  onResume,
+  onRestart,
+  onAdvance
+}: MobileExerciseScreenProps) {
+  const [openSheet, setOpenSheet] = useState<MobileExerciseSheetKind | null>(null);
+  const status = coach.lessonState.status;
+  const primaryLabel = createPrimaryPracticeLabel(status, coach.selectedExercise, mode);
+  const keyLabel = `${formatKeyName(coach.currentRootMidi)} maj`;
+
+  return (
+    <section className="mobile-exercise-screen" aria-label="Pitch coach exercise">
+      <header className="mobile-exercise-header">
+        <button className="mobile-exercise-icon-button" type="button" onClick={onBack} aria-label="Back to exercises">
+          <ArrowLeft size={18} aria-hidden="true" />
+        </button>
+        <div className="mobile-exercise-title">
+          <h1>{coach.selectedExercise.title}</h1>
+          <p>
+            {formatCategoryLabel(coach.selectedExercise.category)} · Take {coach.lessonState.attemptNumber + 1}
+          </p>
+        </div>
+        {mode === "auto" ? (
+          <button
+            className="mobile-exercise-icon-button"
+            type="button"
+            onClick={onToggleAutoPractice}
+            aria-label={autoToggleLabel}
+            title={autoToggleLabel}
+          >
+            {isAutoPracticeActive(status, coach.isBusy) ? (
+              <Pause size={18} fill="currentColor" aria-hidden="true" />
+            ) : status === "complete" ? (
+              <RotateCcw size={18} aria-hidden="true" />
+            ) : (
+              <Play size={18} fill="currentColor" aria-hidden="true" />
+            )}
+          </button>
+        ) : (
+          <span className="mobile-exercise-header-spacer" aria-hidden="true" />
+        )}
+      </header>
+
+      <div className="mobile-exercise-mode-segment" role="group" aria-label="Practice mode">
+        {(["auto", "manual"] as const).map((option) => {
+          const selected = mode === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={selected}
+              data-active={selected || undefined}
+              disabled={coach.isBusy}
+              onClick={() => onSetMode(option)}
+            >
+              {option === "auto" ? <Play size={14} fill="currentColor" /> : <Target size={14} />}
+              <span>{option === "auto" ? "Auto" : "Manual"}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <section className="mobile-exercise-coach" aria-label="Practice guidance">
+        <div className="mobile-exercise-coach__mark" aria-hidden="true">
+          <Music2 size={22} />
+        </div>
+        <div className="mobile-exercise-coach__bubble">
+          <strong>{createMockCoachTitle(status, mode)}</strong>
+          <span>{createMockCoachMessage(coachGuidance, status, mode)}</span>
+        </div>
+      </section>
+
+      <section className="mobile-exercise-roll-card" aria-label="Pitch practice roll">
+        <div className="mobile-exercise-stones">
+          <NoteCheckpointStrip
+            targetSegments={coach.targetSegments}
+            attemptScore={coach.attemptScore}
+            activeSegmentIndices={guidePlaybackFrame.activeSegmentIndices}
+            guideActive={status === "promptPlaying"}
+          />
+        </div>
+        <div className="mobile-exercise-scoreline" aria-label={`${targetsInTuneCount} notes in tune`}>
+          <strong>
+            {targetsInTuneCount}
+            <span>/{coach.targetSegments.length}</span>
+          </strong>
+          <span>in tune · ±{strictness.cents}¢</span>
+        </div>
+        <PitchTimeline
+          frames={coach.pitchFrames}
+          targetSegments={coach.targetSegments}
+          attemptScore={coach.attemptScore}
+          totalDurationMs={coach.listeningDurationMs}
+          toleranceCents={coach.settings.toleranceCents}
+          status={status}
+          themeName={themeName}
+          guidePlayheadMs={guidePlaybackFrame.playheadMs}
+          guideActiveSegmentIndices={guidePlaybackFrame.activeSegmentIndices}
+        />
+      </section>
+
+      <section className="mobile-exercise-action" aria-label="Practice transport">
+        <MobileExerciseTransport
+          mode={mode}
+          status={status}
+          statusView={practiceStatusView}
+          isBusy={coach.isBusy}
+          isPaused={practicePaused}
+          progress={transportProgress}
+          canReplayTake={Boolean(coach.localClip)}
+          primaryLabel={primaryLabel}
+          onPrimaryAction={onPrimaryAction}
+          onPlayGuide={onPlayGuide}
+          onReplayTake={onReplayTake}
+          onScrub={onScrub}
+          onResume={onResume}
+          onRestart={onRestart}
+          onAdvance={onAdvance}
+        />
+      </section>
+
+      <nav className="mobile-exercise-dock" aria-label="Exercise settings">
+        <MobileExerciseDockChip
+          icon={<Activity size={16} />}
+          label="Key"
+          value={keyLabel}
+          mono
+          active={openSheet === "key"}
+          onClick={() => setOpenSheet("key")}
+        />
+        <MobileExerciseDockChip
+          icon={<Target size={16} />}
+          label="Strictness"
+          value={strictness.label}
+          active={openSheet === "strictness"}
+          onClick={() => setOpenSheet("strictness")}
+        />
+        <MobileExerciseDockChip
+          icon={<Clock3 size={16} />}
+          label="Tempo"
+          value={`${coach.settings.tempoBpm} BPM`}
+          mono
+          active={openSheet === "tempo"}
+          onClick={() => setOpenSheet("tempo")}
+        />
+      </nav>
+
+      <MobileExerciseSheet
+        open={openSheet === "key"}
+        title="Key & range"
+        subtitle="Transpose this drill"
+        onClose={() => setOpenSheet(null)}
+      >
+        <MobileKeySheet
+          coach={coach}
+          canStepKeyDown={canStepKeyDown}
+          canStepKeyUp={canStepKeyUp}
+          onStepKey={onStepKey}
+        />
+      </MobileExerciseSheet>
+      <MobileExerciseSheet
+        open={openSheet === "strictness"}
+        title="Strictness"
+        subtitle="How close counts"
+        onClose={() => setOpenSheet(null)}
+      >
+        <MobileStrictnessSheet value={strictness} onChange={onSetStrictness} />
+      </MobileExerciseSheet>
+      <MobileExerciseSheet
+        open={openSheet === "tempo"}
+        title="Guide tempo"
+        onClose={() => setOpenSheet(null)}
+      >
+        <MobileTempoSheet
+          tempoBpm={coach.settings.tempoBpm}
+          activeTempoPreset={activeTempoPreset}
+          onChange={onSetTempo}
+        />
+      </MobileExerciseSheet>
+
+      {coach.errorMessage ? (
+        <div className="error-banner" role="alert">
+          {coach.errorMessage}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function MobileExerciseTransport({
+  mode,
+  status,
+  statusView,
+  isBusy,
+  isPaused,
+  progress,
+  canReplayTake,
+  primaryLabel,
+  onPrimaryAction,
+  onPlayGuide,
+  onReplayTake,
+  onScrub,
+  onResume,
+  onRestart,
+  onAdvance
+}: {
+  mode: PracticeMode;
+  status: LessonStatus;
+  statusView: PracticeStatusView;
+  isBusy: boolean;
+  isPaused: boolean;
+  progress: number;
+  canReplayTake: boolean;
+  primaryLabel: string;
+  onPrimaryAction: () => void;
+  onPlayGuide: () => void;
+  onReplayTake: () => void;
+  onScrub: (progress: number) => void;
+  onResume: () => void;
+  onRestart: () => void;
+  onAdvance: () => void;
+}) {
+  if (mode === "manual") {
+    return (
+      <div className="mobile-exercise-manual-transport">
+        <input
+          className="exercise-transport-slider"
+          type="range"
+          min="0"
+          max="1"
+          step="0.001"
+          value={progress}
+          onChange={(event) => onScrub(Number(event.target.value))}
+          aria-label="Practice scrub"
+          style={{ "--transport-progress": `${Math.round(progress * 100)}%` } as CSSProperties}
+        />
+        <p>{createTransportHint(status, mode)}</p>
+        <div className="mobile-exercise-manual-actions">
+          <button type="button" onClick={onPlayGuide} disabled={isBusy || status === "complete"}>
+            <Play size={15} fill="currentColor" />
+            <span>Guide</span>
+          </button>
+          <button type="button" onClick={onReplayTake} disabled={!canReplayTake}>
+            <LineChart size={16} />
+            <span>Replay</span>
+          </button>
+          {status === "retry" ? (
+            <button type="button" className="is-primary" onClick={onPrimaryAction} disabled={isBusy}>
+              <RotateCcw size={16} />
+              <span>Retry</span>
+            </button>
+          ) : status === "passed" ? (
+            <button type="button" className="is-primary" onClick={onAdvance}>
+              <Play size={16} fill="currentColor" />
+              <span>Move on</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="is-primary"
+              onClick={onPrimaryAction}
+              disabled={isBusy || status === "complete"}
+            >
+              <Mic size={16} />
+              <span>{primaryLabel}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const autoView = createAutoTransportView(status, statusView);
+  const content = (
+    <>
+      {autoView.pulse ? <span className="exercise-eq-bars" aria-hidden="true"><i /><i /><i /><i /></span> : autoView.icon}
+      <span>{autoView.label}</span>
+      <small>{autoView.detail}</small>
+    </>
+  );
+
+  if (isPaused) {
+    return (
+      <button type="button" className="mobile-exercise-status-pill mobile-exercise-status-pill--success" onClick={onResume}>
+        <Play size={16} fill="currentColor" />
+        <span>Resume practice</span>
+      </button>
+    );
+  }
+
+  if (status === "idle") {
+    return (
+      <button
+        type="button"
+        className={`mobile-exercise-status-pill mobile-exercise-status-pill--${autoView.tone}`}
+        onClick={onPrimaryAction}
+        aria-label={`${autoView.label}. ${autoView.detail}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  if (status === "complete") {
+    return (
+      <button
+        type="button"
+        className="mobile-exercise-status-pill mobile-exercise-status-pill--success"
+        onClick={onRestart}
+      >
+        <RotateCcw size={16} />
+        <span>Restart lesson</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className={`mobile-exercise-status-pill mobile-exercise-status-pill--${autoView.tone}`} aria-live="polite">
+      {content}
+    </div>
+  );
+}
+
+function MobileExerciseDockChip({
+  icon,
+  label,
+  value,
+  active,
+  mono = false,
+  onClick
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  active: boolean;
+  mono?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className="mobile-exercise-dock-chip" data-active={active || undefined} onClick={onClick}>
+      <span className="mobile-exercise-dock-chip__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="mobile-exercise-dock-chip__copy">
+        <span>{label}</span>
+        <strong data-mono={mono || undefined}>{value}</strong>
+      </span>
+    </button>
+  );
+}
+
+function MobileExerciseSheet({
+  open,
+  title,
+  subtitle,
+  onClose,
+  children
+}: {
+  open: boolean;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const [mounted, setMounted] = useState(open);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    const prefersReducedMotion =
+      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => setMounted(false), prefersReducedMotion ? 1 : 260);
+    return () => window.clearTimeout(timer);
+  }, [mounted, open]);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return (
+    <div className="mobile-exercise-sheet" data-state={open ? "open" : "closed"} role="dialog" aria-label={title}>
+      <button className="mobile-exercise-sheet__backdrop" type="button" aria-label="Close settings" onClick={onClose} />
+      <div className="mobile-exercise-sheet__panel">
+        <span className="mobile-exercise-sheet__handle" aria-hidden="true" />
+        <div className="mobile-exercise-sheet__header">
+          <h2>{title}</h2>
+          {subtitle ? <span>{subtitle}</span> : null}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function MobileKeySheet({
+  coach,
+  canStepKeyDown,
+  canStepKeyUp,
+  onStepKey
+}: {
+  coach: ReturnType<typeof usePitchCoachController>;
+  canStepKeyDown: boolean;
+  canStepKeyUp: boolean;
+  onStepKey: (rootIndex: number) => void;
+}) {
+  return (
+    <div className="mobile-key-sheet">
+      <div className="mobile-key-stepper">
+        <button
+          type="button"
+          onClick={() => onStepKey(coach.currentRootIndex - 1)}
+          disabled={!canStepKeyDown}
+          aria-label="Lower key"
+        >
+          -
+        </button>
+        <span>
+          <strong>{formatKeyName(coach.currentRootMidi)}</strong>
+          <small>{coach.currentKeyLabel}</small>
+        </span>
+        <button
+          type="button"
+          onClick={() => onStepKey(coach.currentRootIndex + 1)}
+          disabled={!canStepKeyUp}
+          aria-label="Raise key"
+        >
+          +
+        </button>
+      </div>
+      <p className="mobile-sheet-note mobile-sheet-note--success">
+        <CheckCircle2 size={15} aria-hidden="true" />
+        <span>
+          Fits your range · {midiToNoteName(coach.settings.range.lowestMidi)}-
+          {midiToNoteName(coach.settings.range.highestMidi)}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+function MobileStrictnessSheet({
+  value,
+  onChange
+}: {
+  value: StrictnessOption;
+  onChange: (option: StrictnessOption) => void;
+}) {
+  return (
+    <div className="mobile-strictness-sheet">
+      <div className="mobile-sheet-option-grid">
+        {STRICTNESS_OPTIONS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            data-active={value.id === option.id || undefined}
+            onClick={() => onChange(option)}
+          >
+            <strong>{option.label}</strong>
+            <span>±{option.cents}¢</span>
+          </button>
+        ))}
+      </div>
+      <p className="mobile-sheet-note">
+        Anything within <strong>±{value.cents}¢</strong> of the target counts as in-tune.
+      </p>
+    </div>
+  );
+}
+
+function MobileTempoSheet({
+  tempoBpm,
+  activeTempoPreset,
+  onChange
+}: {
+  tempoBpm: number;
+  activeTempoPreset: (typeof TEMPO_PRESETS)[number];
+  onChange: (tempoBpm: number) => void;
+}) {
+  return (
+    <div className="mobile-tempo-sheet">
+      <div className="mobile-tempo-readout">
+        <span>Guide tempo</span>
+        <strong>
+          {tempoBpm}
+          <span>BPM</span>
+        </strong>
+      </div>
+      <input
+        aria-label="Guide tempo"
+        className="exercise-tempo-slider"
+        type="range"
+        min="60"
+        max="120"
+        step="2"
+        value={tempoBpm}
+        style={{ "--tempo-progress": `${calculateTempoProgress(tempoBpm)}%` } as CSSProperties}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <div className="mobile-sheet-option-grid mobile-sheet-option-grid--tempo" role="group" aria-label="Tempo presets">
+        {TEMPO_PRESETS.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            data-active={activeTempoPreset.label === preset.label || undefined}
+            onClick={() => onChange(preset.bpm)}
+          >
+            <strong>{preset.label}</strong>
+            <span>{preset.bpm} BPM</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function createPrimaryPracticeLabel(
   status: LessonStatus,
   exercise: ExerciseDefinition,
@@ -1516,19 +2160,25 @@ const navigationItems = [
   { value: "progress", label: "Progress", icon: <TrendingUp size={19} /> }
 ] satisfies SidebarTabItem<TopLevelScreen>[];
 
+const MOBILE_NAV_MEDIA_QUERY = "(max-width: 760px)";
+
 function MainShell({
   activeScreen,
   onNavigate,
   onOpenSettings,
   practiceSummary,
-  children
+  children,
+  showMobileNav = true
 }: {
   activeScreen: TopLevelScreen;
   onNavigate: (screen: TopLevelScreen) => void;
   onOpenSettings: () => void;
   practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"];
   children: ReactNode;
+  showMobileNav?: boolean;
 }) {
+  const shouldRenderMobileNav = useMediaQuery(MOBILE_NAV_MEDIA_QUERY);
+
   return (
     <AppShell
       className="pitch-shell"
@@ -1542,10 +2192,52 @@ function MainShell({
           footer={<LocalSaveFooter practiceSummary={practiceSummary} onOpenSettings={onOpenSettings} />}
         />
       }
+      mobileNav={
+        showMobileNav && shouldRenderMobileNav ? (
+          <BottomNav
+            items={navigationItems}
+            activeValue={activeScreen}
+            onNavigate={onNavigate}
+          />
+        ) : undefined
+      }
     >
       {children}
     </AppShell>
   );
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => getMediaQueryMatches(query));
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      setMatches(false);
+      return;
+    }
+
+    const mediaQuery = window.matchMedia(query);
+    setMatches(doesMediaQueryMatch(query, mediaQuery));
+
+    const handleChange = (event: MediaQueryListEvent) =>
+      setMatches(event.media === query && event.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [query]);
+
+  return matches;
+}
+
+function getMediaQueryMatches(query: string) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+
+  return doesMediaQueryMatch(query, window.matchMedia(query));
+}
+
+function doesMediaQueryMatch(query: string, mediaQuery: MediaQueryList) {
+  return mediaQuery.media === query && mediaQuery.matches;
 }
 
 function PitchCoachBrand() {
@@ -1627,6 +2319,8 @@ type HomeScreenProps = LibraryScreenProps &
     onNavigateToSongs: () => void;
   };
 
+type MobileHomeScreenProps = Omit<HomeScreenProps, "selectedExerciseId">;
+
 function HomeScreen({
   exercises,
   exerciseProgress,
@@ -1647,6 +2341,25 @@ function HomeScreen({
   const intervalPracticeRows = createHomeIntervalPracticeRows(exercises, exerciseProgress);
   const hasRecommendedHistory = recommendedProgress.attemptCount > 0;
   const showRangeSetupPrompt = rangeSetupStatus !== "completed";
+  const isMobileHome = useMediaQuery(MOBILE_NAV_MEDIA_QUERY);
+
+  if (isMobileHome) {
+    return (
+      <MobileHomeScreen
+        exercises={exercises}
+        exerciseProgress={exerciseProgress}
+        practiceSummary={practiceSummary}
+        recommendedExercise={recommendedExercise}
+        range={range}
+        rangeSetupStatus={rangeSetupStatus}
+        onOpenRangeSetup={onOpenRangeSetup}
+        onSelectExercise={onSelectExercise}
+        onNavigateToPractice={onNavigateToPractice}
+        onNavigateToSongs={onNavigateToSongs}
+        disabled={disabled}
+      />
+    );
+  }
 
   return (
     <main
@@ -1842,6 +2555,231 @@ function HomeScreen({
       {showRangeSetupPrompt ? <RangeSetupFloatingPrompt range={range} onOpen={onOpenRangeSetup} /> : null}
     </main>
   );
+}
+
+function MobileHomeScreen({
+  exercises,
+  exerciseProgress,
+  practiceSummary,
+  recommendedExercise,
+  range,
+  rangeSetupStatus,
+  onOpenRangeSetup,
+  onSelectExercise,
+  onNavigateToPractice,
+  onNavigateToSongs,
+  disabled
+}: MobileHomeScreenProps) {
+  const recommendedProgress = exerciseProgress[recommendedExercise.exercise.id];
+  const completedExerciseCount = countExercisesTried(exercises, exerciseProgress);
+  const exerciseCoveragePercent =
+    exercises.length > 0 ? Math.round((completedExerciseCount / exercises.length) * 100) : 0;
+  const hasRecommendedHistory = recommendedProgress.attemptCount > 0;
+  const showRangeSetupPrompt = rangeSetupStatus !== "completed";
+
+  return (
+    <main
+      className={`mobile-home ${showRangeSetupPrompt ? "mobile-home--with-range-prompt" : ""}`.trim()}
+      aria-label="Pitch coach home"
+    >
+      <section className="mobile-home__header" aria-label="Today">
+        <div className="mobile-home__greeting">
+          <h1>Good evening</h1>
+          <p>{createMobileHomeIntroCopy(practiceSummary)}</p>
+        </div>
+        <MobileStreakChip streakDays={practiceSummary.streakDays} />
+      </section>
+
+      <Card
+        as="section"
+        className="mobile-resume-card"
+        variant="mockSoft"
+        padding="none"
+        aria-label={hasRecommendedHistory ? "Pick up where you left off" : "Recommended practice"}
+      >
+        <ExercisePitchPreview exercise={recommendedExercise.exercise} />
+        <div className="mobile-resume-card__copy">
+          <div className="mobile-kicker">
+            <Sparkles size={14} aria-hidden="true" />
+            <span>{hasRecommendedHistory ? "Pick up where you left off" : "Recommended practice"}</span>
+          </div>
+          <div className="mobile-resume-card__title-row">
+            <h2>{createMobileExerciseTitle(recommendedExercise.exercise)}</h2>
+            <span>{formatMobileExerciseKey(recommendedExercise.exercise)}</span>
+          </div>
+          <p>{createRecommendationCopy(recommendedExercise.reason, recommendedProgress)}</p>
+          <button
+            className="mobile-primary-action"
+            type="button"
+            onClick={() => onSelectExercise(recommendedExercise.exercise.id)}
+            disabled={disabled}
+          >
+            <Play size={14} fill="currentColor" aria-hidden="true" />
+            <span>{hasRecommendedHistory ? "Resume practice" : "Start practice"}</span>
+          </button>
+        </div>
+      </Card>
+
+      <section className="mobile-home__section" aria-labelledby="mobile-home-practice-modes">
+        <MobileSectionTitle id="mobile-home-practice-modes">Practice modes</MobileSectionTitle>
+        <div className="mobile-mode-list">
+          <button className="mobile-mode-card" type="button" onClick={onNavigateToPractice}>
+            <span className="mobile-mode-icon mobile-mode-icon--practice">
+              <Target size={24} strokeWidth={1.9} aria-hidden="true" />
+            </span>
+            <span className="mobile-mode-copy">
+              <strong>Interval Training</strong>
+              <span>
+                {formatInteger(exercises.length)} drills · {formatInteger(completedExerciseCount)} of{" "}
+                {formatInteger(exercises.length)} tried
+              </span>
+              <span className="mobile-mode-progress" aria-hidden="true">
+                <span
+                  style={
+                    {
+                      "--mobile-mode-progress": `${exerciseCoveragePercent}%`
+                    } as CSSProperties
+                  }
+                />
+              </span>
+            </span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
+
+          <button className="mobile-mode-card" type="button" onClick={onNavigateToSongs}>
+            <span className="mobile-mode-icon mobile-mode-icon--song">
+              <Mic size={23} strokeWidth={1.9} aria-hidden="true" />
+            </span>
+            <span className="mobile-mode-copy">
+              <strong>Sing a Song</strong>
+              <span>Upload a track, sing the real vocal</span>
+            </span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+      </section>
+
+      <section className="mobile-home__section" aria-labelledby="mobile-home-this-week">
+        <MobileSectionTitle id="mobile-home-this-week">This week</MobileSectionTitle>
+        <div className="mobile-stat-grid">
+          <MobileStatTile
+            icon={<LineChart size={14} />}
+            label="Accuracy"
+            value={formatInteger(practiceSummary.segmentAccuracy ?? 0)}
+            unit="%"
+            trend={<AccuracySparkline buckets={practiceSummary.weekActivity} />}
+            tone="green"
+          />
+          <MobileStatTile
+            icon={<CheckCircle2 size={14} />}
+            label="In tune"
+            value={formatInteger(practiceSummary.segmentsInTune)}
+            tone="green"
+          />
+          <MobileStatTile
+            icon={<Flame size={14} />}
+            label="Day streak"
+            value={formatInteger(practiceSummary.streakDays)}
+            tone="accent"
+          />
+          <MobileStatTile
+            icon={<Clock3 size={14} />}
+            label="Practiced"
+            value={formatInteger(practiceSummary.practiceMinutes)}
+            unit="min"
+          />
+        </div>
+      </section>
+
+      {showRangeSetupPrompt ? <RangeSetupFloatingPrompt range={range} onOpen={onOpenRangeSetup} /> : null}
+    </main>
+  );
+}
+
+function MobileStreakChip({ streakDays }: { streakDays: number }) {
+  return (
+    <div className="mobile-streak-chip" aria-label={`${formatDayCount(streakDays)} practice streak`}>
+      <Flame size={18} strokeWidth={1.8} aria-hidden="true" />
+      <span>{formatInteger(streakDays)}</span>
+    </div>
+  );
+}
+
+function MobileSectionTitle({
+  children,
+  id
+}: {
+  children: ReactNode;
+  id: string;
+}) {
+  return (
+    <h2 className="mobile-section-title" id={id}>
+      {children}
+    </h2>
+  );
+}
+
+function MobileStatTile({
+  icon,
+  label,
+  value,
+  unit,
+  trend,
+  tone = "default"
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  unit?: ReactNode;
+  trend?: ReactNode;
+  tone?: "default" | "accent" | "green";
+}) {
+  return (
+    <Card className="mobile-stat-card" variant="mock" padding="none">
+      <div className="mobile-stat-card__label">
+        <span className="mobile-stat-card__icon" aria-hidden="true">
+          {icon}
+        </span>
+        <span>{label}</span>
+      </div>
+      <div className="mobile-stat-card__body">
+        <span className={`mobile-stat-card__value mobile-stat-card__value--${tone}`}>
+          {value}
+          {unit ? <span>{unit}</span> : null}
+        </span>
+        {trend ? <span className="mobile-stat-card__trend">{trend}</span> : null}
+      </div>
+    </Card>
+  );
+}
+
+function createMobileHomeIntroCopy(
+  practiceSummary: ReturnType<typeof usePitchCoachController>["practiceSummary"]
+) {
+  if (practiceSummary.streakDays > 0) {
+    return "A few minutes keeps your streak alive.";
+  }
+
+  if (practiceSummary.attemptCount > 0) {
+    return "A short check-in keeps your voice calibrated.";
+  }
+
+  return "Start with one short drill today.";
+}
+
+function createMobileExerciseTitle(exercise: ExerciseDefinition) {
+  return homeIntervalTitleOverrides[exercise.id] ?? exercise.title;
+}
+
+function formatMobileExerciseKey(exercise: ExerciseDefinition) {
+  const rootName = midiToNoteName(exercise.startRootMidi).replace(/\d+$/, "");
+  if (exercise.id === "minor-third-up-back") {
+    return `${rootName} minor`;
+  }
+  if (exercise.category === "glide") {
+    return "free";
+  }
+  return `${rootName} major`;
 }
 
 function countExercisesTried(
