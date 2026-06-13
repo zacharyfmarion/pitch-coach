@@ -18,6 +18,53 @@ describe("settingsStorage", () => {
     expect(normalizeSettings({}).rangeSetup).toEqual({ status: "unseen", source: "default" });
   });
 
+  it("defaults guide tempo settings to the medium practice tempo", () => {
+    expect(loadSettings().defaultTempoBpm).toBe(90);
+    expect(loadSettings().tempoBpm).toBe(90);
+    expect(normalizeSettings({}).defaultTempoBpm).toBe(90);
+    expect(normalizeSettings({}).tempoBpm).toBe(90);
+  });
+
+  it("migrates legacy tempo into the default guide tempo", () => {
+    const settings = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      defaultTempoBpm: undefined,
+      tempoBpm: 76
+    });
+
+    expect(settings.defaultTempoBpm).toBe(76);
+    expect(settings.tempoBpm).toBe(76);
+  });
+
+  it("persists preferred audio input metadata", () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      preferredAudioInput: {
+        deviceId: "mic-1",
+        label: "Studio Condenser",
+        selectedAt: "2026-06-12T12:00:00.000Z"
+      }
+    });
+
+    expect(loadSettings().preferredAudioInput).toEqual({
+      deviceId: "mic-1",
+      label: "Studio Condenser",
+      selectedAt: "2026-06-12T12:00:00.000Z"
+    });
+  });
+
+  it("normalizes invalid preferred audio input metadata to default input", () => {
+    const settings = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      preferredAudioInput: {
+        deviceId: "",
+        label: ""
+      }
+    });
+
+    expect(settings.preferredAudioInput).toBeUndefined();
+  });
+
   it("persists vocal range setup metadata", () => {
     saveSettings({
       ...DEFAULT_SETTINGS,

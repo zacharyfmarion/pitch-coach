@@ -7,6 +7,10 @@
   background: var(--bg-primary);
 }
 
+.pitch-shell .pc-app-shell__header {
+  display: none;
+}
+
 .shell-brand {
   display: flex;
   align-items: center;
@@ -93,6 +97,43 @@
   color: var(--text-secondary);
   font-size: 0.68rem;
   font-weight: 640;
+}
+
+.shell-user-card {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.shell-user-card:hover {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.shell-user-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 58%, transparent);
+  outline-offset: 4px;
+}
+
+.shell-user-card:active {
+  transform: translateY(1px);
+}
+
+.shell-user-sun {
+  display: grid;
+  place-items: center;
+  color: var(--mock-muted-2, var(--text-tertiary));
+}
+
+.shell-mobile-settings-bar {
+  display: none;
 }
 
 .shell-topbar {
@@ -2312,6 +2353,33 @@ button.exercise-auto-pill {
 
   .pitch-shell {
     grid-template-columns: 1fr;
+  }
+
+  .pitch-shell .pc-app-shell__main {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+  }
+
+  .pitch-shell .pc-app-shell__header {
+    display: block;
+  }
+
+  .shell-mobile-settings-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 54px;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-primary);
+  }
+
+  .shell-mobile-settings-bar > span {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 0.86rem;
+    font-weight: 760;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .pitch-shell .pc-app-shell__sidebar {

@@ -1,5 +1,6 @@
 import type { CoachSettings, ThemePreference, VocalRangeSetup } from "../domain/contracts";
 import { DEFAULT_SETTINGS, isExerciseId, normalizeRange } from "../domain/exercise";
+import { normalizeGuideTempoBpm, normalizePreferredAudioInput } from "../domain/settings";
 import { isDefaultRange } from "../domain/vocalRange";
 import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, getThemeByName } from "../themes";
 
@@ -31,17 +32,19 @@ export function saveSettings(settings: CoachSettings) {
 }
 
 export function normalizeSettings(settings: Partial<CoachSettings>): CoachSettings {
+  const defaultTempoBpm = normalizeGuideTempoBpm(
+    settings.defaultTempoBpm ?? settings.tempoBpm,
+    DEFAULT_SETTINGS.defaultTempoBpm
+  );
+  const tempoBpm = normalizeGuideTempoBpm(settings.tempoBpm ?? defaultTempoBpm, defaultTempoBpm);
+
   return {
     exerciseId: isExerciseId(settings.exerciseId) ? settings.exerciseId : DEFAULT_SETTINGS.exerciseId,
     timingMode: "pitch-first",
     practiceMode: settings.practiceMode === "manual" ? "manual" : "auto",
     saveLocalClips: Boolean(settings.saveLocalClips),
-    tempoBpm: clampNumber(
-      Math.round(settings.tempoBpm ?? DEFAULT_SETTINGS.tempoBpm),
-      50,
-      140,
-      DEFAULT_SETTINGS.tempoBpm
-    ),
+    defaultTempoBpm,
+    tempoBpm,
     toleranceCents: clampNumber(
       Math.round(settings.toleranceCents ?? DEFAULT_SETTINGS.toleranceCents),
       15,
@@ -50,7 +53,8 @@ export function normalizeSettings(settings: Partial<CoachSettings>): CoachSettin
     ),
     range: normalizeRange(settings.range ?? DEFAULT_SETTINGS.range),
     rangeSetup: normalizeRangeSetup(settings),
-    themePreference: normalizeThemePreference(settings.themePreference)
+    themePreference: normalizeThemePreference(settings.themePreference),
+    preferredAudioInput: normalizePreferredAudioInput(settings.preferredAudioInput)
   };
 }
 

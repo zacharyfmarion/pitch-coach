@@ -42,7 +42,7 @@ import {
   updatePracticeSessionAfterAttempt
 } from "../domain/progress";
 import { isPitchFirstAttemptComplete, scoreAttempt } from "../domain/scoring";
-import type { CapturedAudioClip } from "../audio/types";
+import type { AudioInputDevice, CapturedAudioClip } from "../audio/types";
 import { createPitchCoachServices, type PitchCoachServices } from "../audio/services";
 import {
   clearAttemptHistory,
@@ -68,6 +68,7 @@ const AUTO_RETRY_DELAY_MS = 1200;
 const VOICE_START_RMS = 0.006;
 const MAX_RENDERED_FRAMES = 1000;
 const RANGE_CAPTURE_MIN_DURATION_MS = 900;
+const INPUT_LEVEL_REFERENCE_RMS = 0.08;
 
 export type RangeCaptureTarget = "low" | "high";
 
@@ -92,6 +93,21 @@ export type RangeCaptureState =
       errorMessage: string;
     };
 
+export type InputLevelState =
+  | {
+      status: "idle";
+      level: 0;
+    }
+  | {
+      status: "listening";
+      level: number;
+    }
+  | {
+      status: "error";
+      level: 0;
+      errorMessage: string;
+    };
+
 export type PitchCoachControllerOptions = {
   services?: PitchCoachServices;
   initialSettings?: CoachSettings;
@@ -112,11 +128,10 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       return loadedSettings;
     }
 
-    const exercise = getExerciseById(options.initialExerciseId);
     return normalizeSettings({
       ...loadedSettings,
       exerciseId: options.initialExerciseId,
-      tempoBpm: exercise.defaultTempoBpm
+      tempoBpm: loadedSettings.defaultTempoBpm
     });
   });
   const selectedExercise = useMemo(() => getExerciseById(settings.exerciseId), [settings.exerciseId]);
@@ -132,6 +147,12 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const [attemptHistory, setAttemptHistory] = useState<AttemptHistoryRecord[]>([]);
   const [practiceSessions, setPracticeSessions] = useState<PracticeSessionRecord[]>([]);
   const [rangeCaptureState, setRangeCaptureState] = useState<RangeCaptureState>({ status: "idle" });
+  const [audioInputDevices, setAudioInputDevices] = useState<AudioInputDevice[]>([]);
+  const [audioInputErrorMessage, setAudioInputErrorMessage] = useState<string | null>(null);
+  const [inputLevelState, setInputLevelState] = useState<InputLevelState>({
+    status: "idle",
+    level: 0
+  });
 
   const runIdRef = useRef(0);
   const activeSessionRef = useRef<PracticeSessionRecord | null>(null);
@@ -192,6 +213,26 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
+
+  const refreshAudioInputDevices = useCallback(async () => {
+    if (!services.audioInputs) {
+      setAudioInputDevices([{ deviceId: "", label: "Default microphone", isDefault: true }]);
+      return;
+    }
+
+    try {
+      const devices = await services.audioInputs.listDevices();
+      setAudioInputDevices(devices);
+      setAudioInputErrorMessage(null);
+    } catch (error) {
+      setAudioInputErrorMessage(createAudioErrorMessage(error));
+    }
+  }, [services.audioInputs]);
+
+  useEffect(() => {
+    void refreshAudioInputDevices();
+    return services.audioInputs?.subscribe(() => void refreshAudioInputDevices());
+  }, [refreshAudioInputDevices, services.audioInputs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,12 +297,11 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   }, []);
 
   const selectExercise = useCallback((exerciseId: ExerciseId) => {
-    const exercise = getExerciseById(exerciseId);
     setSettingsState((current) =>
       normalizeSettings({
         ...current,
         exerciseId,
-        tempoBpm: exercise.defaultTempoBpm
+        tempoBpm: current.defaultTempoBpm
       })
     );
   }, []);
@@ -369,6 +409,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       minFrequencyHz: midiToFrequency(settings.range.lowestMidi),
       maxFrequencyHz: midiToFrequency(settings.range.highestMidi)
     };
+    setInputLevelState({ status: "idle", level: 0 });
 
     try {
       if (includePrompt) {
@@ -390,6 +431,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       await services.audioEngine.startCapture({
         detector: services.detector,
         bounds,
+        deviceId: settings.preferredAudioInput?.deviceId,
         captureAudioClip: settings.saveLocalClips,
         onAudioClip: (clip) => {
           pendingClipRef.current = clip;
@@ -452,6 +494,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     scoringPolicy,
     services,
     selectedExercise,
+    settings.preferredAudioInput?.deviceId,
     settings.range,
     settings.saveLocalClips,
     settings.tempoBpm
@@ -543,6 +586,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     pendingClipRef.current = null;
     setLessonState((current) => ({ ...current, status: "idle" }));
     setRangeCaptureState((current) => (current.status === "listening" ? { status: "idle" } : current));
+    setInputLevelState({ status: "idle", level: 0 });
   }, [clearTimers, services]);
 
   const saveRangeSetup = useCallback((range: VocalRange, source: VocalRangeSetupSource) => {
@@ -589,6 +633,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       runIdRef.current = runId;
       rangeCaptureMidisRef.current = [];
       setRangeCaptureState({ status: "listening", target });
+      setInputLevelState({ status: "idle", level: 0 });
 
       try {
         await services.audioEngine.startCapture({
@@ -597,6 +642,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
             minFrequencyHz: midiToFrequency(VOCAL_RANGE_MIN_MIDI),
             maxFrequencyHz: midiToFrequency(VOCAL_RANGE_MAX_MIDI)
           },
+          deviceId: settings.preferredAudioInput?.deviceId,
           onPitchFrame: (frame) => {
             if (runId !== runIdRef.current || frame.frequencyHz === null || frame.rms < VOICE_START_RMS) {
               return;
@@ -636,7 +682,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
         });
       }
     },
-    [services, stopAttempt]
+    [services, settings.preferredAudioInput?.deviceId, stopAttempt]
   );
 
   const advanceLesson = useCallback(async () => {
@@ -653,6 +699,88 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     setAttemptScore(null);
     setLessonState((current) => advanceAfterPass(current));
   }, [clearTimers, services.audioEngine, services.promptPlayer]);
+
+  const requestAudioInputPermission = useCallback(async () => {
+    if (!services.audioInputs) {
+      return;
+    }
+
+    try {
+      const devices = await services.audioInputs.requestPermission();
+      setAudioInputDevices(devices);
+      setAudioInputErrorMessage(null);
+    } catch (error) {
+      setAudioInputErrorMessage(createAudioErrorMessage(error));
+    }
+  }, [services.audioInputs]);
+
+  const setPreferredAudioInput = useCallback(
+    (deviceId: string) => {
+      const device = audioInputDevices.find((candidate) => candidate.deviceId === deviceId);
+      setSettingsState((current) =>
+        normalizeSettings({
+          ...current,
+          preferredAudioInput: deviceId
+            ? {
+                deviceId,
+                label: device?.label,
+                selectedAt: new Date().toISOString()
+              }
+            : undefined
+        })
+      );
+    },
+    [audioInputDevices]
+  );
+
+  const stopInputLevelMonitor = useCallback(async () => {
+    runIdRef.current += 1;
+    await services.audioEngine.stop();
+    setInputLevelState({ status: "idle", level: 0 });
+  }, [services.audioEngine]);
+
+  const startInputLevelMonitor = useCallback(async () => {
+    await stopAttempt();
+    const runId = runIdRef.current + 1;
+    runIdRef.current = runId;
+    setInputLevelState({ status: "listening", level: 0 });
+
+    try {
+      await services.audioEngine.startCapture({
+        detector: services.detector,
+        bounds: {
+          minFrequencyHz: midiToFrequency(VOCAL_RANGE_MIN_MIDI),
+          maxFrequencyHz: midiToFrequency(VOCAL_RANGE_MAX_MIDI)
+        },
+        deviceId: settings.preferredAudioInput?.deviceId,
+        onPitchFrame: (frame) => {
+          if (runId !== runIdRef.current) {
+            return;
+          }
+
+          setInputLevelState({
+            status: "listening",
+            level: normalizeInputLevel(frame.rms)
+          });
+        }
+      });
+    } catch (error) {
+      if (runId !== runIdRef.current) {
+        return;
+      }
+
+      await services.audioEngine.stop();
+      setInputLevelState({
+        status: "error",
+        level: 0,
+        errorMessage: createAudioErrorMessage(error)
+      });
+    }
+  }, [
+    services,
+    settings.preferredAudioInput?.deviceId,
+    stopAttempt
+  ]);
 
   useEffect(() => {
     void stopAttempt();
@@ -745,10 +873,17 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     clearLocalAttemptHistory,
     deleteLocalClip,
     rangeCaptureState,
+    audioInputDevices,
+    audioInputErrorMessage,
+    inputLevelState,
     saveRangeSetup,
     skipRangeSetup,
     startRangeCapture,
     stopRangeCapture,
+    requestAudioInputPermission,
+    setPreferredAudioInput,
+    startInputLevelMonitor,
+    stopInputLevelMonitor,
     startPracticeSession,
     endPracticeSession,
     playGuide,
@@ -828,9 +963,21 @@ function isVoiceStartFrame(frame: PitchFrame) {
   return frame.frequencyHz !== null && frame.rms >= VOICE_START_RMS;
 }
 
+function normalizeInputLevel(rms: number) {
+  if (!Number.isFinite(rms) || rms <= 0) {
+    return 0;
+  }
+
+  return Math.min(1, rms / INPUT_LEVEL_REFERENCE_RMS);
+}
+
 function createAudioErrorMessage(error: unknown) {
   if (error instanceof DOMException && error.name === "NotAllowedError") {
     return "Microphone permission was denied. Allow mic access to practice with live pitch feedback.";
+  }
+
+  if (error instanceof DOMException && (error.name === "NotFoundError" || error.name === "OverconstrainedError")) {
+    return "The selected microphone is not available. Choose another input or use the default microphone.";
   }
 
   if (error instanceof Error) {

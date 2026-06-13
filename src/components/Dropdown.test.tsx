@@ -27,4 +27,44 @@ describe("Dropdown", () => {
 
     expect(onValueChange).toHaveBeenCalledWith("major-triad");
   });
+
+  it("supports an app-level empty string option without passing an empty item value to Radix", async () => {
+    const onValueChange = vi.fn();
+
+    const dropdown = (
+      <Dropdown
+        ariaLabel="Microphone"
+        value=""
+        options={[
+          { value: "", label: "Default microphone" },
+          { value: "studio-mic", label: "Studio Mic" }
+        ]}
+        onValueChange={onValueChange}
+      />
+    );
+    const { rerender } = render(dropdown);
+
+    const trigger = screen.getByRole("combobox", { name: "Microphone" });
+    expect(trigger.textContent).toContain("Default microphone");
+
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1, pointerType: "mouse" });
+    fireEvent.click(await screen.findByRole("option", { name: "Studio Mic" }));
+    expect(onValueChange).toHaveBeenCalledWith("studio-mic");
+
+    rerender(
+      <Dropdown
+        ariaLabel="Microphone"
+        value="studio-mic"
+        options={[
+          { value: "", label: "Default microphone" },
+          { value: "studio-mic", label: "Studio Mic" }
+        ]}
+        onValueChange={onValueChange}
+      />
+    );
+
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1, pointerType: "mouse" });
+    fireEvent.click(await screen.findByRole("option", { name: "Default microphone" }));
+    expect(onValueChange).toHaveBeenCalledWith("");
+  });
 });

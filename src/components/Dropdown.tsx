@@ -2,6 +2,8 @@ import { forwardRef, useMemo } from "react";
 import * as Select from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 
+const EMPTY_SELECT_VALUE = "__pitch_coach_empty_dropdown_value__";
+
 export type DropdownOption<Value extends string | number> = {
   value: Value;
   label: string;
@@ -27,9 +29,9 @@ export function Dropdown<Value extends string | number>({
   className,
   triggerClassName
 }: DropdownProps<Value>) {
-  const selectedValue = String(value);
+  const selectedValue = encodeSelectValue(value);
   const optionByValue = useMemo(
-    () => new Map(options.map((option) => [String(option.value), option])),
+    () => new Map(options.map((option) => [encodeSelectValue(option.value), option])),
     [options]
   );
 
@@ -57,7 +59,11 @@ export function Dropdown<Value extends string | number>({
         <Select.Content className={["dropdown-content", className].filter(Boolean).join(" ")} position="popper">
           <Select.Viewport className="dropdown-viewport">
             {options.map((option) => (
-              <DropdownItem key={String(option.value)} value={String(option.value)} disabled={option.disabled}>
+              <DropdownItem
+                key={encodeSelectValue(option.value)}
+                value={encodeSelectValue(option.value)}
+                disabled={option.disabled}
+              >
                 {option.label}
               </DropdownItem>
             ))}
@@ -80,3 +86,8 @@ const DropdownItem = forwardRef<HTMLDivElement, Select.SelectItemProps>(
 );
 
 DropdownItem.displayName = "DropdownItem";
+
+function encodeSelectValue(value: string | number) {
+  const stringValue = String(value);
+  return stringValue === "" ? EMPTY_SELECT_VALUE : stringValue;
+}

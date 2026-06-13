@@ -18,6 +18,7 @@ export type AudioCaptureConfig = {
   detector: PitchDetectorAdapter;
   bounds: PitchDetectionBounds;
   onPitchFrame: (frame: PitchFrame) => void;
+  deviceId?: string;
   captureAudioClip?: boolean;
   onAudioClip?: (clip: CapturedAudioClip) => void;
 };
@@ -33,6 +34,18 @@ export interface AudioInputEngine {
   startCapture(config: AudioCaptureConfig): Promise<void>;
   stop(): Promise<void>;
   isRunning(): boolean;
+}
+
+export type AudioInputDevice = {
+  deviceId: string;
+  label: string;
+  isDefault?: boolean;
+};
+
+export interface AudioInputDeviceService {
+  listDevices(): Promise<AudioInputDevice[]>;
+  requestPermission(): Promise<AudioInputDevice[]>;
+  subscribe(onChange: () => void): () => void;
 }
 
 export interface PromptPlayer {

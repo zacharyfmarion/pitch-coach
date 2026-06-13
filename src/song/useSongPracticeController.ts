@@ -308,6 +308,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
           reference,
           reference.analysisRange ?? createSongReferenceRange(settings.range)
         ),
+        deviceId: settings.preferredAudioInput?.deviceId,
         vocalGuideGain,
         onPitchFrame: (frame) => {
           if (runId !== runIdRef.current) {
@@ -349,6 +350,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     services.practiceEngine,
     settings.range.highestMidi,
     settings.range.lowestMidi,
+    settings.preferredAudioInput?.deviceId,
     settings.toleranceCents,
     vocalGuideGain
   ]);

@@ -1,4 +1,5 @@
 import type { AudioCaptureConfig, AudioInputEngine } from "./types";
+import { createAudioInputConstraints } from "./inputConstraints";
 
 const DEFAULT_FRAME_SIZE = 4096;
 const DEFAULT_HOP_SIZE = 1024;
@@ -44,12 +45,7 @@ export class BrowserAudioEngine implements AudioInputEngine {
     }
 
     this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false
-      }
+      audio: createAudioInputConstraints(config.deviceId)
     });
     this.startRecorderIfRequested(config);
 

@@ -38,12 +38,35 @@ test("renders the pitch coach workspace", async ({ page }) => {
   await page.getByRole("combobox", { name: "Exercise" }).click();
   await page.getByRole("option", { name: "Single Note Match" }).click();
   await expect(page).toHaveURL(/\/exercises\/single-note-match$/);
-  await expect(page.getByText("72 BPM")).toBeVisible();
+  await expect(page.getByText("80 BPM")).toBeVisible();
   await expect(page.getByLabel("Attempt history")).toHaveCount(0);
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "Good evening" })).toBeVisible();
+});
+
+test("opens settings from the footer and applies practice defaults", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /Local practice.*Settings & profile/ }).click();
+  await expect(page.getByRole("dialog", { name: "Voice" })).toBeVisible();
+
+  await page.getByRole("button", { name: /Practice.*Tempo & strictness/ }).click();
+  await expect(page.getByRole("dialog", { name: "Practice" })).toBeVisible();
+  await expect(page.getByText("Default guide tempo")).toBeVisible();
+
+  await page.getByRole("button", { name: "Slow" }).click();
+  await expect(page.getByText("70 BPM")).toBeVisible();
+  await page.getByRole("group", { name: "Strictness" }).getByRole("button", { name: "Strict" }).click();
+  await expect(page.getByText(/within \+\/-22 cents/)).toBeVisible();
+
+  await page.getByRole("dialog", { name: "Practice" }).getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: /Start practice/ }).click();
+  await expect(page).toHaveURL(/\/exercises\/major-triad$/);
+  await expect(page.getByText("70 BPM")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Strictness" })).toContainText("Strict");
 });
 
 test("opens exercise routes directly", async ({ page }) => {
@@ -223,6 +246,17 @@ test("keeps the exercise usable on a mobile viewport", async ({ page }) => {
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
 });
 
+test("keeps settings reachable on a mobile viewport", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  await expect(page.locator(".pitch-shell .sidebar-nav__footer")).toBeHidden();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("dialog", { name: "Voice" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Re-test by singing" })).toBeVisible();
+});
+
 test("uses the mock theme without exposing theme choices", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
@@ -335,6 +369,7 @@ async function seedOnboardedSettings(page: import("@playwright/test").Page) {
           source: "manual",
           completedAt: "2026-06-11T20:00:00.000Z"
         },
+        defaultTempoBpm: 80,
         tempoBpm: 80,
         toleranceCents: 35,
         exerciseId: "major-triad",
