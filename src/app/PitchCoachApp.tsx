@@ -1783,12 +1783,30 @@ function MobileExerciseSheet({
   onClose: () => void;
   children: ReactNode;
 }) {
-  if (!open) {
+  const [mounted, setMounted] = useState(open);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    const prefersReducedMotion =
+      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => setMounted(false), prefersReducedMotion ? 1 : 260);
+    return () => window.clearTimeout(timer);
+  }, [mounted, open]);
+
+  if (!mounted) {
     return null;
   }
 
   return (
-    <div className="mobile-exercise-sheet" role="dialog" aria-label={title}>
+    <div className="mobile-exercise-sheet" data-state={open ? "open" : "closed"} role="dialog" aria-label={title}>
       <button className="mobile-exercise-sheet__backdrop" type="button" aria-label="Close settings" onClick={onClose} />
       <div className="mobile-exercise-sheet__panel">
         <span className="mobile-exercise-sheet__handle" aria-hidden="true" />

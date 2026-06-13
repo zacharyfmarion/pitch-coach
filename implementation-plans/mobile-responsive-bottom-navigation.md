@@ -64,3 +64,4 @@ The key mock direction is not the phone bezel or fake status bar. It is the app 
 - [x] Add browser coverage for the mobile Home component structure.
 - [x] Implement the latest mobile exercise screen mock from `Pitch Coach UI Redesign (6)`.
 - [x] Add browser coverage for the latest mobile exercise screen structure and sheets.
+- [x] Animate the mobile exercise bottom sheets with the mock slide-up and backdrop fade timing.

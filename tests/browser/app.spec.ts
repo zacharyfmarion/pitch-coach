@@ -332,6 +332,38 @@ async function expectMobileExerciseToMatchLatestMock(page: Page) {
   expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
 }
 
+async function expectMobileExerciseSheetToAnimate(page: Page, name: string) {
+  const sheet = page.locator(".mobile-exercise-sheet");
+  await expect(page.getByRole("dialog", { name })).toBeVisible();
+  await expect(sheet).toHaveAttribute("data-state", "open");
+
+  const openAnimationNames = await sheet.evaluate((element) => {
+    const panel = element.querySelector(".mobile-exercise-sheet__panel");
+    const backdrop = element.querySelector(".mobile-exercise-sheet__backdrop");
+    return {
+      backdrop: backdrop ? window.getComputedStyle(backdrop).animationName : "",
+      panel: panel ? window.getComputedStyle(panel).animationName : ""
+    };
+  });
+  expect(openAnimationNames.panel).toContain("mobileExerciseSheetIn");
+  expect(openAnimationNames.backdrop).toContain("mobileExerciseBackdropIn");
+
+  await page.getByRole("button", { name: "Close settings" }).click();
+  await expect(sheet).toHaveAttribute("data-state", "closed");
+
+  const closedAnimationNames = await sheet.evaluate((element) => {
+    const panel = element.querySelector(".mobile-exercise-sheet__panel");
+    const backdrop = element.querySelector(".mobile-exercise-sheet__backdrop");
+    return {
+      backdrop: backdrop ? window.getComputedStyle(backdrop).animationName : "",
+      panel: panel ? window.getComputedStyle(panel).animationName : ""
+    };
+  });
+  expect(closedAnimationNames.panel).toContain("mobileExerciseSheetOut");
+  expect(closedAnimationNames.backdrop).toContain("mobileExerciseBackdropOut");
+  await expect(sheet).toHaveCount(0);
+}
+
 test("navigates the shell and renders progress from local history", async ({ page }) => {
   await seedOnboardedSettings(page);
   await page.goto("/");
@@ -447,21 +479,19 @@ test("uses the latest mobile exercise screen components", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
 
   await page.locator(".mobile-exercise-dock-chip", { hasText: "Strictness" }).click();
-  await expect(page.getByRole("dialog", { name: "Strictness" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Gentle ±50¢" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Standard ±35¢" })).toBeVisible();
-  await page.getByRole("button", { name: "Close settings" }).click();
+  await expectMobileExerciseSheetToAnimate(page, "Strictness");
 
   await page.locator(".mobile-exercise-dock-chip", { hasText: "Tempo" }).click();
-  await expect(page.getByRole("dialog", { name: "Guide tempo" })).toBeVisible();
   await expect(page.getByRole("slider", { name: "Guide tempo" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Medium 90 BPM" })).toBeVisible();
-  await page.getByRole("button", { name: "Close settings" }).click();
+  await expectMobileExerciseSheetToAnimate(page, "Guide tempo");
 
   await page.locator(".mobile-exercise-dock-chip", { hasText: "Key" }).click();
-  await expect(page.getByRole("dialog", { name: "Key & range" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Lower key" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Raise key" })).toBeVisible();
+  await expectMobileExerciseSheetToAnimate(page, "Key & range");
   await expectMobileViewportToFit(page);
 });
 
