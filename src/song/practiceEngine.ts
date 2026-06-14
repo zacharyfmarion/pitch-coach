@@ -1,4 +1,5 @@
 import { createAudioBufferFromStereo } from "./audioData";
+import { preparePlayAndRecordAudioSession, resumeAudioContext } from "../audio/audioSession";
 import { createAudioInputConstraints } from "../audio/inputConstraints";
 import type { SongPracticeConfig, SongPracticeEngine } from "./types";
 
@@ -30,12 +31,16 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
   private endedCallback: (() => void) | null = null;
 
   async start(config: SongPracticeConfig) {
-    await this.stop();
+    preparePlayAndRecordAudioSession();
+    if (this.context || this.stream || this.running) {
+      await this.stop();
+    }
     if (!BrowserSongPracticeEngine.isSupported()) {
       throw new Error("This browser does not support song practice audio capture.");
     }
 
     this.context = new AudioContext({ latencyHint: "interactive" });
+    await resumeAudioContext(this.context);
     await this.context.audioWorklet.addModule(WORKLET_URL);
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: createAudioInputConstraints(config.deviceId)
@@ -133,9 +138,8 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
       return;
     }
 
-    if (this.context.state === "suspended") {
-      await this.context.resume();
-    }
+    preparePlayAndRecordAudioSession();
+    await resumeAudioContext(this.context);
     this.paused = false;
     this.startPlaybackTimer();
   }
