@@ -1139,6 +1139,10 @@
   border-radius: 14px;
 }
 
+.exercise-setting-popover__content--random-run {
+  width: min(292px, calc(100vw - 56px));
+}
+
 .exercise-key-stepper {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 40px;
@@ -1230,8 +1234,40 @@
   gap: var(--space-3);
 }
 
+.random-run-controls {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.random-run-length-control,
+.random-run-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.random-run-length-control > span,
+.random-run-field > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.random-run-length-control strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
 .exercise-tempo-slider,
-.exercise-transport-slider {
+.exercise-transport-slider,
+.random-run-length-slider {
   width: 100%;
   height: 10px;
   border: 1px solid rgba(60, 42, 28, 0.28);
@@ -1247,6 +1283,16 @@
       90deg,
       var(--accent-primary) 0 var(--tempo-progress, 50%),
       #454545 var(--tempo-progress, 50%) 100%
+    );
+}
+
+.random-run-length-slider {
+  height: 7px;
+  background:
+    linear-gradient(
+      90deg,
+      var(--accent-primary) 0 var(--random-run-length-progress, 22%),
+      #454545 var(--random-run-length-progress, 22%) 100%
     );
 }
 
@@ -1266,7 +1312,8 @@
 }
 
 .exercise-tempo-slider::-webkit-slider-thumb,
-.exercise-transport-slider::-webkit-slider-thumb {
+.exercise-transport-slider::-webkit-slider-thumb,
+.random-run-length-slider::-webkit-slider-thumb {
   width: 34px;
   height: 34px;
   border: 0;
@@ -1286,7 +1333,8 @@
 }
 
 .exercise-tempo-slider::-moz-range-thumb,
-.exercise-transport-slider::-moz-range-thumb {
+.exercise-transport-slider::-moz-range-thumb,
+.random-run-length-slider::-moz-range-thumb {
   width: 34px;
   height: 34px;
   border: 0;
@@ -1308,9 +1356,48 @@
   height: 24px;
 }
 
-.exercise-setting-popover__content--tempo .exercise-tempo-slider::-moz-range-thumb {
+.exercise-setting-popover__content--tempo .exercise-tempo-slider::-moz-range-thumb,
+.random-run-length-slider::-moz-range-thumb {
   width: 24px;
   height: 24px;
+}
+
+.random-run-length-slider::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+}
+
+.random-run-difficulty-row {
+  display: flex;
+  width: 100%;
+}
+
+.random-run-difficulty-row button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.random-run-difficulty-row button:disabled,
+.random-run-new-button:disabled,
+.random-run-length-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.random-run-new-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 760;
 }
 
 .exercise-tempo-presets button {

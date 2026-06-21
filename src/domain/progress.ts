@@ -1,4 +1,5 @@
 import type {
+  AttemptHistoryGeneratedRun,
   AttemptHistoryRecord,
   AttemptScore,
   ExerciseDefinition,
@@ -64,6 +65,7 @@ type CreateAttemptHistoryRecordOptions = {
   tempoBpm: number;
   toleranceCents: number;
   score: AttemptScore;
+  generatedRun?: AttemptHistoryGeneratedRun;
   createdAt?: string;
 };
 
@@ -101,6 +103,7 @@ export function createAttemptHistoryRecord({
   tempoBpm,
   toleranceCents,
   score,
+  generatedRun,
   createdAt = new Date().toISOString()
 }: CreateAttemptHistoryRecordOptions): AttemptHistoryRecord {
   return {
@@ -114,6 +117,7 @@ export function createAttemptHistoryRecord({
     passed: score.passed,
     summary: score.summary,
     durationMs: score.durationMs,
+    ...(generatedRun ? { generatedRun } : {}),
     segments: score.segments.map((segment) => ({
       id: segment.id,
       kind: segment.kind,

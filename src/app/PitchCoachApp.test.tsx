@@ -77,7 +77,7 @@ describe("PitchCoachApp", () => {
     expect(screen.getByRole("button", { name: /Start practice/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Interval Training/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Sing a Song/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("0 / 12 done");
+    expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("0 / 13 done");
     expect(screen.getByText("Recently practiced")).toBeTruthy();
     expect(screen.getByText("Major Third")).toBeTruthy();
     expect(screen.getByText("Perfect Fifth")).toBeTruthy();
@@ -93,7 +93,7 @@ describe("PitchCoachApp", () => {
     render(<PitchCoachApp services={createServices([])} initialSettings={ONBOARDED_SETTINGS} />);
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("2 / 12 done")
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("2 / 13 done")
     );
     const stats = screen.getByLabelText("Practice stats").textContent ?? "";
     expect(stats).toContain("Accuracy50%");
@@ -132,7 +132,7 @@ describe("PitchCoachApp", () => {
 
     expect(screen.getByRole("tab", { name: "Practice" }).getAttribute("data-state")).toBe("active");
     expect(screen.getByRole("heading", { name: "Practice Library", level: 1 })).toBeTruthy();
-    expect(document.querySelector(".library-heading")?.textContent).toContain("0 / 12 exercises tried");
+    expect(document.querySelector(".library-heading")?.textContent).toContain("0 / 13 exercises tried");
     expect(screen.getByLabelText("No accuracy yet").textContent).toContain("New");
     expect(screen.getByRole("button", { name: /Major Triad/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Major Triad/i }).textContent).toContain("New");
@@ -1065,7 +1065,7 @@ describe("PitchCoachApp", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 / 12 done")
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 / 13 done")
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Local practice.*Settings & profile/i }));
@@ -1079,7 +1079,7 @@ describe("PitchCoachApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 / 12 done")
+      expect(screen.getByRole("button", { name: /Interval Training/i }).textContent).toContain("1 / 13 done")
     );
   });
 
@@ -1173,6 +1173,89 @@ describe("PitchCoachApp", () => {
       90,
       "chord-then-sequence"
     );
+  });
+
+  it("configures random run length and difficulty before starting playback", async () => {
+    const services = createServices([]);
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
+
+    openRandomRun();
+    expect(window.location.pathname).toBe("/exercises/random-run-playback");
+    expect(screen.getByRole("button", { name: "Random run" }).textContent).toContain("5 notes · L2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Random run" }));
+    fireEvent.change(screen.getByRole("slider", { name: "Run length" }), {
+      target: { value: "8" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "L4" }));
+
+    expect(screen.getByRole("button", { name: "Random run" }).textContent).toContain("8 notes · L4");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+
+    const [targets, tempoBpm, promptStyle] = getLatestPromptCall(services);
+    expect(targets).toHaveLength(8);
+    expect(targets.every(isNoteSegment)).toBe(true);
+    expect(tempoBpm).toBe(90);
+    expect(promptStyle).toBe("sequence-only");
+  });
+
+  it("retries the same generated run and records generated metadata", async () => {
+    vi.useFakeTimers();
+    const services = createServices(triadFrames({ offsets: [-200, -200, -200] }));
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
+
+    openRandomRun();
+    fireEvent.click(screen.getByRole("button", { name: "Random run" }));
+    fireEvent.change(screen.getByRole("slider", { name: "Run length" }), {
+      target: { value: "3" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await flushReact();
+    await flushReact();
+    await act(async () => {
+      vi.advanceTimersByTime(12050);
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("button", { name: "Retry run" })).toBeTruthy();
+    const firstRun = getLatestPromptNoteNames(services);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry run" }));
+    await flushReact();
+    await flushReact();
+    await act(async () => {
+      vi.advanceTimersByTime(12050);
+      await Promise.resolve();
+    });
+
+    expect(getLatestPromptNoteNames(services)).toEqual(firstRun);
+    const records = await loadAttemptHistory();
+    expect(records).toHaveLength(2);
+    expect(records.every((record) => record.exerciseId === "random-run-playback")).toBe(true);
+    expect(records.every((record) => record.generatedRun?.length === 3)).toBe(true);
+    expect(records[0]?.generatedRun?.offsets).toEqual(records[1]?.generatedRun?.offsets);
+  });
+
+  it("generates a fresh random run from the manual New run control", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.21);
+    const services = createServices([]);
+    render(<PitchCoachApp services={services} initialSettings={ONBOARDED_SETTINGS} />);
+
+    openRandomRun();
+    fireEvent.click(screen.getByRole("button", { name: "Manual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hear guide" }));
+    await flushReact();
+    const firstRun = getLatestPromptNoteNames(services);
+
+    fireEvent.click(screen.getByRole("button", { name: "Random run" }));
+    fireEvent.click(screen.getByRole("button", { name: "New run" }));
+    await flushReact();
+    fireEvent.click(screen.getByRole("button", { name: "Hear guide" }));
+    await flushReact();
+
+    expect(getLatestPromptNoteNames(services)).not.toEqual(firstRun);
   });
 
   it("uses the preferred microphone for exercise capture", async () => {
@@ -1647,6 +1730,11 @@ function openFiveNoteScale() {
   fireEvent.click(screen.getByRole("button", { name: /Five-Note Major Scale/i }));
 }
 
+function openRandomRun() {
+  openPracticeLibrary();
+  fireEvent.click(screen.getByRole("button", { name: /Random Runs/i }));
+}
+
 function openPracticeLibrary() {
   if (screen.queryByRole("heading", { name: "Practice Library", level: 1 })) {
     return;
@@ -1666,6 +1754,22 @@ async function chooseDropdownOption(trigger: HTMLElement, optionName: string) {
 
 function isNoteSegment(segment: TargetSegment): segment is TargetNoteSegment {
   return segment.kind === "note";
+}
+
+function getLatestPromptCall(services: ReturnType<typeof createServices>) {
+  const calls = vi.mocked(services.promptPlayer.playPrompt).mock.calls;
+  const latestCall = calls.at(-1);
+  if (!latestCall) {
+    throw new Error("Expected a prompt playback call");
+  }
+
+  return latestCall;
+}
+
+function getLatestPromptNoteNames(services: ReturnType<typeof createServices>) {
+  return getLatestPromptCall(services)[0].map((target) =>
+    target.kind === "note" ? target.noteName : `${target.fromNoteName} to ${target.toNoteName}`
+  );
 }
 
 async function flushReact() {

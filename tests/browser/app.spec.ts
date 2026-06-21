@@ -10,7 +10,7 @@ test("renders the pitch coach workspace", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Interval Training/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Sing a Song/ })).toBeVisible();
   await expect(page.getByText("Recently practiced")).toBeVisible();
-  await expect(page.getByText("0 / 12 done")).toBeVisible();
+  await expect(page.getByText("0 / 13 done")).toBeVisible();
   await expect(page.getByText("Robin")).toHaveCount(0);
 
   await page.getByRole("button", { name: /Start practice/ }).click();
@@ -75,6 +75,21 @@ test("opens exercise routes directly", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Start lesson" })).toBeVisible();
   await expect(page.getByLabel("Pitch timeline")).toBeVisible();
   await expect(page.getByRole("button", { name: "Key" })).toContainText("A major");
+});
+
+test("opens the random run exercise controls", async ({ page }) => {
+  await seedOnboardedSettings(page);
+  await page.goto("/practice");
+
+  await page.getByRole("button", { name: /Random Runs/ }).click();
+  await expect(page).toHaveURL(/\/exercises\/random-run-playback$/);
+  await expect(page.getByRole("button", { name: "Random run" })).toContainText("5 notes · L2");
+
+  await page.getByRole("button", { name: "Random run" }).click();
+  await expect(page.getByRole("dialog", { name: "Run settings" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Run length" })).toBeVisible();
+  await page.getByRole("button", { name: "L4" }).click();
+  await expect(page.getByRole("button", { name: "Random run" })).toContainText("5 notes · L4");
 });
 
 test("shows range setup from Start lesson without a detail-page prompt", async ({ page }) => {
@@ -469,7 +484,7 @@ test("navigates the shell and renders progress from local history", async ({ pag
   await page.getByRole("tab", { name: "Practice" }).click();
   await expect(page).toHaveURL(/\/practice$/);
   await expect(page.getByRole("heading", { name: "Practice Library", level: 1 })).toBeVisible();
-  await expect(page.getByText(/1 \/ 12 exercises tried/)).toBeVisible();
+  await expect(page.getByText(/1 \/ 13 exercises tried/)).toBeVisible();
 });
 
 test("groups repeated exercise attempts into one recent progress session", async ({ page }) => {
@@ -594,7 +609,7 @@ test("uses the mock mobile home components", async ({ page }) => {
 
   await expectMobileHomeToMatchMock(page);
   await expect(page.getByText("Start with one short drill today.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Interval Training 12 drills · 0 of 12 tried" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Interval Training 13 drills · 0 of 13 tried" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sing a Song Upload a track, sing the real vocal" })).toBeVisible();
   await expectMobileViewportToFit(page);
 });
