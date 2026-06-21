@@ -25,6 +25,20 @@ describe("settingsStorage", () => {
     expect(normalizeSettings({}).tempoBpm).toBe(90);
   });
 
+  it("defaults and normalizes random run settings", () => {
+    expect(loadSettings().randomRun).toEqual({ length: 5, difficulty: 2 });
+    expect(normalizeSettings({}).randomRun).toEqual({ length: 5, difficulty: 2 });
+    expect(
+      normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        randomRun: {
+          length: 99,
+          difficulty: 4
+        }
+      }).randomRun
+    ).toEqual({ length: 12, difficulty: 4 });
+  });
+
   it("migrates legacy tempo into the default guide tempo", () => {
     const settings = normalizeSettings({
       ...DEFAULT_SETTINGS,

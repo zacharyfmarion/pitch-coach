@@ -4,8 +4,10 @@ import type {
   AttemptScore,
   CoachSettings,
   ExerciseId,
+  GeneratedRandomRun,
   PitchFrame,
   PracticeSessionRecord,
+  RandomRunConfig,
   VocalRange,
   VocalRangeSetupSource
 } from "../domain/contracts";
@@ -16,6 +18,7 @@ import {
   EXERCISES,
   formatExercisePattern,
   getExerciseById,
+  isRandomRunExercise,
   normalizeRange
 } from "../domain/exercise";
 import {
@@ -42,6 +45,11 @@ import {
   updatePracticeSessionAfterAttempt
 } from "../domain/progress";
 import { isPitchFirstAttemptComplete, scoreAttempt } from "../domain/scoring";
+import {
+  createRandomRunSeed,
+  generateRandomRun,
+  nextRandomRunSeed
+} from "../domain/randomRun";
 import type { AudioInputDevice, CapturedAudioClip } from "../audio/types";
 import { createPitchCoachServices, type PitchCoachServices } from "../audio/services";
 import {
@@ -138,6 +146,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const [lessonState, setLessonState] = useState(() =>
     createLessonState(getExerciseById(settings.exerciseId), settings.range)
   );
+  const [randomRunSeed, setRandomRunSeed] = useState(() => createRandomRunSeed());
   const [pitchFrames, setPitchFrames] = useState<PitchFrame[]>([]);
   const [attemptScore, setAttemptScore] = useState<AttemptScore | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -168,12 +177,23 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   const rangeCaptureMidisRef = useRef<number[]>([]);
 
   const currentRootMidi = getCurrentRootMidi(lessonState) ?? selectedExercise.startRootMidi;
+  const activeRandomRun = useMemo(
+    () =>
+      isRandomRunExercise(selectedExercise)
+        ? generateRandomRun(settings.randomRun, currentRootMidi, settings.range, randomRunSeed)
+        : null,
+    [currentRootMidi, randomRunSeed, selectedExercise, settings.randomRun, settings.range]
+  );
+  const activePatternSegments = activeRandomRun?.patternSegments ?? selectedExercise.patternSegments;
   const targetSegments = useMemo(
-    () => buildTargetNotes(currentRootMidi, selectedExercise, settings.tempoBpm),
-    [currentRootMidi, selectedExercise, settings.tempoBpm]
+    () => buildTargetNotes(currentRootMidi, selectedExercise, settings.tempoBpm, activePatternSegments),
+    [activePatternSegments, currentRootMidi, selectedExercise, settings.tempoBpm]
   );
   const noteOptions = useMemo(() => createNoteOptions(), []);
-  const scoringPolicy = useMemo(() => createScoringPolicy(settings), [settings]);
+  const scoringPolicy = useMemo(
+    () => createScoringPolicy(settings, targetSegments),
+    [settings, targetSegments]
+  );
   const exerciseProgress = useMemo(
     () => summarizeExerciseProgress(attemptHistory, EXERCISES),
     [attemptHistory]
@@ -297,11 +317,25 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
   }, []);
 
   const selectExercise = useCallback((exerciseId: ExerciseId) => {
+    if (isRandomRunExercise(exerciseId)) {
+      setRandomRunSeed((current) => nextRandomRunSeed(current));
+    }
+
     setSettingsState((current) =>
       normalizeSettings({
         ...current,
         exerciseId,
         tempoBpm: current.defaultTempoBpm
+      })
+    );
+  }, []);
+
+  const setRandomRunConfig = useCallback((randomRun: RandomRunConfig) => {
+    setRandomRunSeed((current) => nextRandomRunSeed(current));
+    setSettingsState((current) =>
+      normalizeSettings({
+        ...current,
+        randomRun
       })
     );
   }, []);
@@ -340,7 +374,8 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
         rootMidi: attemptRootMidi,
         tempoBpm: settings.tempoBpm,
         toleranceCents: settings.toleranceCents,
-        score
+        score,
+        generatedRun: activeRandomRun ? createAttemptGeneratedRun(activeRandomRun) : undefined
       });
       await persistPracticeSession(updatePracticeSessionAfterAttempt(practiceSession, historyRecord));
       await persistAttemptHistory(historyRecord);
@@ -352,6 +387,9 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
           autoFlowTimerRef.current = window.setTimeout(() => {
             const advanced = advanceAfterPass(lessonStateRef.current);
             autoFlowTimerRef.current = null;
+            if (isRandomRunExercise(selectedExercise.id) && advanced.status === "idle") {
+              setRandomRunSeed((current) => nextRandomRunSeed(current));
+            }
             setLessonState(advanced);
             if (advanced.status === "idle") {
               setQueuedAutoStart(true);
@@ -366,6 +404,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       }
     },
     [
+      activeRandomRun,
       clearListeningTimer,
       currentRootMidi,
       scoringPolicy,
@@ -404,7 +443,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     pendingClipRef.current = null;
     setPitchFrames([]);
 
-    const attemptTargets = buildTargetNotes(rootMidi, selectedExercise, settings.tempoBpm);
+    const attemptTargets = buildTargetNotes(rootMidi, selectedExercise, settings.tempoBpm, activePatternSegments);
     const bounds = {
       minFrequencyHz: midiToFrequency(settings.range.lowestMidi),
       maxFrequencyHz: midiToFrequency(settings.range.highestMidi)
@@ -489,6 +528,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       setErrorMessage(createAudioErrorMessage(error));
     }
   }, [
+    activePatternSegments,
     clearTimers,
     finishAttempt,
     scoringPolicy,
@@ -537,7 +577,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     framesRef.current = [];
     setPitchFrames([]);
 
-    const attemptTargets = buildTargetNotes(rootMidi, selectedExercise, settings.tempoBpm);
+    const attemptTargets = buildTargetNotes(rootMidi, selectedExercise, settings.tempoBpm, activePatternSegments);
 
     try {
       setLessonState((current) =>
@@ -573,7 +613,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
       setLessonState((current) => ({ ...current, status: "idle" }));
       setErrorMessage(createAudioErrorMessage(error));
     }
-  }, [clearTimers, selectedExercise, services.promptPlayer, settings.tempoBpm]);
+  }, [activePatternSegments, clearTimers, selectedExercise, services.promptPlayer, settings.tempoBpm]);
 
   const stopAttempt = useCallback(async () => {
     runIdRef.current += 1;
@@ -697,8 +737,12 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     framesRef.current = [];
     setPitchFrames([]);
     setAttemptScore(null);
-    setLessonState((current) => advanceAfterPass(current));
-  }, [clearTimers, services.audioEngine, services.promptPlayer]);
+    const advanced = advanceAfterPass(lessonStateRef.current);
+    if (isRandomRunExercise(selectedExercise.id) && advanced.status === "idle") {
+      setRandomRunSeed((current) => nextRandomRunSeed(current));
+    }
+    setLessonState(advanced);
+  }, [clearTimers, selectedExercise.id, services.audioEngine, services.promptPlayer]);
 
   const requestAudioInputPermission = useCallback(async () => {
     if (!services.audioInputs) {
@@ -787,7 +831,14 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     setLessonState(createLessonState(selectedExercise, settings.range));
     setAttemptScore(null);
     setPitchFrames([]);
-  }, [selectedExercise, settings.range.lowestMidi, settings.range.highestMidi, stopAttempt]);
+  }, [
+    selectedExercise,
+    settings.randomRun.difficulty,
+    settings.randomRun.length,
+    settings.range.lowestMidi,
+    settings.range.highestMidi,
+    stopAttempt
+  ]);
 
   const setCurrentRootIndex = useCallback(
     async (rootIndex: number) => {
@@ -815,6 +866,9 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
 
   const resetLesson = useCallback(async () => {
     await stopAttempt();
+    if (isRandomRunExercise(selectedExercise)) {
+      setRandomRunSeed((current) => nextRandomRunSeed(current));
+    }
     setLessonState(createLessonState(selectedExercise, settings.range));
     setAttemptScore(null);
     setPitchFrames([]);
@@ -823,6 +877,28 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     lastCompletionCheckMsRef.current = 0;
     finishStartedRef.current = false;
     pendingClipRef.current = null;
+  }, [selectedExercise, settings.range, stopAttempt]);
+
+  const regenerateRandomRun = useCallback(async () => {
+    await stopAttempt();
+    setRandomRunSeed((current) => nextRandomRunSeed(current));
+    setAttemptScore(null);
+    setPitchFrames([]);
+    framesRef.current = [];
+    voiceStartMsRef.current = null;
+    lastCompletionCheckMsRef.current = 0;
+    finishStartedRef.current = false;
+    pendingClipRef.current = null;
+    setLessonState((current) =>
+      current.status === "complete"
+        ? createLessonState(selectedExercise, settings.range)
+        : {
+            ...current,
+            status: "idle",
+            attemptNumber: 0,
+            lastScore: undefined
+          }
+    );
   }, [selectedExercise, settings.range, stopAttempt]);
 
   const deleteLocalClip = useCallback(async () => {
@@ -847,8 +923,10 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     settings,
     setSettings,
     selectExercise,
+    setRandomRunConfig,
     selectedExercise,
     exercises: EXERCISES,
+    activeRandomRun,
     lessonState,
     pitchFrames,
     attemptScore,
@@ -890,6 +968,7 @@ export function usePitchCoachController(options: PitchCoachControllerOptions = {
     startAttempt,
     stopAttempt,
     advanceLesson,
+    regenerateRandomRun,
     setCurrentRootIndex,
     resetLesson,
     isBusy:
@@ -969,6 +1048,15 @@ function normalizeInputLevel(rms: number) {
   }
 
   return Math.min(1, rms / INPUT_LEVEL_REFERENCE_RMS);
+}
+
+function createAttemptGeneratedRun(run: GeneratedRandomRun) {
+  return {
+    seed: run.seed,
+    length: run.config.length,
+    difficulty: run.config.difficulty,
+    offsets: run.offsets
+  };
 }
 
 function createAudioErrorMessage(error: unknown) {

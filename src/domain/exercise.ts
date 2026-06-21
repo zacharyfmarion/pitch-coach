@@ -14,6 +14,7 @@ import {
   midiToNoteName,
   parseNoteName
 } from "./music";
+import { DEFAULT_RANDOM_RUN_CONFIG, RANDOM_RUN_EXERCISE_ID } from "./randomRun";
 import { DEFAULT_GUIDE_TEMPO_BPM } from "./settings";
 import { DEFAULT_RANGE_SETUP } from "./vocalRange";
 
@@ -203,6 +204,24 @@ export const EXERCISES: readonly ExerciseDefinition[] = [
     promptStyle: "sequence-only"
   },
   {
+    id: RANDOM_RUN_EXERCISE_ID,
+    title: "Random Runs",
+    description: "Hear a generated run and sing it back.",
+    difficulty: 3,
+    category: "scale",
+    focus: "Playback memory",
+    patternSegments: [ROOT_SEGMENT],
+    startRootMidi: parseNoteName("A3"),
+    stepSemitones: 1,
+    direction: "up-then-down",
+    defaultTempoBpm: 90,
+    scoringProfile: "sequence",
+    promptStyle: "sequence-only",
+    generator: {
+      kind: "random-run"
+    }
+  },
+  {
     id: "five-note-scale",
     title: "Five-Note Major Scale",
     description: "Sing up and down the first five major-scale steps.",
@@ -293,7 +312,8 @@ export const DEFAULT_SETTINGS: CoachSettings = {
   practiceMode: "auto",
   themePreference: {
     mode: "system"
-  }
+  },
+  randomRun: DEFAULT_RANDOM_RUN_CONFIG
 };
 
 export const DEFAULT_SCORING_POLICY: ScoringPolicy = {
@@ -318,7 +338,10 @@ export const DEFAULT_SCORING_POLICY: ScoringPolicy = {
   missingTargetCost: 185
 };
 
-export function createScoringPolicy(settings: CoachSettings): ScoringPolicy {
+export function createScoringPolicy(
+  settings: CoachSettings,
+  targetSegments?: readonly TargetSegment[]
+): ScoringPolicy {
   const exercise = getExerciseById(settings.exerciseId);
   const policy = {
     ...DEFAULT_SCORING_POLICY,
@@ -337,11 +360,12 @@ export function createScoringPolicy(settings: CoachSettings): ScoringPolicy {
   }
 
   if (exercise.scoringProfile === "sequence") {
+    const targetDurationMs = getTargetDurationMs(targetSegments);
     return {
       ...policy,
       attemptMaxDurationMs: Math.max(
         policy.attemptMaxDurationMs,
-        getExerciseDurationBeats(exercise) * (60000 / settings.tempoBpm) + 2500
+        targetDurationMs ?? getExerciseDurationBeats(exercise) * (60000 / settings.tempoBpm) + 2500
       )
     };
   }
@@ -391,12 +415,13 @@ export function createRootSequence(exercise: ExerciseDefinition, range: VocalRan
 export function buildTargetNotes(
   rootMidi: number,
   exercise: ExerciseDefinition,
-  tempoBpm: number
+  tempoBpm: number,
+  patternSegments: readonly ExercisePatternSegment[] = exercise.patternSegments
 ): TargetSegment[] {
   const beatMs = 60000 / tempoBpm;
   let cursorMs = 0;
 
-  return exercise.patternSegments.map((segment, index) => {
+  return patternSegments.map((segment, index) => {
     const durationBeats =
       segment.kind === "note"
         ? segment.durationBeats ?? exercise.noteDurationBeats ?? 1
@@ -453,6 +478,12 @@ export function formatExercisePattern(exercise: ExerciseDefinition) {
   return exercise.patternSegments.map((segment) => segment.shortLabel).join("-");
 }
 
+export function isRandomRunExercise(exercise: ExerciseDefinition | ExerciseId) {
+  return typeof exercise === "string"
+    ? exercise === RANDOM_RUN_EXERCISE_ID
+    : exercise.generator?.kind === "random-run";
+}
+
 function getPatternSemitoneOffsets(exercise: ExerciseDefinition) {
   return exercise.patternSegments.flatMap((segment) =>
     segment.kind === "note"
@@ -469,6 +500,11 @@ function getExerciseDurationBeats(exercise: ExerciseDefinition) {
 
     return total + segment.durationBeats;
   }, 0);
+}
+
+function getTargetDurationMs(targetSegments?: readonly TargetSegment[]) {
+  const lastSegment = targetSegments?.at(-1);
+  return lastSegment ? lastSegment.endMs + 2500 : undefined;
 }
 
 function midiRangeByStep(startMidi: number, endMidi: number, stepSemitones: number) {

@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTargetNotes,
+  createScoringPolicy,
+  DEFAULT_SETTINGS,
   createRootSequence,
   EXERCISES,
   getExerciseById,
+  isRandomRunExercise,
   MAJOR_TRIAD_EXERCISE
 } from "./exercise";
 import { midiToNoteName, parseNoteName } from "./music";
+import { generateRandomRun } from "./randomRun";
 
 describe("exercise definitions", () => {
   it("creates an up-then-down root sequence within range", () => {
@@ -105,6 +109,49 @@ describe("exercise definitions", () => {
     expect(getExerciseById("descending-triad").promptStyle).toBe("chord-then-sequence");
     expect(getExerciseById("five-note-scale").promptStyle).toBe("sequence-only");
     expect(getExerciseById("step-up-back").promptStyle).toBe("sequence-only");
+  });
+
+  it("builds generated random runs as ordinary timed note targets", () => {
+    const exercise = getExerciseById("random-run-playback");
+    const run = generateRandomRun(
+      { length: 6, difficulty: 3 },
+      parseNoteName("A3"),
+      {
+        lowestMidi: parseNoteName("C3"),
+        highestMidi: parseNoteName("C5")
+      },
+      2026
+    );
+
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, 90, run.patternSegments);
+
+    expect(isRandomRunExercise(exercise)).toBe(true);
+    expect(targets).toHaveLength(6);
+    expect(targets.every((target) => target.kind === "note")).toBe(true);
+    expect(targets[0]).toMatchObject({
+      kind: "note",
+      offsetSemitones: 0,
+      shortLabel: "1",
+      startMs: 0
+    });
+    expect(targets[5].endMs).toBeCloseTo(4000);
+  });
+
+  it("scales sequence scoring duration from generated target length", () => {
+    const exercise = getExerciseById("random-run-playback");
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      exerciseId: exercise.id,
+      tempoBpm: 50,
+      randomRun: {
+        length: 12,
+        difficulty: 5 as const
+      }
+    };
+    const run = generateRandomRun(settings.randomRun, parseNoteName("A3"), settings.range, 42);
+    const targets = buildTargetNotes(parseNoteName("A3"), exercise, settings.tempoBpm, run.patternSegments);
+
+    expect(createScoringPolicy(settings, targets).attemptMaxDurationMs).toBeGreaterThan(16000);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { CoachSettings, ThemePreference, VocalRangeSetup } from "../domain/contracts";
 import { DEFAULT_SETTINGS, isExerciseId, normalizeRange } from "../domain/exercise";
+import { normalizeRandomRunConfig } from "../domain/randomRun";
 import { normalizeGuideTempoBpm, normalizePreferredAudioInput } from "../domain/settings";
 import { isDefaultRange } from "../domain/vocalRange";
 import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, getThemeByName } from "../themes";
@@ -54,6 +55,7 @@ export function normalizeSettings(settings: Partial<CoachSettings>): CoachSettin
     range: normalizeRange(settings.range ?? DEFAULT_SETTINGS.range),
     rangeSetup: normalizeRangeSetup(settings),
     themePreference: normalizeThemePreference(settings.themePreference),
+    randomRun: normalizeRandomRunConfig(settings.randomRun),
     preferredAudioInput: normalizePreferredAudioInput(settings.preferredAudioInput)
   };
 }

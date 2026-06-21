@@ -14,6 +14,7 @@ export type ExerciseId =
   | "descending-fourth-return"
   | "major-triad"
   | "descending-triad"
+  | "random-run-playback"
   | "five-note-scale"
   | "octave-arpeggio"
   | "fifth-glide"
@@ -45,6 +46,27 @@ export type ExercisePatternSegment =
       curve: "linear";
     };
 
+export type RandomRunDifficulty = 1 | 2 | 3 | 4 | 5;
+
+export type RandomRunConfig = {
+  length: number;
+  difficulty: RandomRunDifficulty;
+};
+
+export type GeneratedRandomRun = {
+  seed: number;
+  config: RandomRunConfig;
+  offsets: number[];
+  patternSegments: ExercisePatternSegment[];
+};
+
+export type AttemptHistoryGeneratedRun = {
+  seed: number;
+  length: number;
+  difficulty: RandomRunDifficulty;
+  offsets: number[];
+};
+
 export type ExerciseDefinition = {
   id: ExerciseId;
   title: string;
@@ -60,6 +82,9 @@ export type ExerciseDefinition = {
   scoringProfile: ScoringProfile;
   promptStyle: PromptStyle;
   noteDurationBeats?: number;
+  generator?: {
+    kind: "random-run";
+  };
 };
 
 export type VocalRange = {
@@ -96,6 +121,7 @@ export type CoachSettings = {
   timingMode: TimingMode;
   practiceMode: PracticeMode;
   themePreference: ThemePreference;
+  randomRun: RandomRunConfig;
   preferredAudioInput?: PreferredAudioInput;
 };
 
@@ -308,6 +334,7 @@ export type AttemptHistoryRecord = {
   summary: string;
   durationMs: number;
   segments: AttemptHistorySegment[];
+  generatedRun?: AttemptHistoryGeneratedRun;
 };
 
 export type PracticeSessionRecord = {

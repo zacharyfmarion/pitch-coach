@@ -17,6 +17,7 @@ import {
   Play,
   RotateCcw,
   Settings as SettingsIcon,
+  Shuffle,
   Sparkles,
   Target,
   TrendingUp,
@@ -52,12 +53,18 @@ import type {
   ExerciseProgressSummary,
   LessonStatus,
   PracticeMode,
+  RandomRunConfig,
+  RandomRunDifficulty,
   SegmentAssessmentStatus,
   TargetSegment
 } from "../domain/contracts";
-import { DEFAULT_SETTINGS, isExerciseId } from "../domain/exercise";
+import { DEFAULT_SETTINGS, isExerciseId, isRandomRunExercise } from "../domain/exercise";
 import { midiToNoteName } from "../domain/music";
 import { getGuidePlaybackFrame, getPromptTimeline } from "../domain/promptTiming";
+import {
+  MAX_RANDOM_RUN_LENGTH,
+  MIN_RANDOM_RUN_LENGTH
+} from "../domain/randomRun";
 import { SongPracticeScreen } from "../song/SongPracticeScreen";
 import type { SongModeServices } from "../song/types";
 import { usePitchCoachTheme } from "./theme";
@@ -368,6 +375,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
       defaultTempoBpm: DEFAULT_SETTINGS.defaultTempoBpm,
       tempoBpm: DEFAULT_SETTINGS.defaultTempoBpm,
       toleranceCents: DEFAULT_SETTINGS.toleranceCents,
+      randomRun: DEFAULT_SETTINGS.randomRun,
       preferredAudioInput: undefined
     });
   }, [coach.setSettings, coach.settings]);
@@ -538,6 +546,7 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
   };
   const tempoProgress = calculateTempoProgress(coach.settings.tempoBpm);
   const activeTempoPreset = getActiveTempoPreset(coach.settings.tempoBpm);
+  const showRandomRunControls = isRandomRunExercise(coach.selectedExercise);
   const autoToggleLabel = isAutoPracticeActive(coach.lessonState.status, coach.isBusy)
     ? "Pause practice"
     : practicePaused
@@ -757,6 +766,22 @@ function ExercisePracticeApp({ router, coachOptions, songServices }: ExercisePra
                   </div>
                 </div>
               </ExerciseSettingPopover>
+              {showRandomRunControls ? (
+                <ExerciseSettingPopover
+                  ariaLabel="Random run"
+                  icon={<Shuffle size={18} />}
+                  label="Run"
+                  value={formatRandomRunConfigValue(coach.settings.randomRun)}
+                  contentClassName="exercise-setting-popover__content--random-run"
+                >
+                  <RandomRunControls
+                    config={coach.settings.randomRun}
+                    disabled={coach.isBusy}
+                    onChange={coach.setRandomRunConfig}
+                    onNewRun={() => void coach.regenerateRandomRun()}
+                  />
+                </ExerciseSettingPopover>
+              ) : null}
               <span className="exercise-control-divider" aria-hidden="true" />
               <div className="exercise-mode-toggle" role="group" aria-label="Practice mode">
                 {(["auto", "manual"] as const).map((option) => (
@@ -1125,6 +1150,14 @@ const TEMPO_PRESETS = [
   { label: "Brisk", bpm: 110 }
 ] as const;
 
+const RANDOM_RUN_DIFFICULTY_OPTIONS = [
+  { difficulty: 1, label: "L1" },
+  { difficulty: 2, label: "L2" },
+  { difficulty: 3, label: "L3" },
+  { difficulty: 4, label: "L4" },
+  { difficulty: 5, label: "L5" }
+] as const satisfies readonly { difficulty: RandomRunDifficulty; label: string }[];
+
 type StrictnessOption = (typeof STRICTNESS_OPTIONS)[number];
 
 function getStrictnessOption(toleranceCents: number): StrictnessOption {
@@ -1138,6 +1171,83 @@ function getStrictnessOption(toleranceCents: number): StrictnessOption {
 function getActiveTempoPreset(tempoBpm: number) {
   return TEMPO_PRESETS.reduce((nearest, preset) =>
     Math.abs(preset.bpm - tempoBpm) < Math.abs(nearest.bpm - tempoBpm) ? preset : nearest
+  );
+}
+
+function formatRandomRunConfigValue(config: RandomRunConfig) {
+  return `${config.length} notes · L${config.difficulty}`;
+}
+
+function RandomRunControls({
+  config,
+  disabled,
+  onChange,
+  onNewRun
+}: {
+  config: RandomRunConfig;
+  disabled: boolean;
+  onChange: (config: RandomRunConfig) => void;
+  onNewRun: () => void;
+}) {
+  const lengthProgress =
+    ((config.length - MIN_RANDOM_RUN_LENGTH) / (MAX_RANDOM_RUN_LENGTH - MIN_RANDOM_RUN_LENGTH)) * 100;
+
+  return (
+    <div className="random-run-controls">
+      <label className="random-run-length-control">
+        <span>
+          <span>Length</span>
+          <strong>{config.length} notes</strong>
+        </span>
+        <input
+          aria-label="Run length"
+          className="random-run-length-slider"
+          type="range"
+          min={MIN_RANDOM_RUN_LENGTH}
+          max={MAX_RANDOM_RUN_LENGTH}
+          step="1"
+          value={config.length}
+          disabled={disabled}
+          style={{ "--random-run-length-progress": `${lengthProgress}%` } as CSSProperties}
+          onChange={(event) =>
+            onChange({
+              ...config,
+              length: Number(event.target.value)
+            })
+          }
+        />
+      </label>
+      <div className="random-run-field">
+        <span>Difficulty</span>
+        <div className="exercise-segmented-row random-run-difficulty-row" role="group" aria-label="Run difficulty">
+          {RANDOM_RUN_DIFFICULTY_OPTIONS.map((option) => (
+            <button
+              key={option.difficulty}
+              type="button"
+              data-active={config.difficulty === option.difficulty || undefined}
+              disabled={disabled}
+              onClick={() =>
+                onChange({
+                  ...config,
+                  difficulty: option.difficulty
+                })
+              }
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button
+        type="button"
+        className="random-run-new-button"
+        onClick={onNewRun}
+        disabled={disabled}
+      >
+        <Shuffle size={15} aria-hidden="true" />
+        <span>New run</span>
+      </button>
+    </div>
   );
 }
 
@@ -1360,7 +1470,7 @@ function ExerciseTransport({
   );
 }
 
-type MobileExerciseSheetKind = "key" | "strictness" | "tempo";
+type MobileExerciseSheetKind = "key" | "strictness" | "tempo" | "random-run";
 
 type MobileExerciseScreenProps = {
   coach: ReturnType<typeof usePitchCoachController>;
@@ -1428,6 +1538,7 @@ function MobileExerciseScreen({
   const status = coach.lessonState.status;
   const primaryLabel = createPrimaryPracticeLabel(status, coach.selectedExercise, mode);
   const keyLabel = `${formatKeyName(coach.currentRootMidi)} maj`;
+  const showRandomRunControls = isRandomRunExercise(coach.selectedExercise);
 
   return (
     <section className="mobile-exercise-screen" aria-label="Pitch coach exercise">
@@ -1564,6 +1675,15 @@ function MobileExerciseScreen({
           active={openSheet === "tempo"}
           onClick={() => setOpenSheet("tempo")}
         />
+        {showRandomRunControls ? (
+          <MobileExerciseDockChip
+            icon={<Shuffle size={16} />}
+            label="Run"
+            value={formatRandomRunConfigValue(coach.settings.randomRun)}
+            active={openSheet === "random-run"}
+            onClick={() => setOpenSheet("random-run")}
+          />
+        ) : null}
       </nav>
 
       <MobileExerciseSheet
@@ -1596,6 +1716,19 @@ function MobileExerciseScreen({
           tempoBpm={coach.settings.tempoBpm}
           activeTempoPreset={activeTempoPreset}
           onChange={onSetTempo}
+        />
+      </MobileExerciseSheet>
+      <MobileExerciseSheet
+        open={openSheet === "random-run"}
+        title="Random run"
+        subtitle="Length & difficulty"
+        onClose={() => setOpenSheet(null)}
+      >
+        <RandomRunControls
+          config={coach.settings.randomRun}
+          disabled={coach.isBusy}
+          onChange={coach.setRandomRunConfig}
+          onNewRun={() => void coach.regenerateRandomRun()}
         />
       </MobileExerciseSheet>
 
@@ -1951,6 +2084,9 @@ function createPrimaryPracticeLabel(
   }
 
   if (status === "retry") {
+    if (isRandomRunExercise(exercise)) {
+      return "Retry run";
+    }
     return exercise.id === "major-triad" ? "Retry triad" : "Retry exercise";
   }
 
