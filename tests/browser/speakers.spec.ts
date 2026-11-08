@@ -80,7 +80,7 @@ test("actual worker preserves a three-second unison hold and rejects guide-only 
     const { createCalibrationProbe } = await import("/src/audio/calibratedCancellation.ts");
     const { StreamingPitch } = await import("/src/audio/streamingPitch.ts");
     const { PitchyPitchDetectorAdapter } = await import("/src/audio/pitchyDetector.ts");
-    const { SPEAKER_PITCH_OPTIONS } = await import("/src/audio/speakerCancellation.ts");
+    const { SPEAKER_PITCH_OPTIONS } = await import("/src/audio/speakerSettings.ts");
     const probe = createCalibrationProbe();
     const practiceStart = probe.left.length + 24000;
     const length = practiceStart + 5 * 48000;
