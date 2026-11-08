@@ -6,10 +6,12 @@ import { createSongPracticePitchBounds, createSongReferenceRange } from "./refer
 import { isCurrentSongReference } from "./referenceVersion";
 import { createSongModeServices } from "./services";
 import { scoreSongAttempt } from "./songScoring";
+import { createSpeakerDemo } from "./speakerDemo";
 import { pendingSongRuntimeSupport } from "./support";
 import { DEFAULT_REFERENCE_DETAIL, REFERENCE_DETAIL_OPTIONS } from "./transcriptionConfig";
 import type {
   SongModeServices,
+  SongInputMode,
   SongReference,
   SongReferenceDetail,
   SongRuntimeSupport,
@@ -68,6 +70,9 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const [liveFrames, setLiveFrames] = useState<PitchFrame[]>([]);
   const [score, setScore] = useState<SongScore | null>(null);
   const [vocalGuideGain, setVocalGuideGainState] = useState(0);
+  const [inputMode, setInputMode] = useState<SongInputMode>("headphones");
+  const [inputStatus, setInputStatus] = useState("");
+  const [isDemo, setIsDemo] = useState(false);
   const [currentPlaybackTimeMs, setCurrentPlaybackTimeMs] = useState(0);
   const [referenceDetail, setReferenceDetailState] =
     useState<SongReferenceDetail>(DEFAULT_REFERENCE_DETAIL);
@@ -133,6 +138,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       runIdRef.current += 1;
       await services.practiceEngine.stop();
       setStage("decoding");
+      setIsDemo(false);
       setErrorMessage(null);
       setFileName(file.name);
       setDecodedAudio(null);
@@ -294,6 +300,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     runIdRef.current = runId;
     setStage("practicing");
     setErrorMessage(null);
+    setInputStatus("Preparing microphone…");
     setLiveFrames([]);
     setScore(null);
     setCurrentPlaybackTimeMs(0);
@@ -303,7 +310,16 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       await services.practiceEngine.start({
         accompaniment: separation.accompaniment,
         vocals: separation.vocals,
-        detector: services.detector,
+        detector: inputMode === "aec3" ? services.speakerDetector ?? services.detector : services.detector,
+        inputMode,
+        onInputStatus: (message) => { if (runId === runIdRef.current) setInputStatus(message); },
+        onError: (message) => {
+          if (runId !== runIdRef.current) return;
+          runIdRef.current += 1;
+          setInputStatus("Practice stopped.");
+          setErrorMessage(message);
+          setStage("ready");
+        },
         bounds: createSongPracticePitchBounds(
           reference,
           reference.analysisRange ?? createSongReferenceRange(settings.range)
@@ -333,6 +349,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
 
           setScore(scoreSongAttempt(reference, liveFramesRef.current, settings.toleranceCents));
           setStage("complete");
+          setInputStatus("Practice complete.");
         }
       });
     } catch (error) {
@@ -341,12 +358,15 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       }
 
       setStage("ready");
+      setInputStatus("Microphone is off.");
       setErrorMessage(createSongErrorMessage(error));
     }
   }, [
     reference,
     separation,
     services.detector,
+    services.speakerDetector,
+    inputMode,
     services.practiceEngine,
     settings.range.highestMidi,
     settings.range.lowestMidi,
@@ -358,6 +378,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const stopPractice = useCallback(async () => {
     runIdRef.current += 1;
     await services.practiceEngine.stop();
+    setInputStatus("Microphone is off.");
     if (referenceRef.current) {
       setScore(scoreSongAttempt(referenceRef.current, liveFramesRef.current, settings.toleranceCents));
       setStage("complete");
@@ -399,6 +420,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     await services.practiceEngine.stop();
     setStage(support.supported ? "empty" : "unsupported");
     setErrorMessage(null);
+    setIsDemo(false);
+    setInputStatus("");
     setFileName(null);
     setDecodedAudio(null);
     setSeparation(null);
@@ -410,6 +433,27 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setTrimStartMsState(0);
     setTrimEndMsState(DEFAULT_SECTION_MS);
   }, [services.practiceEngine, support.supported]);
+
+  const loadSpeakerDemo = useCallback(async () => {
+    const runId = ++runIdRef.current;
+    await services.practiceEngine.stop();
+    if (runId !== runIdRef.current) return;
+    const demo = createSpeakerDemo(settings.range);
+    clearAttemptState({ clearSeparation: true });
+    setIsDemo(true);
+    setFileName("Speaker test · generated melody");
+    setDecodedAudio(null);
+    setReference(demo.reference);
+    setSeparation(demo.separation);
+    setTrimStartMsState(0);
+    setTrimEndMsState(demo.reference.durationMs);
+    setVocalGuideGainState(0.35);
+    setInputMode("aec3");
+    setInputStatus("Start practice, listen to the guide, then sing along.");
+    setErrorMessage(null);
+    setAnalysisProgress({ modelProgress: 1, separationProgress: 1, transcriptionProgress: 1, status: "Generated melody — ready to sing. No model download needed." });
+    setStage("ready");
+  }, [clearAttemptState, services.practiceEngine, settings.range]);
 
   const setReferenceDetail = useCallback(
     (detail: SongReferenceDetail) => {
@@ -484,6 +528,11 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     referenceDetailOptions: REFERENCE_DETAIL_OPTIONS,
     toleranceCents: settings.toleranceCents,
     vocalGuideGain,
+    inputMode,
+    inputStatus,
+    isDemo,
+    loadSpeakerDemo,
+    setInputMode,
     canAnalyze,
     canPractice,
     chooseFile,

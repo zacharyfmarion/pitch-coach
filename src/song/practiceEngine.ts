@@ -1,237 +1,233 @@
 import { createAudioBufferFromStereo } from "./audioData";
 import { preparePlayAndRecordAudioSession, resumeAudioContext } from "../audio/audioSession";
 import { createAudioInputConstraints } from "../audio/inputConstraints";
+import { AEC_DELAY_SAMPLES, SPEAKER_SAMPLE_RATE } from "../audio/speakerCancellation";
+import { StreamingPitch } from "../audio/streamingPitch";
 import type { SongPracticeConfig, SongPracticeEngine } from "./types";
 
-const WORKLET_URL = new URL("../audio/audio-input-processor.js", import.meta.url);
-const FRAME_SIZE = 4096;
-const HOP_SIZE = 1024;
+const WORKLET_URL = new URL("../audio/speaker-input-processor.js", import.meta.url);
 
-type AudioFrameMessage = {
-  type: "audio-frame";
-  samples: Float32Array;
-  timeMs: number;
+type Session = {
+  context: AudioContext;
+  stream?: MediaStream;
+  nodes: AudioNode[];
+  sources: AudioBufferSourceNode[];
+  worklet?: AudioWorkletNode;
+  worker?: Worker;
+  channel?: MessageChannel;
+  rejectInitialization?: (error: Error) => void;
+  vocalGain?: GainNode;
+  timer?: number;
+  endTimer?: number;
+  startMs: number;
+  running: boolean;
+  paused: boolean;
+};
+
+type AudioMessage = {
+  type: "audio" | "processed" | "ready" | "error";
+  microphone?: Float32Array;
+  samples?: Float32Array;
+  startSample: number;
+  message?: string;
 };
 
 export class BrowserSongPracticeEngine implements SongPracticeEngine {
-  private context: AudioContext | null = null;
-  private stream: MediaStream | null = null;
-  private source: MediaStreamAudioSourceNode | null = null;
-  private worklet: AudioWorkletNode | null = null;
-  private sink: GainNode | null = null;
-  private accompanimentSource: AudioBufferSourceNode | null = null;
-  private vocalSource: AudioBufferSourceNode | null = null;
-  private vocalGain: GainNode | null = null;
-  private playbackTimer: number | null = null;
-  private playbackTimeCallback: ((timeMs: number) => void) | null = null;
-  private playbackDurationMs = 0;
-  private running = false;
-  private paused = false;
-  private playbackStartMs = 0;
-  private endedCallback: (() => void) | null = null;
+  private session: Session | null = null;
+  private generation = 0;
 
   async start(config: SongPracticeConfig) {
     preparePlayAndRecordAudioSession();
-    if (this.context || this.stream || this.running) {
-      await this.stop();
-    }
-    if (!BrowserSongPracticeEngine.isSupported()) {
-      throw new Error("This browser does not support song practice audio capture.");
-    }
-
-    this.context = new AudioContext({ latencyHint: "interactive" });
-    await resumeAudioContext(this.context);
-    await this.context.audioWorklet.addModule(WORKLET_URL);
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: createAudioInputConstraints(config.deviceId)
-    });
-
-    this.source = this.context.createMediaStreamSource(this.stream);
-    this.worklet = new AudioWorkletNode(this.context, "pitch-coach-input", {
-      processorOptions: {
-        frameSize: FRAME_SIZE,
-        hopSize: HOP_SIZE
-      }
-    });
-    this.sink = this.context.createGain();
-    this.sink.gain.value = 0;
-
-    const accompanimentGain = this.context.createGain();
-    accompanimentGain.gain.value = 0.95;
-    this.vocalGain = this.context.createGain();
-    this.vocalGain.gain.value = config.vocalGuideGain;
-
-    this.accompanimentSource = this.context.createBufferSource();
-    this.accompanimentSource.buffer = createAudioBufferFromStereo(this.context, config.accompaniment);
-    this.vocalSource = this.context.createBufferSource();
-    this.vocalSource.buffer = createAudioBufferFromStereo(this.context, config.vocals);
-
-    this.source.connect(this.worklet);
-    this.worklet.connect(this.sink);
-    this.sink.connect(this.context.destination);
-    this.accompanimentSource.connect(accompanimentGain).connect(this.context.destination);
-    this.vocalSource.connect(this.vocalGain).connect(this.context.destination);
-
-    this.playbackStartMs = (this.context.currentTime + 0.1) * 1000;
-    this.endedCallback = config.onEnded;
-    this.worklet.port.onmessage = (event: MessageEvent<AudioFrameMessage>) => {
-      if (!this.running || this.paused || event.data.type !== "audio-frame") {
-        return;
-      }
-
-      const timeMs = event.data.timeMs - this.playbackStartMs;
-      if (timeMs < -80) {
-        return;
-      }
-
-      config.onPitchFrame(
-        config.detector.detectPitch(
-          event.data.samples,
-          this.context!.sampleRate,
-          Math.max(0, timeMs),
-          config.bounds
-        )
-      );
+    if (this.session) await this.stop();
+    if (!BrowserSongPracticeEngine.isSupported()) throw new Error("This browser does not support song practice audio capture.");
+    const generation = ++this.generation;
+    const mode = config.inputMode ?? "headphones";
+    const context = new AudioContext({ latencyHint: "interactive", ...(mode === "aec3" ? { sampleRate: SPEAKER_SAMPLE_RATE } : {}) });
+    const session: Session = { context, nodes: [], sources: [], startMs: 0, running: false, paused: false };
+    this.session = session;
+    const current = () => this.session === session && generation === this.generation;
+    const fail = (message: string) => {
+      if (!current()) return;
+      void this.stop();
+      config.onError?.(message);
     };
-
-    this.accompanimentSource.onended = () => {
-      if (!this.running) {
-        return;
-      }
-
-      config.onPlaybackTime?.(config.accompaniment.durationMs);
-      const onEnded = this.endedCallback;
-      void this.stop().then(() => onEnded?.());
-    };
-
-    this.running = true;
-    this.paused = false;
-    this.playbackDurationMs = config.accompaniment.durationMs;
-    this.playbackTimeCallback = config.onPlaybackTime ?? null;
-    const startAt = this.playbackStartMs / 1000;
-    config.onPlaybackTime?.(0);
-    this.startPlaybackTimer();
-    this.accompanimentSource.start(startAt);
-    this.vocalSource.start(startAt);
-  }
-
-  async pause() {
-    if (!this.running || this.paused || !this.context) {
-      return;
-    }
-
-    this.paused = true;
-    this.clearPlaybackTimer();
     try {
-      if (this.context.state === "running") {
-        await this.context.suspend();
+      await resumeAudioContext(context);
+      if (!current()) return;
+      if (mode === "aec3" && context.sampleRate !== SPEAKER_SAMPLE_RATE) throw new Error("Local speaker cancellation requires 48 kHz audio. Try browser cancellation or headphones.");
+      await context.audioWorklet.addModule(WORKLET_URL);
+      if (!current()) return;
+      if (mode === "aec3") {
+        config.onInputStatus?.("Loading local speaker cancellation…");
+        session.worker = new Worker(new URL("../audio/speaker-worker.ts", import.meta.url), { type: "module" });
+        session.channel = new MessageChannel();
+        await new Promise<void>((resolve, reject) => {
+          const timeout = window.setTimeout(() => reject(new Error("Speaker cancellation took too long to load. Try again or use headphones.")), 15000);
+          session.rejectInitialization = (error) => { window.clearTimeout(timeout); reject(error); };
+          session.worker!.onerror = () => session.rejectInitialization?.(new Error("Unable to load local speaker cancellation."));
+          session.worker!.onmessage = (event: MessageEvent<AudioMessage>) => {
+            if (event.data.type === "ready") {
+              window.clearTimeout(timeout);
+              session.rejectInitialization = undefined;
+              resolve();
+            } else if (event.data.type === "error") session.rejectInitialization?.(new Error(event.data.message));
+          };
+          session.worker!.postMessage({ type: "init", port: session.channel!.port1 }, [session.channel!.port1]);
+        });
+        if (!current()) return;
       }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        ...createAudioInputConstraints(config.deviceId), echoCancellation: mode === "browser"
+      } });
+      if (!current()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      session.stream = stream;
+      const track = stream.getAudioTracks()[0];
+      const settings = track.getSettings();
+      if (mode === "browser" && settings.echoCancellation === false) throw new Error("This input does not support browser cancellation. Select local cancellation or headphones.");
+      if (mode === "aec3" && settings.echoCancellation) throw new Error("The microphone did not disable browser cancellation. Use Browser cancellation to avoid processing twice.");
+      track.addEventListener("ended", () => fail("Microphone disconnected. Reconnect it and start practice again."));
+      const microphone = context.createMediaStreamSource(stream);
+      const worklet = new AudioWorkletNode(context, "pitch-coach-speaker-input", {
+        numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [1], channelCount: 2,
+        channelCountMode: "explicit", processorOptions: { useWorker: mode === "aec3" }
+      });
+      session.worklet = worklet;
+      const sink = context.createGain(); sink.gain.value = 0;
+      const playback = context.createGain();
+      const accompanimentGain = context.createGain(); accompanimentGain.gain.value = 0.95;
+      const vocalGain = context.createGain(); vocalGain.gain.value = config.vocalGuideGain;
+      session.vocalGain = vocalGain;
+      session.nodes.push(microphone, worklet, sink, playback, accompanimentGain, vocalGain);
+      microphone.connect(worklet, 0, 0);
+      playback.connect(context.destination);
+      playback.connect(worklet, 0, 1);
+      worklet.connect(sink).connect(context.destination);
+      accompanimentGain.connect(playback);
+      vocalGain.connect(playback);
+      const accompaniment = context.createBufferSource();
+      accompaniment.buffer = createAudioBufferFromStereo(context, config.accompaniment);
+      accompaniment.connect(accompanimentGain);
+      const vocals = context.createBufferSource();
+      vocals.buffer = createAudioBufferFromStereo(context, config.vocals);
+      vocals.connect(vocalGain);
+      session.sources.push(accompaniment, vocals);
+      const calibrationSeconds = mode === "aec3" ? 2 : 0;
+      const launchTime = context.currentTime + 0.15;
+      session.startMs = (launchTime + calibrationSeconds) * 1000;
+      // These are browser-reported estimates, not measured acoustic latency.
+      const inputLatency = (settings as MediaTrackSettings & { latency?: number }).latency ?? 0;
+      const deviceDelayMs = (inputLatency + context.baseLatency + (context.outputLatency ?? 0)) * 1000;
+      const pitch = new StreamingPitch(config.detector, config.bounds, context.sampleRate, mode === "aec3" ? AEC_DELAY_SAMPLES : 0);
+      const receive = (event: MessageEvent<AudioMessage>) => {
+        if (!current()) return;
+        if (event.data.type === "error") { fail(event.data.message ?? "Speaker processing failed."); return; }
+        // Drain blocks captured just before suspend so resuming has no sample gap.
+        if (!session.running) return;
+        const { startSample } = event.data;
+        const samples = event.data.samples ?? event.data.microphone;
+        if (!samples) return;
+        if (context.currentTime - (startSample + samples.length) / context.sampleRate > 0.5) {
+          fail("Audio processing fell behind. Close busy tabs or try headphones."); return;
+        }
+        for (const frame of pitch.push(samples, startSample)) {
+          const timeMs = frame.timeMs - session.startMs - deviceDelayMs;
+          if (timeMs >= 0 && timeMs <= config.accompaniment.durationMs) config.onPitchFrame({ ...frame, timeMs });
+        }
+      };
+      worklet.port.onmessage = receive;
+      worklet.onprocessorerror = () => fail("Audio capture stopped unexpectedly. Start practice again.");
+      if (session.worker && session.channel) {
+        session.worker.onmessage = receive;
+        session.worker.onerror = () => fail("Speaker processing stopped unexpectedly. Try headphones or browser cancellation.");
+        worklet.port.postMessage({ type: "connect", port: session.channel.port2 }, [session.channel.port2]);
+      }
+      if (calibrationSeconds) {
+        const calibration = context.createBufferSource();
+        calibration.buffer = accompaniment.buffer;
+        calibration.loop = true;
+        calibration.connect(accompanimentGain);
+        session.sources.push(calibration);
+        calibration.start(launchTime);
+        calibration.stop(session.startMs / 1000);
+        config.onInputStatus?.("Listen for two seconds while cancellation settles, then sing.");
+      }
+      let statusShown = false;
+      session.running = true;
+      config.onPlaybackTime?.(0);
+      session.timer = window.setInterval(() => {
+        if (!current() || session.paused) return;
+        const timeMs = Math.max(0, context.currentTime * 1000 - session.startMs);
+        if (!statusShown && context.currentTime * 1000 >= session.startMs) {
+          config.onInputStatus?.(mode === "aec3" ? "Local cancellation active. Sing with the track." : mode === "browser" ? "Browser cancellation requested. Sing with the track." : "Headphone mode. Microphone processing is off.");
+          statusShown = true;
+        }
+        config.onPlaybackTime?.(Math.min(timeMs, config.accompaniment.durationMs));
+      }, 50);
+      accompaniment.onended = () => {
+        if (!current() || !session.running) return;
+        session.endTimer = window.setTimeout(() => {
+          if (!current()) return;
+          config.onPlaybackTime?.(config.accompaniment.durationMs);
+          void this.stop().then(config.onEnded);
+        }, Math.max(150, deviceDelayMs + 100));
+      };
+      accompaniment.start(session.startMs / 1000);
+      vocals.start(session.startMs / 1000);
     } catch (error) {
-      this.paused = false;
-      this.startPlaybackTimer();
+      if (!current()) return;
+      await this.stop();
       throw error;
     }
   }
 
-  async resume() {
-    if (!this.running || !this.paused || !this.context) {
-      return;
-    }
+  async pause() {
+    const session = this.session;
+    if (!session?.running || session.paused) return;
+    session.paused = true;
+    try { await session.context.suspend(); }
+    catch (error) { session.paused = false; throw error; }
+  }
 
+  async resume() {
+    const session = this.session;
+    if (!session?.running || !session.paused) return;
     preparePlayAndRecordAudioSession();
-    await resumeAudioContext(this.context);
-    this.paused = false;
-    this.startPlaybackTimer();
+    await resumeAudioContext(session.context);
+    session.paused = false;
   }
 
   async stop() {
-    const wasRunning = this.running;
-    this.running = false;
-    this.paused = false;
-    this.endedCallback = null;
-    this.clearPlaybackTimer();
-
-    if (wasRunning) {
-      try {
-        this.accompanimentSource?.stop();
-      } catch {
-        // Already stopped.
-      }
-      try {
-        this.vocalSource?.stop();
-      } catch {
-        // Already stopped.
-      }
+    this.generation += 1;
+    const session = this.session;
+    this.session = null;
+    if (!session) return;
+    session.running = false;
+    window.clearInterval(session.timer);
+    window.clearTimeout(session.endTimer);
+    session.rejectInitialization?.(new Error("Practice cancelled."));
+    session.worker?.terminate();
+    session.channel?.port1.close();
+    session.channel?.port2.close();
+    session.worklet?.port.close();
+    for (const source of session.sources) {
+      source.onended = null;
+      try { source.stop(); } catch { /* Not started or already stopped. */ }
+      source.disconnect();
     }
-
-    this.worklet?.port.close();
-    this.source?.disconnect();
-    this.worklet?.disconnect();
-    this.sink?.disconnect();
-    this.accompanimentSource?.disconnect();
-    this.vocalSource?.disconnect();
-    this.vocalGain?.disconnect();
-    this.stream?.getTracks().forEach((track) => track.stop());
-
-    if (this.context && this.context.state !== "closed") {
-      await this.context.close();
-    }
-
-    this.context = null;
-    this.stream = null;
-    this.source = null;
-    this.worklet = null;
-    this.sink = null;
-    this.accompanimentSource = null;
-    this.vocalSource = null;
-    this.vocalGain = null;
-    this.playbackTimeCallback = null;
-    this.playbackDurationMs = 0;
-    this.playbackStartMs = 0;
+    session.nodes.forEach((node) => node.disconnect());
+    session.stream?.getTracks().forEach((track) => track.stop());
+    if (session.context.state !== "closed") await session.context.close();
   }
 
   setVocalGuideGain(gain: number) {
-    if (this.vocalGain) {
-      this.vocalGain.gain.value = gain;
-    }
+    if (this.session?.vocalGain) this.session.vocalGain.gain.value = gain;
   }
-
-  isRunning() {
-    return this.running;
-  }
-
-  isPaused() {
-    return this.paused;
-  }
-
+  isRunning() { return this.session?.running ?? false; }
+  isPaused() { return this.session?.paused ?? false; }
   static isSupported() {
-    return Boolean(
-      typeof window !== "undefined" &&
-        window.AudioContext &&
-        "AudioWorkletNode" in window &&
-        navigator.mediaDevices?.getUserMedia
-    );
-  }
-
-  private clearPlaybackTimer() {
-    if (this.playbackTimer !== null) {
-      window.clearInterval(this.playbackTimer);
-      this.playbackTimer = null;
-    }
-  }
-
-  private startPlaybackTimer() {
-    this.clearPlaybackTimer();
-    this.playbackTimer = window.setInterval(() => {
-      if (!this.running || this.paused || !this.context) {
-        return;
-      }
-
-      const timeMs = Math.min(
-        Math.max(0, this.context.currentTime * 1000 - this.playbackStartMs),
-        this.playbackDurationMs
-      );
-      this.playbackTimeCallback?.(timeMs);
-    }, 50);
+    return Boolean(typeof window !== "undefined" && window.AudioContext && "AudioWorkletNode" in window && navigator.mediaDevices?.getUserMedia);
   }
 }

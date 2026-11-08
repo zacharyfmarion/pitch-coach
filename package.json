@@ -10,10 +10,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "playwright test",
+    "benchmark:speakers:prepare": "python3 scripts/prepare-speaker-benchmark.py",
+    "benchmark:speakers": "tsx benchmarks/speaker/run.ts",
     "validate:changes": "bash scripts/validate-changes.sh",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@ennuicastr/webrtcaec3.js": "0.3.0",
     "@radix-ui/react-alert-dialog": "1.1.16",
     "@radix-ui/react-progress": "1.1.9",
     "@radix-ui/react-select": "2.2.6",
@@ -42,6 +45,7 @@
     "eslint": "10.3.0",
     "globals": "17.6.0",
     "jsdom": "29.1.1",
+    "tsx": "4.20.6",
     "typescript": "6.0.3",
     "typescript-eslint": "8.59.3",
     "vite": "8.0.12",
