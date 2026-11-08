@@ -1,0 +1,483 @@
+{
+  "purpose": "Characterize known matching-guide suppression; not a passing acceptance test or measured human performance.",
+  "settings": {
+    "sampleRate": 48000,
+    "blockSize": 480,
+    "pitch": {
+      "clarityThreshold": 0.66,
+      "rmsThreshold": 0.008
+    },
+    "aecVersion": "0.3.0",
+    "delaySamples": 430,
+    "guideGain": 0.35,
+    "echoTaps": [
+      [
+        3120,
+        0.65
+      ],
+      [
+        3361,
+        0.15
+      ]
+    ]
+  },
+  "results": [
+    {
+      "scenario": {
+        "id": "guide-muted",
+        "guideGain": 0,
+        "harmonics": 0,
+        "detuneCents": 0,
+        "vibratoCents": 0
+      },
+      "measurements": {
+        "microphone": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0.9791666666666666,
+            "recall50Cents": 0,
+            "belowLevelRate": 0,
+            "meanRms": 0.060165931233938354,
+            "meanClarity": 0.9185827113076384
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.95,
+            "recall50Cents": 0.6,
+            "belowLevelRate": 0,
+            "meanRms": 0.05850857941862676,
+            "meanClarity": 0.9398742495907474
+          }
+        },
+        "cancelled": {
+          "onset": {
+            "frames": 112,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05286641911970691,
+            "meanClarity": 0.9942916359044365
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05317286233922138,
+            "meanClarity": 0.9926375602663381
+          }
+        },
+        "cleanSinger": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05654070804381295,
+            "meanClarity": 0.9999999670624561
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05656410319005186,
+            "meanClarity": 0.9999999618663283
+          }
+        }
+      }
+    },
+    {
+      "scenario": {
+        "id": "matching-guide",
+        "guideGain": 0.35,
+        "harmonics": 0,
+        "detuneCents": 0,
+        "vibratoCents": 0
+      },
+      "measurements": {
+        "microphone": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0.5,
+            "recall50Cents": 0,
+            "belowLevelRate": 0,
+            "meanRms": 0.05041275671641149,
+            "meanClarity": 0.9506368092201676
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.58125,
+            "recall50Cents": 0.325,
+            "belowLevelRate": 0,
+            "meanRms": 0.046407268243467165,
+            "meanClarity": 0.9604168367930572
+          }
+        },
+        "cancelled": {
+          "onset": {
+            "frames": 112,
+            "detectionRate": 0.6875,
+            "recall50Cents": 0.625,
+            "belowLevelRate": 0.22321428571428573,
+            "meanRms": 0.028743694665947554,
+            "meanClarity": 0.8418022134094512
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.05,
+            "recall50Cents": 0.05,
+            "belowLevelRate": 0.95,
+            "meanRms": 0.0022740963943150634,
+            "meanClarity": 0.724878492738253
+          }
+        },
+        "cleanSinger": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05654070804381295,
+            "meanClarity": 0.9999999670624561
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05656410319005186,
+            "meanClarity": 0.9999999618663283
+          }
+        }
+      }
+    },
+    {
+      "scenario": {
+        "id": "matching-guide-thin-harmonics",
+        "guideGain": 0.35,
+        "harmonics": 0.25,
+        "detuneCents": 0,
+        "vibratoCents": 4
+      },
+      "measurements": {
+        "microphone": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0.5208333333333334,
+            "recall50Cents": 0,
+            "belowLevelRate": 0,
+            "meanRms": 0.049791984428422316,
+            "meanClarity": 0.9455164475325262
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.58125,
+            "recall50Cents": 0.31875,
+            "belowLevelRate": 0,
+            "meanRms": 0.045918932957068545,
+            "meanClarity": 0.9594332506017803
+          }
+        },
+        "cancelled": {
+          "onset": {
+            "frames": 112,
+            "detectionRate": 0.6339285714285714,
+            "recall50Cents": 0.5357142857142857,
+            "belowLevelRate": 0.30357142857142855,
+            "meanRms": 0.02734410034221668,
+            "meanClarity": 0.8875767494967154
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.190625,
+            "recall50Cents": 0.190625,
+            "belowLevelRate": 0.809375,
+            "meanRms": 0.008707018434891276,
+            "meanClarity": 0.8468297023348462
+          }
+        },
+        "cleanSinger": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05682901397772461,
+            "meanClarity": 0.999974332561372
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05684786560247361,
+            "meanClarity": 0.9999758305888127
+          }
+        }
+      }
+    },
+    {
+      "scenario": {
+        "id": "matching-guide-rich-harmonics",
+        "guideGain": 0.35,
+        "harmonics": 1,
+        "detuneCents": 0,
+        "vibratoCents": 8
+      },
+      "measurements": {
+        "microphone": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0.6666666666666666,
+            "recall50Cents": 0.041666666666666664,
+            "belowLevelRate": 0,
+            "meanRms": 0.05431067707580512,
+            "meanClarity": 0.9327994992699158
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.84375,
+            "recall50Cents": 0.3875,
+            "belowLevelRate": 0,
+            "meanRms": 0.05110880703068608,
+            "meanClarity": 0.9421126046784082
+          }
+        },
+        "cancelled": {
+          "onset": {
+            "frames": 112,
+            "detectionRate": 0.9732142857142857,
+            "recall50Cents": 0.7946428571428571,
+            "belowLevelRate": 0,
+            "meanRms": 0.04158194737997465,
+            "meanClarity": 0.9320466960383788
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.94375,
+            "recall50Cents": 0.865625,
+            "belowLevelRate": 0.05625,
+            "meanRms": 0.020726579821244987,
+            "meanClarity": 0.9628826248914668
+          }
+        },
+        "cleanSinger": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.0609750466287596,
+            "meanClarity": 0.9998441645019854
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.060987961411524204,
+            "meanClarity": 0.999852658099098
+          }
+        }
+      }
+    },
+    {
+      "scenario": {
+        "id": "guide-detuned-15-cents",
+        "guideGain": 0.35,
+        "harmonics": 0,
+        "detuneCents": 15,
+        "vibratoCents": 0
+      },
+      "measurements": {
+        "microphone": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0.7083333333333334,
+            "recall50Cents": 0.1875,
+            "belowLevelRate": 0,
+            "meanRms": 0.0597179323617144,
+            "meanClarity": 0.9174509646253505
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.80625,
+            "recall50Cents": 0.54375,
+            "belowLevelRate": 0,
+            "meanRms": 0.06019473714917578,
+            "meanClarity": 0.9419908894806301
+          }
+        },
+        "cancelled": {
+          "onset": {
+            "frames": 112,
+            "detectionRate": 0.7678571428571429,
+            "recall50Cents": 0.6428571428571429,
+            "belowLevelRate": 0.20535714285714285,
+            "meanRms": 0.028309357832223447,
+            "meanClarity": 0.8671464568312333
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.284375,
+            "recall50Cents": 0.265625,
+            "belowLevelRate": 0.703125,
+            "meanRms": 0.011204872862065982,
+            "meanClarity": 0.7888876572079819
+          }
+        },
+        "cleanSinger": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.05661186292111278,
+            "meanClarity": 0.9999999692859706
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 1,
+            "recall50Cents": 1,
+            "belowLevelRate": 0,
+            "meanRms": 0.056560952896953585,
+            "meanClarity": 0.9999999621718475
+          }
+        }
+      }
+    },
+    {
+      "scenario": {
+        "id": "guide-without-singer",
+        "guideGain": 0.35,
+        "harmonics": 0,
+        "detuneCents": 0,
+        "vibratoCents": 0,
+        "silent": true
+      },
+      "measurements": {
+        "microphone": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0.041666666666666664,
+            "recall50Cents": null,
+            "belowLevelRate": 0,
+            "meanRms": 0.03750188553746198,
+            "meanClarity": 0.9566222829917702
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0.6,
+            "recall50Cents": null,
+            "belowLevelRate": 0,
+            "meanRms": 0.03625182806377891,
+            "meanClarity": 0.9526330615113764
+          }
+        },
+        "cancelled": {
+          "onset": {
+            "frames": 112,
+            "detectionRate": 0.5982142857142857,
+            "recall50Cents": null,
+            "belowLevelRate": 0.39285714285714285,
+            "meanRms": 0.011413434623860531,
+            "meanClarity": 0.81747933810668
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 1,
+            "meanRms": 0.001064366423232039,
+            "meanClarity": 0.7158415820553315
+          }
+        },
+        "cleanSinger": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 1,
+            "meanRms": 0,
+            "meanClarity": 0
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 1,
+            "meanRms": 0,
+            "meanClarity": 0
+          }
+        }
+      }
+    },
+    {
+      "scenario": {
+        "id": "backing-without-singer",
+        "guideGain": 0,
+        "harmonics": 0,
+        "detuneCents": 0,
+        "vibratoCents": 0,
+        "silent": true
+      },
+      "measurements": {
+        "microphone": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 0,
+            "meanRms": 0.02072193462351411,
+            "meanClarity": 0.9752973312526905
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 0,
+            "meanRms": 0.014169316437295767,
+            "meanClarity": 0.972242948712814
+          }
+        },
+        "cancelled": {
+          "onset": {
+            "frames": 112,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 1,
+            "meanRms": 0.0009938691536004116,
+            "meanClarity": 0.7049785617165324
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 1,
+            "meanRms": 0.0009756537480310922,
+            "meanClarity": 0.695025602644577
+          }
+        },
+        "cleanSinger": {
+          "onset": {
+            "frames": 96,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 1,
+            "meanRms": 0,
+            "meanClarity": 0
+          },
+          "sustain": {
+            "frames": 320,
+            "detectionRate": 0,
+            "recall50Cents": null,
+            "belowLevelRate": 1,
+            "meanRms": 0,
+            "meanClarity": 0
+          }
+        }
+      }
+    }
+  ]
+}

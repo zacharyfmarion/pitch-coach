@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test.use({
   launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--autoplay-policy=no-user-gesture-required"] },
@@ -16,18 +17,36 @@ test("speaker demo works without WebGPU, loads real WASM, pauses, stops, and cha
   await expect(page.getByLabel("Song pitch timeline")).toBeVisible();
   const modes = page.getByRole("group", { name: "Microphone processing" });
   await expect(modes.getByRole("button", { name: "Speakers", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("switch", { name: "Debug microphone" }).click();
   await page.getByRole("button", { name: "Start song practice" }).click();
   await expect(page.getByRole("status", { name: "Microphone status" })).toContainText("Local cancellation active", { timeout: 20000 });
+  await expect(page.getByRole("button", { name: "Download input report" })).toBeEnabled();
+  await expect(page.getByRole("switch", { name: "Debug microphone" })).toBeDisabled();
   await expect(modes.getByRole("button", { name: "Headphones" })).toBeDisabled();
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.getByRole("button", { name: "Stop", exact: true }).click();
   await expect(page.getByRole("status", { name: "Microphone status" })).toHaveText("Microphone is off.");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download input report" }).click();
+  const download = await downloaded;
+  const reportPath = await download.path();
+  expect(reportPath).not.toBeNull();
+  const report = JSON.parse(await readFile(reportPath!, "utf8"));
+  expect(report.kind).toBe("pitch-coach-input-diagnostics");
+  expect(report.session).toMatchObject({ mode: "aec3", sampleRate: 48000, echoCancellation: false, thresholds: { rmsThreshold: 0.008 } });
+  expect(report.summary.receivedFrames).toBeGreaterThan(0);
+  expect(report.frames).toHaveLength(report.summary.receivedFrames);
+  expect(report.frames[0].raw.timeMs - report.frames[0].processed.timeMs).toBeCloseTo(430 / 48, 3);
+  expect(report.frames.every((frame: { raw: { rms: number }; processingMs: number }) => Number.isFinite(frame.raw.rms) && frame.processingMs >= 0)).toBe(true);
+  expect(JSON.stringify(report)).not.toMatch(/microphone":\[|samples|deviceId|groupId/);
+  await page.screenshot({ path: "test-results/input-debug-desktop.png", fullPage: true });
   await modes.getByRole("button", { name: "Headphones" }).click();
   await page.getByRole("button", { name: "Start song practice" }).click();
   await expect(page.getByRole("status", { name: "Microphone status" })).toContainText("Headphone mode");
   await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await modes.getByRole("button", { name: "Speakers", exact: true }).click();
   await page.screenshot({ path: "test-results/speaker-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(modes).toBeVisible();
@@ -95,10 +114,12 @@ test("real AudioWorklet/Worker graph cancels known speaker leakage while preserv
     const frequencies: Array<number | null> = [];
     const failures: string[] = [];
     let blocks = 0;
+    let unexpectedRawBlocks = 0;
     node.port.onmessage = (event) => failures.push(event.data.message);
     worker.onmessage = (event) => {
       if (event.data.type === "error") { failures.push(event.data.message); return; }
       blocks += 1;
+      if (event.data.microphone) unexpectedRawBlocks += 1;
       for (const frame of tracker.push(event.data.samples, event.data.startSample)) {
         const time = frame.timeMs / 1000 - startAt;
         if (time >= 4 && time <= 6.8) frequencies.push(frame.frequencyHz);
@@ -108,10 +129,11 @@ test("real AudioWorklet/Worker graph cancels known speaker leakage while preserv
     await new Promise<void>((resolve) => { micSource.onended = () => setTimeout(resolve, 100); });
     worker.terminate(); node.disconnect(); await context.close();
     const recall = (values: Array<number | null>) => values.filter((f) => f !== null && Math.abs(1200 * Math.log2(f / 220)) < 50).length / values.length;
-    return { blocks, failures, recall: recall(frequencies), offlineRecall: recall(offlineFrequencies) };
+    return { blocks, failures, unexpectedRawBlocks, recall: recall(frequencies), offlineRecall: recall(offlineFrequencies) };
   });
   expect(result.failures).toEqual([]);
   expect(result.blocks).toBeGreaterThan(800);
+  expect(result.unexpectedRawBlocks).toBe(0);
   expect(result.recall).toBeGreaterThan(0.5);
   expect(Math.abs(result.recall - result.offlineRecall)).toBeLessThan(0.05);
 });

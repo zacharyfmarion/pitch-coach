@@ -1,7 +1,7 @@
 import { loadEchoCanceller, SpeakerCancellation } from "./speakerCancellation";
 
 let processor: SpeakerCancellation | undefined;
-self.onmessage = async (event: MessageEvent<{ type: "init"; port: MessagePort }>) => {
+self.onmessage = async (event: MessageEvent<{ type: "init"; port: MessagePort; diagnostics?: boolean }>) => {
   if (event.data.type !== "init") return;
   const port = event.data.port;
   try {
@@ -11,7 +11,8 @@ self.onmessage = async (event: MessageEvent<{ type: "init"; port: MessagePort }>
         const start = performance.now();
         const { microphone, left, right, startSample } = audio.data;
         const samples = processor!.process(microphone, left, right).slice();
-        self.postMessage({ type: "processed", samples, startSample, processingMs: performance.now() - start }, { transfer: [samples.buffer] });
+        const raw = event.data.diagnostics ? microphone : undefined;
+        self.postMessage({ type: "processed", samples, microphone: raw, startSample, processingMs: performance.now() - start }, { transfer: raw ? [samples.buffer, raw.buffer] : [samples.buffer] });
         port.postMessage({ type: "ack" });
       } catch (error) {
         processor?.dispose();

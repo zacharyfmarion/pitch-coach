@@ -1,5 +1,6 @@
 import type { PitchDetectionBounds, PitchDetectorAdapter } from "../audio/types";
 import type { PitchFrame, VocalRange } from "../domain/contracts";
+import type { InputDiagnosticFrame, InputDiagnosticSession } from "../audio/inputDiagnostics";
 
 export type SongStereoBuffer = {
   sampleRate: number;
@@ -138,6 +139,8 @@ export type SongPracticeConfig = {
   inputMode?: SongInputMode;
   onInputStatus?: (message: string) => void;
   onError?: (message: string) => void;
+  onInputDiagnostic?: (frame: InputDiagnosticFrame) => void;
+  onInputDiagnosticSession?: (session: InputDiagnosticSession) => void;
   onPitchFrame: (frame: PitchFrame) => void;
   onPlaybackTime?: (timeMs: number) => void;
   onEnded: () => void;

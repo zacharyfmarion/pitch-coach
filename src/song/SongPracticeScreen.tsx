@@ -27,6 +27,7 @@ import { Toggle } from "../components/ui/Toggle";
 import { createSongDebugInfo, createVocalEnergyTrace } from "./debugDiagnostics";
 import { formatSongReferenceRange } from "./referenceRange";
 import { SongPitchTimeline } from "./SongPitchTimeline";
+import { LiveInputDebugPanel } from "./LiveInputDebugPanel";
 import {
   SONG_SECTION_LIMITS,
   useSongPracticeController,
@@ -387,6 +388,9 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                         : "Use headphones. Captures your microphone without playback cancellation."}
                   </p>
                   {song.inputStatus ? <p className="history-empty" role="status" aria-label="Microphone status">{song.inputStatus}</p> : null}
+                  {song.inputMode === "aec3" && song.vocalGuideGain > 0 ? (
+                    <p className="history-empty">Known prototype limitation: cancellation can cut off held notes that match the audible guide. Try Guide at 0% to compare, or use headphones with Headphones mode.</p>
+                  ) : null}
                   <label>
                     <span>Guide</span>
                     <input
@@ -411,6 +415,8 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                     <output>{song.toleranceCents} cents</output>
                   </label>
                 </section>
+
+                {song.inputMode === "aec3" ? <LiveInputDebugPanel debug={song.inputDebug} busy={song.isBusy} /> : null}
 
                 <section className="feedback-panel" aria-label="Song feedback">
                   <div className="group-heading">

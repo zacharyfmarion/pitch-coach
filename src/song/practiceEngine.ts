@@ -1,8 +1,10 @@
 import { createAudioBufferFromStereo } from "./audioData";
 import { preparePlayAndRecordAudioSession, resumeAudioContext } from "../audio/audioSession";
 import { createAudioInputConstraints } from "../audio/inputConstraints";
-import { AEC_DELAY_SAMPLES, SPEAKER_SAMPLE_RATE } from "../audio/speakerCancellation";
+import { AEC_DELAY_SAMPLES, SPEAKER_PITCH_OPTIONS, SPEAKER_SAMPLE_RATE } from "../audio/speakerCancellation";
 import { StreamingPitch } from "../audio/streamingPitch";
+import { PitchyPitchDetectorAdapter } from "../audio/pitchyDetector";
+import { pitchRejection, RAW_DIAGNOSTIC_THRESHOLDS } from "../audio/inputDiagnostics";
 import type { SongPracticeConfig, SongPracticeEngine } from "./types";
 
 const WORKLET_URL = new URL("../audio/speaker-input-processor.js", import.meta.url);
@@ -30,6 +32,7 @@ type AudioMessage = {
   samples?: Float32Array;
   startSample: number;
   message?: string;
+  processingMs?: number;
 };
 
 export class BrowserSongPracticeEngine implements SongPracticeEngine {
@@ -72,7 +75,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
               resolve();
             } else if (event.data.type === "error") session.rejectInitialization?.(new Error(event.data.message));
           };
-          session.worker!.postMessage({ type: "init", port: session.channel!.port1 }, [session.channel!.port1]);
+          session.worker!.postMessage({ type: "init", port: session.channel!.port1, diagnostics: Boolean(config.onInputDiagnostic) }, [session.channel!.port1]);
         });
         if (!current()) return;
       }
@@ -121,6 +124,16 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
       const inputLatency = (settings as MediaTrackSettings & { latency?: number }).latency ?? 0;
       const deviceDelayMs = (inputLatency + context.baseLatency + (context.outputLatency ?? 0)) * 1000;
       const pitch = new StreamingPitch(config.detector, config.bounds, context.sampleRate, mode === "aec3" ? AEC_DELAY_SAMPLES : 0);
+      const rawPitch = mode === "aec3" && config.onInputDiagnostic
+        ? new StreamingPitch(new PitchyPitchDetectorAdapter(RAW_DIAGNOSTIC_THRESHOLDS), config.bounds, context.sampleRate)
+        : null;
+      if (rawPitch) config.onInputDiagnosticSession?.({
+        mode: "aec3", sampleRate: context.sampleRate, inputLatencyMs: inputLatency * 1000,
+        outputLatencyMs: (context.outputLatency ?? 0) * 1000, baseLatencyMs: context.baseLatency * 1000,
+        algorithmicDelayMs: AEC_DELAY_SAMPLES / context.sampleRate * 1000,
+        echoCancellation: settings.echoCancellation, noiseSuppression: settings.noiseSuppression,
+        autoGainControl: settings.autoGainControl, bounds: config.bounds, thresholds: SPEAKER_PITCH_OPTIONS, rawThresholds: RAW_DIAGNOSTIC_THRESHOLDS
+      });
       const receive = (event: MessageEvent<AudioMessage>) => {
         if (!current()) return;
         if (event.data.type === "error") { fail(event.data.message ?? "Speaker processing failed."); return; }
@@ -129,12 +142,22 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         const { startSample } = event.data;
         const samples = event.data.samples ?? event.data.microphone;
         if (!samples) return;
-        if (context.currentTime - (startSample + samples.length) / context.sampleRate > 0.5) {
+        const queueLagMs = Math.max(0, (context.currentTime - (startSample + samples.length) / context.sampleRate) * 1000);
+        if (queueLagMs > 500) {
           fail("Audio processing fell behind. Close busy tabs or try headphones."); return;
         }
-        for (const frame of pitch.push(samples, startSample)) {
+        const rawFrames = rawPitch && event.data.microphone ? rawPitch.push(event.data.microphone, startSample) : [];
+        for (const [index, frame] of pitch.push(samples, startSample).entries()) {
           const timeMs = frame.timeMs - session.startMs - deviceDelayMs;
-          if (timeMs >= 0 && timeMs <= config.accompaniment.durationMs) config.onPitchFrame({ ...frame, timeMs });
+          if (timeMs >= 0 && timeMs <= config.accompaniment.durationMs) {
+            config.onPitchFrame({ ...frame, timeMs });
+            const raw = rawFrames[index];
+            if (raw) config.onInputDiagnostic?.({
+              raw: { ...raw, timeMs: raw.timeMs - session.startMs - deviceDelayMs },
+              processed: { ...frame, timeMs }, rejection: pitchRejection(frame, SPEAKER_PITCH_OPTIONS),
+              guideGain: vocalGain.gain.value, processingMs: event.data.processingMs ?? 0, queueLagMs
+            });
+          }
         }
       };
       worklet.port.onmessage = receive;

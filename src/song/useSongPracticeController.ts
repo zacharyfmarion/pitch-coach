@@ -7,6 +7,7 @@ import { isCurrentSongReference } from "./referenceVersion";
 import { createSongModeServices } from "./services";
 import { scoreSongAttempt } from "./songScoring";
 import { createSpeakerDemo } from "./speakerDemo";
+import { useLiveInputDiagnostics } from "./useLiveInputDiagnostics";
 import { pendingSongRuntimeSupport } from "./support";
 import { DEFAULT_REFERENCE_DETAIL, REFERENCE_DETAIL_OPTIONS } from "./transcriptionConfig";
 import type {
@@ -72,6 +73,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const [vocalGuideGain, setVocalGuideGainState] = useState(0);
   const [inputMode, setInputMode] = useState<SongInputMode>("headphones");
   const [inputStatus, setInputStatus] = useState("");
+  const inputDebug = useLiveInputDiagnostics();
+  const { reset: resetInputDebug, finish: finishInputDebug, receive: receiveInputDebug, receiveSession: receiveInputDebugSession, enabled: inputDebugEnabled } = inputDebug;
   const [isDemo, setIsDemo] = useState(false);
   const [currentPlaybackTimeMs, setCurrentPlaybackTimeMs] = useState(0);
   const [referenceDetail, setReferenceDetailState] =
@@ -123,6 +126,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const canPractice = Boolean(reference && separation && (stage === "ready" || stage === "complete"));
 
   const clearAttemptState = useCallback((options: { clearSeparation: boolean }) => {
+    resetInputDebug();
     if (options.clearSeparation) {
       setSeparation(null);
     }
@@ -131,7 +135,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setScore(null);
     setCurrentPlaybackTimeMs(0);
     liveFramesRef.current = [];
-  }, []);
+  }, [resetInputDebug]);
 
   const chooseFile = useCallback(
     async (file: File) => {
@@ -301,6 +305,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setStage("practicing");
     setErrorMessage(null);
     setInputStatus("Preparing microphone…");
+    resetInputDebug();
     setLiveFrames([]);
     setScore(null);
     setCurrentPlaybackTimeMs(0);
@@ -312,6 +317,12 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
         vocals: separation.vocals,
         detector: inputMode === "aec3" ? services.speakerDetector ?? services.detector : services.detector,
         inputMode,
+        onInputDiagnostic: inputDebugEnabled && inputMode === "aec3" ? (frame) => {
+          if (runId === runIdRef.current) receiveInputDebug(frame);
+        } : undefined,
+        onInputDiagnosticSession: inputDebugEnabled && inputMode === "aec3" ? (session) => {
+          if (runId === runIdRef.current) receiveInputDebugSession(session);
+        } : undefined,
         onInputStatus: (message) => { if (runId === runIdRef.current) setInputStatus(message); },
         onError: (message) => {
           if (runId !== runIdRef.current) return;
@@ -319,6 +330,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
           setInputStatus("Practice stopped.");
           setErrorMessage(message);
           setStage("ready");
+          finishInputDebug();
         },
         bounds: createSongPracticePitchBounds(
           reference,
@@ -350,6 +362,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
           setScore(scoreSongAttempt(reference, liveFramesRef.current, settings.toleranceCents));
           setStage("complete");
           setInputStatus("Practice complete.");
+          finishInputDebug();
         }
       });
     } catch (error) {
@@ -360,6 +373,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setStage("ready");
       setInputStatus("Microphone is off.");
       setErrorMessage(createSongErrorMessage(error));
+      finishInputDebug();
     }
   }, [
     reference,
@@ -367,6 +381,11 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     services.detector,
     services.speakerDetector,
     inputMode,
+    inputDebugEnabled,
+    resetInputDebug,
+    receiveInputDebug,
+    receiveInputDebugSession,
+    finishInputDebug,
     services.practiceEngine,
     settings.range.highestMidi,
     settings.range.lowestMidi,
@@ -379,13 +398,14 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     runIdRef.current += 1;
     await services.practiceEngine.stop();
     setInputStatus("Microphone is off.");
+    finishInputDebug();
     if (referenceRef.current) {
       setScore(scoreSongAttempt(referenceRef.current, liveFramesRef.current, settings.toleranceCents));
       setStage("complete");
     } else {
       setStage("decoded");
     }
-  }, [services.practiceEngine, settings.toleranceCents]);
+  }, [finishInputDebug, services.practiceEngine, settings.toleranceCents]);
 
   const pausePractice = useCallback(async () => {
     if (stage !== "practicing") {
@@ -422,6 +442,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setErrorMessage(null);
     setIsDemo(false);
     setInputStatus("");
+    resetInputDebug();
     setFileName(null);
     setDecodedAudio(null);
     setSeparation(null);
@@ -432,7 +453,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     liveFramesRef.current = [];
     setTrimStartMsState(0);
     setTrimEndMsState(DEFAULT_SECTION_MS);
-  }, [services.practiceEngine, support.supported]);
+  }, [resetInputDebug, services.practiceEngine, support.supported]);
 
   const loadSpeakerDemo = useCallback(async () => {
     const runId = ++runIdRef.current;
@@ -530,6 +551,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     vocalGuideGain,
     inputMode,
     inputStatus,
+    inputDebug,
     isDemo,
     loadSpeakerDemo,
     setInputMode,

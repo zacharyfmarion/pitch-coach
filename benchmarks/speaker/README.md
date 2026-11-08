@@ -2,6 +2,8 @@
 
 This prototype evaluates whether local echo cancellation improves **pitch tracking** while Pitch Coach plays a backing track. It does not evaluate studio-quality vocal isolation. All microphone processing stays on the device.
 
+**Known failure found during user testing:** an audible guide at the singer's pitch can cause onset-only tracking. The original competing-guide benchmark used a guide two semitones higher; its passing gates do not establish reliable same-pitch sing-along. See the sustained-note diagnosis below. The canceller has not yet been fixed for this case.
+
 ## Reproduce
 
 ```bash
@@ -68,3 +70,33 @@ Playwright checks the real WASM worker, the real AudioWorklet graph with a known
 The **Browser** comparison mode requests native browser echo cancellation. It has not been scored by this offline benchmark: feeding a simulated signal into a Web Audio node does not exercise the browser's hardware microphone AEC. Headphone mode is the raw-input baseline.
 
 Remaining evidence gaps: real microphones/speakers and measured room paths, moving devices, Bluetooth latency, unrelated external playback, mobile CPU budgets, and original-vocal identity ambiguity. A known playback reference is required. Next benchmark expansion should add recorded acoustic loopback pairs or measured room responses; keep a fresh evaluation split for future tuning. The prototype can be tested now without treating listening impressions as its accuracy metric.
+
+## Sustained-note diagnosis — 2026-11-08
+
+The reported screenshot showed short detected fragments at note onset, followed by gaps while the singer continued. The user confirmed **Speakers mode with the vocal guide audible**. A new, original synthetic fixture uses the exact generated demo, actual playback gains, a two-second calibration, and an independent singer oscillator with a different initial phase. Echo is a fixed two-tap path (65 ms × 0.65 and 70.02 ms × 0.15). Guide-on, guide-muted, weak/rich harmonic, small-detuning, and singer-silent controls all run through the production WASM class and pitch detector.
+
+```bash
+pnpm benchmark:speakers:sustain --output benchmarks/speaker/results/sustain-diagnostic.json
+```
+
+No dataset download is needed. The [full numeric report](results/sustain-diagnostic.json) separates onset (70–200 ms after each note starts) from sustain (300–700 ms), over 16 authored notes. Detection means any accepted pitch; recall requires the correct pitch within 50 cents, so octave errors and gaps fail. Silence controls report false detection rather than pitch recall. The clean isolated singer is a fixture control, not input to cancellation. Both microphone and processed diagnostic baselines use the same 0.008 RMS / 0.66 clarity gates to isolate processing effects (the original dataset's raw baseline uses 0.005).
+
+| Case | Onset detection | Sustained detection | Sustained correct pitch |
+| --- | ---: | ---: | ---: |
+| Pure held tone, guide muted | 100% | 100% | 100% |
+| Pure held tone matching guide | 68.8% | 5.0% | 5.0% |
+| Matching guide, weak harmonics + 4-cent vibrato | 63.4% | 19.1% | 19.1% |
+| Matching guide, rich harmonics + 8-cent vibrato | 97.3% | 94.4% | 86.6% |
+| Pure tone 15 cents above guide | 76.8% | 28.4% | 26.6% |
+| **No singer**, guide audible | **59.8% false** | 0% false | — |
+| No singer, guide muted | 0% false | 0% false | — |
+
+The matching pure tone's cancelled sustain RMS averages **0.00227**, below the **0.008** pitch gate; 95% of sustained windows fall below that gate. Muting only the guide restores 100% sustained pitch recall in this fixture. This localizes the reproduced failure to cancellation followed by the volume gate, before chart rendering. It does not establish which internal AEC3 filter/suppressor causes the attenuation. Richer harmonics help, so the pure-tone result must not be presented as a measured human success rate.
+
+The singer-silent case also produces short onset traces from guide leakage. Thus onset fragments in a screenshot are not sufficient proof that the microphone initially tracked the singer. The existing guide-shifted dataset and aggregate whole-excerpt metrics missed both aspects of this same-pitch case. Future fixes must preserve sustained matching-pitch singing **and** reject guide-only onsets. Simply lowering the gate, drawing through gaps, or falling back to raw microphone pitch would risk crediting playback.
+
+### Confirm on a real microphone
+
+In Speakers mode, enable **Debug microphone** before starting. Remain silent for the first few notes, hold a vowel while following the guide, then mute **Guide** halfway through. Stop and **Download input report**. The graph compares input and cancelled RMS; the report includes per-window input/cancelled pitch, RMS, clarity, rejection reason, guide gain, processing/queue time, and browser-reported processing settings. The microphone signal includes speaker leakage and is not singer ground truth. OS processing before capture is not observable. Paired input/processed window centers differ by the recorded 8.96 ms AEC delay; each timestamp is retained explicitly.
+
+Diagnostics are opt-in, kept only in memory (up to two minutes; truncation is reported), and explicitly downloaded as JSON. No audio samples, device IDs, device labels, song names, or uploads are included. Turning diagnostics off avoids the extra raw pitch analysis. This confirms the stage where a live signal is lost; it is not an automatic accuracy benchmark without an independent clean singer reference. The DSP and gates are deliberately unchanged in this diagnostic build.
