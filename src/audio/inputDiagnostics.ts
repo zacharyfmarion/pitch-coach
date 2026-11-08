@@ -1,6 +1,7 @@
 import type { PitchFrame } from "../domain/contracts";
 import type { PitchDetectionBounds } from "./types";
 import type { PitchyPitchDetectorOptions } from "./pitchyDetector";
+import type { CalibrationQuality } from "./calibratedCancellation";
 
 export const RAW_DIAGNOSTIC_THRESHOLDS = { clarityThreshold: 0.66, rmsThreshold: 0.005 } as const;
 
@@ -16,7 +17,8 @@ export type InputDiagnosticFrame = {
 };
 
 export type InputDiagnosticSession = {
-  mode: "aec3";
+  mode: "aec3" | "calibrated";
+  calibration?: CalibrationQuality;
   sampleRate: number;
   inputLatencyMs: number;
   outputLatencyMs: number;

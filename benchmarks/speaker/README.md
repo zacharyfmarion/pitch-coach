@@ -2,9 +2,57 @@
 
 This prototype evaluates whether local echo cancellation improves **pitch tracking** while Pitch Coach plays a backing track. It does not evaluate studio-quality vocal isolation. All microphone processing stays on the device.
 
-**Known failure found during user testing:** an audible guide at the singer's pitch can cause onset-only tracking. The original competing-guide benchmark used a guide two semitones higher; its passing gates do not establish reliable same-pitch sing-along. See the sustained-note diagnosis below. The canceller has not yet been fixed for this case.
+Speaker mode now uses a **calibrated playback model that stays fixed while singing**, replacing the continuously adapting AEC3 processor. It addresses the onset-only failure when the singer matches the guide. The historical AEC3 evaluation and diagnosis remain below; they are not the current implementation's acceptance evidence.
 
-## Reproduce
+## Calibrated guide-on cancellation
+
+The same production processor is exercised by `guideBenchmark.ts` and the real browser worker. It never receives singer-only audio, target notes, f0 annotations, or simulator room parameters. Pitch windows, the 0.008 RMS / 0.66 clarity gates, and scoring remain unchanged. There is no raw-pitch fallback, held-pitch interpolation, or target-note substitution.
+
+Before each attempt, a 3.74-second probe measures the left and right speaker paths separately. Periodic broadband training is followed by different stereo noise: an initial portion chooses a simple soft-saturation parameter, and a final unused portion validates cancellation. The model consists of that fixed memoryless speaker response and two measured 16384-sample causal impulse responses (341 ms at 48 kHz). A partitioned FFT filter subtracts predicted playback in 480-sample blocks without adding the old AEC3's 430-sample delay. Filters do not adapt during singing.
+
+Calibration must achieve **at least 22 dB echo reduction on its unused validation segment**, have a measurable speaker return, and avoid microphone clipping. Unreliable checks stop practice; no raw signal is scored. Scoring starts after a quiet tail. Pause/resume includes a 450 ms settling interval because physical room echoes decay while the audio clock is suspended. Reports include calibration acceptance, measured reduction and estimated nonlinearity. No calibration recordings or filter coefficients are saved or uploaded.
+
+```bash
+pnpm benchmark:speakers:prepare
+pnpm benchmark:speakers:guide --split development --check
+pnpm benchmark:speakers:guide --split regression --check
+```
+
+Development uses vocadito recordings 1–8 plus original sustained-note fixtures. The frozen recording-regression suite uses 9–40; these recordings were evaluated previously, so this is **not a fresh held-out test**. The new guide is a same-pitch, time-aligned copy of the normalized vocal in the actual playback, deliberately creating very strong correlation. The singer is added independently after the simulated acoustic path; singer-silent controls keep the entire guide/backing mix playing. Synthetic tests additionally use independent-phase pure tones, weak/rich harmonics, vibrato, 15-cent detuning, and muted-guide controls. The simulator applies the same unknown stereo room path to calibration and practice, with independent validation samples. It adds 35/65/110 ms delays, reflections, differing channel gains, noise, and memoryless speaker distortion. The regression suite changes distortion strength from 6 to 7.3, between calibration search-grid values.
+
+Acceptance gates, chosen on development cases before the recording-regression run:
+
+- At least 95% **correct-pitch recall** at both onset (70–200 ms) and sustain (300–700 ms) in every accepted synthetic singing case; missing and octave-error estimates fail.
+- At most 1% false detections in guide-only controls, including onset, sustain, and the full synthetic clip.
+- Recorded singing recall within three percentage points of the same clean-vocal detector; at most 1% false detections when the singer is entirely silent.
+- Every regular room case must pass calibration. Noisy, 200 ppm clock-drift, and severe hard-clipping stress cases must refuse calibration. Refused cases are listed separately and never counted as accurate silent frames.
+
+The initial linear-only candidate preserved singing but produced 5.18% false detections on recorded guide-only cases, all under speaker distortion. Calibration was extended to estimate that distortion and qualify it on separate probe samples; the pitch gate was not lowered. The final development run preserves 93.24% pitch recall versus 93.29% on clean vocals, with **0/19,200 false voiced frames** in fully-silent-singer controls. All accepted synthetic cases have 100% onset and sustain pitch recall, and 0% guide-only detections. Three unsupported acoustic conditions are refused rather than scored.
+
+### Frozen recording-regression results
+
+32 recordings × 4 acoustic conditions × singing/silent controls = **256 evaluated cases**. All regular cases passed calibration and all recording-regression gates passed.
+
+| Measurement | Clean singer | Previous AEC3 | Calibrated model |
+| --- | ---: | ---: | ---: |
+| Correct pitch within 50 cents | 90.16% | 43.18% | **90.15%** |
+| Missed voiced frames | 4.21% | 42.87% | **4.22%** |
+| Median pitch error among estimates | 7.16 cents | 14.67 cents | **7.15 cents** |
+| Guide-only false detection | — | 0.048% | **0 / 75,564 frames** |
+
+On annotated rests within otherwise sung recordings, false-voiced rates are 23.01% for clean audio and 23.02% after calibrated cancellation. Preserving the clean waveform also preserves the pitch detector's existing voicing/boundary errors. The zero result above refers strictly to the entirely silent-singer controls.
+
+[Development summary](results/guide-development.json), [development cases](results/guide-development-cases.csv), [recording-regression summary](results/guide-regression.json), and [all recording-regression cases](results/guide-regression-cases.csv) retain the evidence. Commands retain complete case JSON in `.cache/speaker-benchmark/`; checked-in summaries split the cases into CSV for reviewability. Calibration counts in the reports count case evaluations sharing the same fitted room/recording calibration.
+
+On the Apple M1 Max development host, the frozen regression run used about 0.039 seconds of compute per second of audio, with p95 processing of 0.58 ms per 10 ms block. A worst-case block took 39.15 ms while other validation work ran, and maximum one-time calibration took 479 ms. These are Node measurements, not hardware microphone-to-display latency guarantees. Calibration permits a larger bounded startup queue; active practice retains the 20-block capture limit and stops on excessive lag.
+
+The browser limits the song mix to ±0.18 for every guide-slider setting, inside the calibration's ±0.2 validation range. Calibration itself bypasses that song gain. This avoids extrapolating a measured speaker response to much louder uploaded tracks. Benchmarks also test louder, unnormalized references as additional stress; those volumes are not a claim about the app's playback loudness.
+
+This measures fixed simulated paths, not a universal real-room guarantee. Keep device positions and system volume fixed after calibration; restarting practice measures a new path. Guide-slider changes are included in the actual post-gain playback reference. Unmodeled or changing acoustics, arbitrary speaker distortion, Bluetooth clock behavior, and very weak singing remain limitations. Natural annotated rests inside otherwise sung recordings still have detector/window-boundary errors; fully-silent control rates must not be presented as all-frame accuracy. The browser tests separately require ≥95% recall during an actual three-second unison hold and ≤1% detections before and after the singer while the guide continues, and cover failed calibration, cancellation during setup, pause/resume, diagnostics, and mobile layout.
+
+Implementation references: [FFT.js API and license](https://github.com/indutny/fft.js), [acoustic echo model and filtering background](https://www.mathworks.com/help/audio/ug/acoustic-echo-cancellation-aec.html). The simulated soft-saturation family is an explicit benchmark assumption; calibration validation, not that assumption, controls whether a live attempt starts.
+
+## Historical AEC3 benchmark: reproduce
 
 ```bash
 pnpm install --frozen-lockfile
@@ -61,7 +109,7 @@ All fixed prototype gates passed: clean recall loses ≤3 percentage points; equ
 
 On the recorded Apple Silicon host, cancellation plus pitch analysis used about **0.041 seconds of compute per second of audio**. Worst case p95 block processing was about **0.91 ms**, but a maximum block took **24.5 ms** while other work was running. Averages and p95 are not guarantees against occasional missed deadlines.
 
-## Browser integration and limits
+## Historical AEC3 browser integration and limits
 
 The actual AudioWorklet captures microphone and the final stereo playback mix on one audio clock. A MessageChannel feeds bounded 10 ms blocks to a worker; overload stops practice with an actionable message instead of accumulating stale feedback. Playback includes the current guide gain. Pitch window timestamps compensate known algorithmic delay and browser-reported input/output latency estimates. Those estimates still require real-device calibration to establish absolute scoring alignment. Stop, permission failure, disconnected microphones, and late permission grants release resources.
 
@@ -99,4 +147,4 @@ The singer-silent case also produces short onset traces from guide leakage. Thus
 
 In Speakers mode, enable **Debug microphone** before starting. Remain silent for the first few notes, hold a vowel while following the guide, then mute **Guide** halfway through. Stop and **Download input report**. The graph compares input and cancelled RMS; the report includes per-window input/cancelled pitch, RMS, clarity, rejection reason, guide gain, processing/queue time, and browser-reported processing settings. The microphone signal includes speaker leakage and is not singer ground truth. OS processing before capture is not observable. Paired input/processed window centers differ by the recorded 8.96 ms AEC delay; each timestamp is retained explicitly.
 
-Diagnostics are opt-in, kept only in memory (up to two minutes; truncation is reported), and explicitly downloaded as JSON. No audio samples, device IDs, device labels, song names, or uploads are included. Turning diagnostics off avoids the extra raw pitch analysis. This confirms the stage where a live signal is lost; it is not an automatic accuracy benchmark without an independent clean singer reference. The DSP and gates are deliberately unchanged in this diagnostic build.
+Diagnostics are opt-in, kept only in memory (up to two minutes; truncation is reported), and explicitly downloaded as JSON. No audio samples, device IDs, device labels, song names, or uploads are included. Turning diagnostics off avoids the extra raw pitch analysis. This confirms the stage where a live signal is lost; it is not an automatic accuracy benchmark without an independent clean singer reference. That earlier diagnostic build left DSP and gates unchanged; the current calibrated replacement is described above.

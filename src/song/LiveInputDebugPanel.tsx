@@ -24,7 +24,7 @@ export function LiveInputDebugPanel({ debug, busy }: { debug: ReturnType<typeof 
         <Toggle aria-label="Debug microphone" checked={debug.enabled} onChange={debug.setEnabled} disabled={busy} />
       </label>
       {debug.enabled ? <>
-        <p className="history-empty">Enable before starting. Stay silent for the first few notes, then hold a vowel. Mute the Guide halfway through to compare. Stop and download the report.</p>
+        <p className="history-empty">Enable before starting. Stay quiet during the speaker check and first few notes, then hold a vowel with the Guide playing. Stop and download the report.</p>
         <p className="history-empty">Only numeric levels and pitch measurements are kept locally. No audio is saved or uploaded. The microphone signal includes the speakers; its pitch is not proof of singing.</p>
         <svg viewBox="0 0 300 100" role="img" aria-label="Microphone and cancelled levels over the last six seconds" style={{ width: "100%", display: "block" }}>
           <line x1="0" x2="300" y1={y(threshold)} y2={y(threshold)} stroke="var(--text-secondary, #777)" strokeDasharray="4 4" />
@@ -39,8 +39,9 @@ export function LiveInputDebugPanel({ debug, busy }: { debug: ReturnType<typeof 
           <span>Frames captured</span><strong>{debug.frames.length}</strong>
           <span>Below volume gate</span><strong>{count("below-level")}</strong>
           <span>Low clarity</span><strong>{count("unclear")}</strong>
+          <span>Speaker check</span><strong>{debug.session?.calibration ? `${debug.session.calibration.accepted ? "Passed" : "Failed"} · ${debug.session.calibration.reductionDb.toFixed(1)} dB reduction` : "—"}</strong>
         </div>
-        <Button onClick={debug.download} disabled={!debug.frames.length}>Download input report</Button>
+        <Button onClick={debug.download} disabled={!debug.frames.length && !debug.session}>Download input report</Button>
       </> : null}
     </section>
   );

@@ -184,7 +184,7 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
               onClick={() =>
                 song.stage === "paused" ? void song.resumePractice() : void song.pausePractice()
               }
-              disabled={!isActivePractice}
+              disabled={!isActivePractice || song.isPreparing}
               aria-label={pauseResumeLabel}
               title={pauseResumeLabel}
             >
@@ -382,15 +382,12 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                   />
                   <p className="history-empty">
                     {song.inputMode === "aec3"
-                      ? "Speaker prototype: reduces this app’s playback in your microphone. Start at a moderate volume. All processing stays on your device."
+                      ? "Use a moderate volume for the speaker check before each attempt. Keep volume and device positions unchanged afterward; restart practice if either changes. Processing stays on your device."
                       : song.inputMode === "browser"
                         ? "Uses your browser’s echo cancellation. Results vary by browser and microphone."
                         : "Use headphones. Captures your microphone without playback cancellation."}
                   </p>
                   {song.inputStatus ? <p className="history-empty" role="status" aria-label="Microphone status">{song.inputStatus}</p> : null}
-                  {song.inputMode === "aec3" && song.vocalGuideGain > 0 ? (
-                    <p className="history-empty">Known prototype limitation: cancellation can cut off held notes that match the audible guide. Try Guide at 0% to compare, or use headphones with Headphones mode.</p>
-                  ) : null}
                   <label>
                     <span>Guide</span>
                     <input

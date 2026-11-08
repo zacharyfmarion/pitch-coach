@@ -1,7 +1,9 @@
-import { createAudioBufferFromStereo } from "./audioData";
+import { createAudioBufferFromStereo, createStereoBuffer } from "./audioData";
 import { preparePlayAndRecordAudioSession, resumeAudioContext } from "../audio/audioSession";
 import { createAudioInputConstraints } from "../audio/inputConstraints";
-import { AEC_DELAY_SAMPLES, SPEAKER_PITCH_OPTIONS, SPEAKER_SAMPLE_RATE } from "../audio/speakerCancellation";
+import { SPEAKER_PITCH_OPTIONS, SPEAKER_SAMPLE_RATE } from "../audio/speakerSettings";
+import { createCalibrationProbe, type CalibrationQuality } from "../audio/calibratedCancellation";
+import { speakerMixGain } from "../audio/speakerHeadroom";
 import { StreamingPitch } from "../audio/streamingPitch";
 import { PitchyPitchDetectorAdapter } from "../audio/pitchyDetector";
 import { pitchRejection, RAW_DIAGNOSTIC_THRESHOLDS } from "../audio/inputDiagnostics";
@@ -22,17 +24,19 @@ type Session = {
   timer?: number;
   endTimer?: number;
   startMs: number;
+  ignoreUntilMs: number;
   running: boolean;
   paused: boolean;
 };
 
 type AudioMessage = {
-  type: "audio" | "processed" | "ready" | "error";
+  type: "audio" | "processed" | "ready" | "error" | "calibrated";
   microphone?: Float32Array;
   samples?: Float32Array;
   startSample: number;
   message?: string;
   processingMs?: number;
+  quality?: CalibrationQuality;
 };
 
 export class BrowserSongPracticeEngine implements SongPracticeEngine {
@@ -46,7 +50,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     const generation = ++this.generation;
     const mode = config.inputMode ?? "headphones";
     const context = new AudioContext({ latencyHint: "interactive", ...(mode === "aec3" ? { sampleRate: SPEAKER_SAMPLE_RATE } : {}) });
-    const session: Session = { context, nodes: [], sources: [], startMs: 0, running: false, paused: false };
+    const session: Session = { context, nodes: [], sources: [], startMs: 0, ignoreUntilMs: 0, running: false, paused: false };
     this.session = session;
     const current = () => this.session === session && generation === this.generation;
     const fail = (message: string) => {
@@ -100,16 +104,19 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
       session.worklet = worklet;
       const sink = context.createGain(); sink.gain.value = 0;
       const playback = context.createGain();
+      const songMix = context.createGain();
+      if (mode === "aec3") songMix.gain.value = speakerMixGain(config.accompaniment, config.vocals);
       const accompanimentGain = context.createGain(); accompanimentGain.gain.value = 0.95;
       const vocalGain = context.createGain(); vocalGain.gain.value = config.vocalGuideGain;
       session.vocalGain = vocalGain;
-      session.nodes.push(microphone, worklet, sink, playback, accompanimentGain, vocalGain);
+      session.nodes.push(microphone, worklet, sink, playback, songMix, accompanimentGain, vocalGain);
       microphone.connect(worklet, 0, 0);
       playback.connect(context.destination);
       playback.connect(worklet, 0, 1);
       worklet.connect(sink).connect(context.destination);
-      accompanimentGain.connect(playback);
-      vocalGain.connect(playback);
+      accompanimentGain.connect(songMix);
+      vocalGain.connect(songMix);
+      songMix.connect(playback);
       const accompaniment = context.createBufferSource();
       accompaniment.buffer = createAudioBufferFromStereo(context, config.accompaniment);
       accompaniment.connect(accompanimentGain);
@@ -117,31 +124,32 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
       vocals.buffer = createAudioBufferFromStereo(context, config.vocals);
       vocals.connect(vocalGain);
       session.sources.push(accompaniment, vocals);
-      const calibrationSeconds = mode === "aec3" ? 2 : 0;
-      const launchTime = context.currentTime + 0.15;
-      session.startMs = (launchTime + calibrationSeconds) * 1000;
+      session.startMs = Infinity;
       // These are browser-reported estimates, not measured acoustic latency.
       const inputLatency = (settings as MediaTrackSettings & { latency?: number }).latency ?? 0;
       const deviceDelayMs = (inputLatency + context.baseLatency + (context.outputLatency ?? 0)) * 1000;
-      const pitch = new StreamingPitch(config.detector, config.bounds, context.sampleRate, mode === "aec3" ? AEC_DELAY_SAMPLES : 0);
+      const pitch = new StreamingPitch(config.detector, config.bounds, context.sampleRate);
       const rawPitch = mode === "aec3" && config.onInputDiagnostic
         ? new StreamingPitch(new PitchyPitchDetectorAdapter(RAW_DIAGNOSTIC_THRESHOLDS), config.bounds, context.sampleRate)
         : null;
-      if (rawPitch) config.onInputDiagnosticSession?.({
-        mode: "aec3", sampleRate: context.sampleRate, inputLatencyMs: inputLatency * 1000,
+      const reportCalibration = (quality: CalibrationQuality) => config.onInputDiagnosticSession?.({
+        mode: "calibrated", calibration: quality, sampleRate: context.sampleRate, inputLatencyMs: inputLatency * 1000,
         outputLatencyMs: (context.outputLatency ?? 0) * 1000, baseLatencyMs: context.baseLatency * 1000,
-        algorithmicDelayMs: AEC_DELAY_SAMPLES / context.sampleRate * 1000,
+        algorithmicDelayMs: 0,
         echoCancellation: settings.echoCancellation, noiseSuppression: settings.noiseSuppression,
         autoGainControl: settings.autoGainControl, bounds: config.bounds, thresholds: SPEAKER_PITCH_OPTIONS, rawThresholds: RAW_DIAGNOSTIC_THRESHOLDS
       });
+      let receiveCalibration: ((quality: CalibrationQuality) => void) | undefined;
       const receive = (event: MessageEvent<AudioMessage>) => {
         if (!current()) return;
         if (event.data.type === "error") { fail(event.data.message ?? "Speaker processing failed."); return; }
+        if (event.data.type === "calibrated" && event.data.quality) { receiveCalibration?.(event.data.quality); return; }
         // Drain blocks captured just before suspend so resuming has no sample gap.
         if (!session.running) return;
         const { startSample } = event.data;
         const samples = event.data.samples ?? event.data.microphone;
         if (!samples) return;
+        if ((startSample + samples.length) / context.sampleRate * 1000 < session.startMs - 100) return;
         const queueLagMs = Math.max(0, (context.currentTime - (startSample + samples.length) / context.sampleRate) * 1000);
         if (queueLagMs > 500) {
           fail("Audio processing fell behind. Close busy tabs or try headphones."); return;
@@ -149,7 +157,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         const rawFrames = rawPitch && event.data.microphone ? rawPitch.push(event.data.microphone, startSample) : [];
         for (const [index, frame] of pitch.push(samples, startSample).entries()) {
           const timeMs = frame.timeMs - session.startMs - deviceDelayMs;
-          if (timeMs >= 0 && timeMs <= config.accompaniment.durationMs) {
+          if (timeMs >= 0 && timeMs <= config.accompaniment.durationMs && frame.timeMs >= session.ignoreUntilMs) {
             config.onPitchFrame({ ...frame, timeMs });
             const raw = rawFrames[index];
             if (raw) config.onInputDiagnostic?.({
@@ -167,24 +175,42 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         session.worker.onerror = () => fail("Speaker processing stopped unexpectedly. Try headphones or browser cancellation.");
         worklet.port.postMessage({ type: "connect", port: session.channel.port2 }, [session.channel.port2]);
       }
-      if (calibrationSeconds) {
+      if (mode === "aec3") {
+        const probe = createCalibrationProbe();
         const calibration = context.createBufferSource();
-        calibration.buffer = accompaniment.buffer;
-        calibration.loop = true;
-        calibration.connect(accompanimentGain);
+        calibration.buffer = createAudioBufferFromStereo(context, createStereoBuffer(probe.left, probe.right, context.sampleRate));
+        calibration.connect(playback);
         session.sources.push(calibration);
-        calibration.start(launchTime);
-        calibration.stop(session.startMs / 1000);
-        config.onInputStatus?.("Listen for two seconds while cancellation settles, then sing.");
+        const launchTime = Math.round((context.currentTime + 0.15) * context.sampleRate) / context.sampleRate;
+        config.onInputStatus?.("Stay quiet for the four-second speaker check. Sing when the song starts.");
+        await new Promise<void>((resolve, reject) => {
+          const timeout = window.setTimeout(() => reject(new Error("Speaker check timed out. Try again or use headphones.")), 15000);
+          session.rejectInitialization = (error) => { window.clearTimeout(timeout); reject(error); };
+          receiveCalibration = (quality) => {
+            window.clearTimeout(timeout);
+            session.rejectInitialization = undefined;
+            reportCalibration(quality);
+            if (quality.accepted) resolve();
+            else reject(new Error("Speaker check could not isolate playback reliably. Stay quiet, check speaker and microphone levels, and retry. If it keeps failing, use headphones."));
+          };
+          session.worker!.postMessage({ type: "calibrate", startSample: Math.round(launchTime * context.sampleRate) });
+          calibration.start(launchTime);
+        });
+        if (!current()) return;
+        // Flush the probe's acoustic tail and the worker queue before scoring.
+        session.startMs = (context.currentTime + 0.5) * 1000;
+      } else {
+        session.startMs = (context.currentTime + 0.15) * 1000;
       }
       let statusShown = false;
+      worklet.port.postMessage({ type: "active", startSample: Math.round(session.startMs / 1000 * context.sampleRate) });
       session.running = true;
       config.onPlaybackTime?.(0);
       session.timer = window.setInterval(() => {
         if (!current() || session.paused) return;
         const timeMs = Math.max(0, context.currentTime * 1000 - session.startMs);
         if (!statusShown && context.currentTime * 1000 >= session.startMs) {
-          config.onInputStatus?.(mode === "aec3" ? "Local cancellation active. Sing with the track." : mode === "browser" ? "Browser cancellation requested. Sing with the track." : "Headphone mode. Microphone processing is off.");
+          config.onInputStatus?.(mode === "aec3" ? "Calibrated cancellation active. Sing with the guide." : mode === "browser" ? "Browser cancellation requested. Sing with the track." : "Headphone mode. Microphone processing is off.");
           statusShown = true;
         }
         config.onPlaybackTime?.(Math.min(timeMs, config.accompaniment.durationMs));
@@ -218,6 +244,9 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
     const session = this.session;
     if (!session?.running || !session.paused) return;
     preparePlayAndRecordAudioSession();
+    // Physical room echoes decay while the AudioContext clock is suspended.
+    // Let the 341 ms filter history and pitch window refill before scoring.
+    session.ignoreUntilMs = session.context.currentTime * 1000 + (session.worker ? 450 : 0);
     await resumeAudioContext(session.context);
     session.paused = false;
   }

@@ -13,6 +13,7 @@
     "benchmark:speakers:prepare": "python3 scripts/prepare-speaker-benchmark.py",
     "benchmark:speakers": "tsx benchmarks/speaker/run.ts",
     "benchmark:speakers:sustain": "tsx benchmarks/speaker/sustain.ts",
+    "benchmark:speakers:guide": "tsx benchmarks/speaker/guideBenchmark.ts",
     "validate:changes": "bash scripts/validate-changes.sh",
     "preview": "vite preview --host 127.0.0.1"
   },
@@ -28,6 +29,7 @@
     "@tensorflow/tfjs": "3.21.0",
     "class-variance-authority": "0.7.1",
     "demucs-web": "1.0.2",
+    "fft.js": "4.0.4",
     "lucide-react": "1.14.0",
     "onnxruntime-web": "1.26.0",
     "pitchy": "4.1.0",

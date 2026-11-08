@@ -38,6 +38,9 @@ dependencies:
   demucs-web:
     specifier: 1.0.2
     version: 1.0.2(onnxruntime-web@1.26.0)
+  fft.js:
+    specifier: 4.0.4
+    version: 4.0.4
   lucide-react:
     specifier: 1.14.0
     version: 1.14.0(react@19.2.6)

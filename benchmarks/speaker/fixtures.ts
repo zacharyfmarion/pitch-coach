@@ -1,7 +1,7 @@
 export const SAMPLE_RATE = 48000;
 export const LEAD_IN_SECONDS = 2;
 export type Annotation = [number, number];
-export type Scenario = { id: string; sirDb?: number; delayMs: number; reverb?: boolean; guide?: boolean; silent?: boolean; nonlinear?: boolean; drift?: boolean };
+export type Scenario = { id: string; sirDb?: number; delayMs: number; reverb?: boolean; guide?: boolean; guideSemitones?: number; silent?: boolean; nonlinear?: boolean; drift?: boolean };
 
 export const SCENARIOS: Scenario[] = [
   { id: "clean", delayMs: 0 },
@@ -54,7 +54,7 @@ export function createMixture(vocals: Float32Array, scenario: Scenario, seed: nu
     right[i] = envelope * (bass + fifth) - percussion * 0.4;
     if (scenario.guide) {
       // A competing, two-semitones-higher voice, present in the known playback.
-      const v = Math.floor(Math.max(0, i - lead) * 2 ** (2 / 12)) % vocals.length;
+      const v = Math.floor(Math.max(0, i - lead) * 2 ** ((scenario.guideSemitones ?? 2) / 12)) % vocals.length;
       const guide = i >= lead && i < lead + vocals.length ? vocals[v] * normalization : 0;
       left[i] += guide * 1.2;
       right[i] += guide * 1.2;

@@ -73,6 +73,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const [vocalGuideGain, setVocalGuideGainState] = useState(0);
   const [inputMode, setInputMode] = useState<SongInputMode>("headphones");
   const [inputStatus, setInputStatus] = useState("");
+  const [isPreparing, setIsPreparing] = useState(false);
   const inputDebug = useLiveInputDiagnostics();
   const { reset: resetInputDebug, finish: finishInputDebug, receive: receiveInputDebug, receiveSession: receiveInputDebugSession, enabled: inputDebugEnabled } = inputDebug;
   const [isDemo, setIsDemo] = useState(false);
@@ -127,6 +128,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
 
   const clearAttemptState = useCallback((options: { clearSeparation: boolean }) => {
     resetInputDebug();
+    setIsPreparing(false);
     if (options.clearSeparation) {
       setSeparation(null);
     }
@@ -305,6 +307,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setStage("practicing");
     setErrorMessage(null);
     setInputStatus("Preparing microphone…");
+    setIsPreparing(true);
     resetInputDebug();
     setLiveFrames([]);
     setScore(null);
@@ -328,6 +331,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
           if (runId !== runIdRef.current) return;
           runIdRef.current += 1;
           setInputStatus("Practice stopped.");
+          setIsPreparing(false);
           setErrorMessage(message);
           setStage("ready");
           finishInputDebug();
@@ -374,6 +378,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
       setInputStatus("Microphone is off.");
       setErrorMessage(createSongErrorMessage(error));
       finishInputDebug();
+    } finally {
+      if (runId === runIdRef.current) setIsPreparing(false);
     }
   }, [
     reference,
@@ -398,6 +404,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     runIdRef.current += 1;
     await services.practiceEngine.stop();
     setInputStatus("Microphone is off.");
+    setIsPreparing(false);
     finishInputDebug();
     if (referenceRef.current) {
       setScore(scoreSongAttempt(referenceRef.current, liveFramesRef.current, settings.toleranceCents));
@@ -442,6 +449,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setErrorMessage(null);
     setIsDemo(false);
     setInputStatus("");
+    setIsPreparing(false);
     resetInputDebug();
     setFileName(null);
     setDecodedAudio(null);
@@ -470,7 +478,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setTrimEndMsState(demo.reference.durationMs);
     setVocalGuideGainState(0.35);
     setInputMode("aec3");
-    setInputStatus("Start practice, listen to the guide, then sing along.");
+    setInputStatus("Start practice, stay quiet for the speaker check, then sing with the guide.");
     setErrorMessage(null);
     setAnalysisProgress({ modelProgress: 1, separationProgress: 1, transcriptionProgress: 1, status: "Generated melody — ready to sing. No model download needed." });
     setStage("ready");
@@ -551,6 +559,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     vocalGuideGain,
     inputMode,
     inputStatus,
+    isPreparing,
     inputDebug,
     isDemo,
     loadSpeakerDemo,

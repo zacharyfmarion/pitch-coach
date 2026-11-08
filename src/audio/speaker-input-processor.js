@@ -4,6 +4,7 @@ class SpeakerInputProcessor extends AudioWorkletProcessor {
     super();
     this.target = this.port;
     this.pending = 0;
+    this.activeAt = Infinity;
     this.failed = false;
     this.microphone = new Float32Array(480);
     this.left = new Float32Array(480);
@@ -12,6 +13,7 @@ class SpeakerInputProcessor extends AudioWorkletProcessor {
     this.startSample = 0;
     this.useWorker = Boolean(options.processorOptions?.useWorker);
     this.port.onmessage = (event) => {
+      if (event.data.type === "active") { this.activeAt = event.data.startSample; return; }
       if (event.data.type === "connect") {
         this.target = event.data.port;
         this.target.onmessage = () => { this.pending = Math.max(0, this.pending - 1); };
@@ -33,7 +35,7 @@ class SpeakerInputProcessor extends AudioWorkletProcessor {
       this.right[this.used] = right?.[i] ?? 0;
       this.used += 1;
       if (this.used === 480) {
-        if (this.useWorker && this.pending >= 20) {
+        if (this.useWorker && this.pending >= (currentFrame >= this.activeAt ? 20 : 200)) {
           this.failed = true;
           this.port.postMessage({ type: "error", message: "Speaker processing could not keep up. Try headphones or browser cancellation." });
           return true;

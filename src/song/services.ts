@@ -1,5 +1,5 @@
 import { PitchyPitchDetectorAdapter } from "../audio/pitchyDetector";
-import { SPEAKER_PITCH_OPTIONS } from "../audio/speakerCancellation";
+import { SPEAKER_PITCH_OPTIONS } from "../audio/speakerSettings";
 import { decodeSongFile } from "./audioData";
 import { BrowserSongPracticeEngine } from "./practiceEngine";
 import { detectSongRuntimeSupport } from "./support";

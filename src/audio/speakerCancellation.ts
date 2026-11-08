@@ -1,11 +1,10 @@
 import type WebRtcAec3 from "@ennuicastr/webrtcaec3.js";
+import { SPEAKER_SAMPLE_RATE, SPEAKER_BLOCK_SIZE } from "./speakerSettings";
+export { SPEAKER_SAMPLE_RATE, SPEAKER_BLOCK_SIZE, SPEAKER_PITCH_OPTIONS } from "./speakerSettings";
 
-export const SPEAKER_SAMPLE_RATE = 48000;
-export const SPEAKER_BLOCK_SIZE = 480;
 // Impulse peak delay measured for the pinned 0.3.0 WASM at 48 kHz. This is
 // algorithmic delay only: device input/output latency is handled by the engine.
 export const AEC_DELAY_SAMPLES = 430;
-export const SPEAKER_PITCH_OPTIONS = { clarityThreshold: 0.66, rmsThreshold: 0.008 } as const;
 
 let modulePromise: Promise<WebRtcAec3.WebRtcAec3> | undefined;
 
