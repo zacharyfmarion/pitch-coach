@@ -4224,11 +4224,23 @@ button.exercise-auto-pill {
   }
 
   .mock-song-layout {
-    display: grid !important;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 14px !important;
   }
 
+  .mock-song-page--loaded {
+    grid-template-rows: auto auto !important;
+    align-content: start !important;
+  }
+
+  .mock-song-workbench {
+    flex: none !important;
+    grid-template-rows: auto 360px auto !important;
+  }
+
   .mock-song-side-panel {
+    flex: none !important;
     overflow: visible !important;
   }
 

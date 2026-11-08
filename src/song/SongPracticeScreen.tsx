@@ -27,6 +27,7 @@ import { Toggle } from "../components/ui/Toggle";
 import { createSongDebugInfo, createVocalEnergyTrace } from "./debugDiagnostics";
 import { formatSongReferenceRange } from "./referenceRange";
 import { SongPitchTimeline } from "./SongPitchTimeline";
+import { LiveInputDebugPanel } from "./LiveInputDebugPanel";
 import {
   SONG_SECTION_LIMITS,
   useSongPracticeController,
@@ -100,6 +101,7 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
         <SongEmptyState
           isChecking={song.stage === "checking"}
           onChooseFile={(file) => void song.chooseFile(file)}
+          onTrySpeakerDemo={() => void song.loadSpeakerDemo()}
         />
       </main>
     );
@@ -182,7 +184,7 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
               onClick={() =>
                 song.stage === "paused" ? void song.resumePractice() : void song.pausePractice()
               }
-              disabled={!isActivePractice}
+              disabled={!isActivePractice || song.isPreparing}
               aria-label={pauseResumeLabel}
               title={pauseResumeLabel}
             >
@@ -291,7 +293,7 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                     options={song.referenceDetailOptions}
                     value={song.referenceDetail}
                     onChange={song.setReferenceDetail}
-                    disabled={song.isBusy}
+                    disabled={song.isBusy || song.isDemo}
                   />
                   <p className="history-empty">{song.analysisProgress.status}</p>
                   {song.reference ? (
@@ -367,6 +369,25 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                     <Headphones size={17} />
                     <h2>Practice Mix</h2>
                   </div>
+                  <SegmentedControl
+                    aria-label="Microphone processing"
+                    options={[
+                      { value: "headphones", label: "Headphones" },
+                      { value: "aec3", label: "Speakers" },
+                      { value: "browser", label: "Browser" }
+                    ]}
+                    value={song.inputMode}
+                    onChange={song.setInputMode}
+                    disabled={song.isBusy}
+                  />
+                  <p className="history-empty">
+                    {song.inputMode === "aec3"
+                      ? "Use a moderate volume for the speaker check before each attempt. Keep volume and device positions unchanged afterward; restart practice if either changes. Processing stays on your device."
+                      : song.inputMode === "browser"
+                        ? "Uses your browser’s echo cancellation. Results vary by browser and microphone."
+                        : "Use headphones. Captures your microphone without playback cancellation."}
+                  </p>
+                  {song.inputStatus ? <p className="history-empty" role="status" aria-label="Microphone status">{song.inputStatus}</p> : null}
                   <label>
                     <span>Guide</span>
                     <input
@@ -391,6 +412,8 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                     <output>{song.toleranceCents} cents</output>
                   </label>
                 </section>
+
+                {song.inputMode === "aec3" ? <LiveInputDebugPanel debug={song.inputDebug} busy={song.isBusy} /> : null}
 
                 <section className="feedback-panel" aria-label="Song feedback">
                   <div className="group-heading">
@@ -453,10 +476,12 @@ function SongMockHeader({
 
 function SongEmptyState({
   isChecking,
-  onChooseFile
+  onChooseFile,
+  onTrySpeakerDemo
 }: {
   isChecking: boolean;
   onChooseFile: (file: File) => void;
+  onTrySpeakerDemo: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -494,6 +519,11 @@ function SongEmptyState({
           disabled={isChecking}
         />
         <span className="mock-song-empty__privacy">Everything runs on your device — nothing is uploaded.</span>
+      </Card>
+      <Card variant="mock" padding="md" aria-label="Speaker prototype">
+        <h2>Try singing with speakers</h2>
+        <p>A short generated melody to test live pitch tracking with a backing track. No upload or model download needed.</p>
+        <Button variant="song" onClick={onTrySpeakerDemo} disabled={isChecking}>Try speaker prototype</Button>
       </Card>
       <SongHowItWorks />
     </section>

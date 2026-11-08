@@ -1,0 +1,324 @@
+{
+  "protocol": "speaker-benchmark-v1",
+  "split": "held-out",
+  "recordingIds": [
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40
+  ],
+  "excerpt": "first 12 seconds",
+  "seedRule": "recording ID * 73",
+  "dataset": {
+    "doi": "10.5281/zenodo.5578807",
+    "archiveMd5": "dea40fd18f14d899643c4ba221b33a46",
+    "license": "CC-BY-4.0",
+    "hashes": {
+      "vocadito_9.wav": "f980cc7df935c0c9e839b25759de72fadad6763c069be96645be46f8dd3ffd32",
+      "vocadito_9_f0.csv": "b5936116058e717ec4fda99ddc323d471059debd9fb599809c59a41888c48126",
+      "vocadito_10.wav": "0978bde1c130ae26a9cfcd90012f12fdaf9877bbe45cf21c5237ba7ac9b8703b",
+      "vocadito_10_f0.csv": "b62573c234fe091acdc7f7ac75259df12d5a8b2bd89f5b803bfc0f433c085e96",
+      "vocadito_11.wav": "c4d669eca7e25c5037b191805b54b2c990d5e31bc77c9c77188b140100297197",
+      "vocadito_11_f0.csv": "3649b1c134df2c7630e37f614adf05b67b186f3f494a8cc6551a12b3d8a593d1",
+      "vocadito_12.wav": "5a342e32b20b3764a9ab9784abbf7bac6db69583ec529fc9027f96c69df04e00",
+      "vocadito_12_f0.csv": "c58207b659b08a3ba35baeda01d3ac31231a4c8e5c3b3906ccdc37799e6d0b34",
+      "vocadito_13.wav": "5a26861f99c4d02a3efe2355215de2774fb51257cc2d2bf6021827b64e25ec94",
+      "vocadito_13_f0.csv": "db131bc7ac4413649c4c20a9938fc7af66a731367c769fcc91480a9f27d95847",
+      "vocadito_14.wav": "a41e814df6ee5840f0beaea5da2ab3ad6b38be62b169da08962a722bcc06cdd1",
+      "vocadito_14_f0.csv": "4d765f594d38e18ab514ab1afba93147ac6564be4cfc62f9c268de0e9949f88c",
+      "vocadito_15.wav": "0bc39b00e14881b20756f48530a4688e1bb7aa1c24ee09d4351a327e3acce28d",
+      "vocadito_15_f0.csv": "740a77c865d6dcdae2af05328230d88c97cc2d95a54a4ef44d1cde49a53afafa",
+      "vocadito_16.wav": "595e80b5382812702e64d5b6a8f453d9744391166d47c7020cc1d6e71e310e25",
+      "vocadito_16_f0.csv": "fb06556c007943d6d2793af5dd6ba0ac43a1ab5e1180777bfc795564028ea8cf",
+      "vocadito_17.wav": "4b144cdbbcdb318f19c0aa5ac1e2675dbe8d6cb8941286d251959f25e4c96998",
+      "vocadito_17_f0.csv": "d865f0cd526a030f19ba674ebf6c8956fdd8d8b4a0732a539fdb5a35ee86dc29",
+      "vocadito_18.wav": "4f2a3712dd912b235990f3505593200172da3f386c80db91dfaeb04fc641c929",
+      "vocadito_18_f0.csv": "83ad770e3afd14cad289bf4f7b2ec3a745c12d0fd047d031da70d8de24fda34b",
+      "vocadito_19.wav": "8f6d828d65f723ca602abaf8b28a5e8bdc510d37951556b86ff8b6d07889af28",
+      "vocadito_19_f0.csv": "12b8692cdc1d08d9813ce6c5d93105a43321155f78eeb331afd4a04df3cd58ce",
+      "vocadito_20.wav": "feb3c31e77b7779bdfb302c7819644535804f22a90a8e21f63c393d667ec5181",
+      "vocadito_20_f0.csv": "e09cff1461c2d3ebedcd46093297c44bb00bc705d630d11a6b6e0b8323a047d9",
+      "vocadito_21.wav": "d9d3c20794fd3b42e8f7693b91e8194844a6b80b3932ae4fc06d8e0e277687a7",
+      "vocadito_21_f0.csv": "683af807f48f0a04718e02a45128fc2ee848307cd9b7eb0ac06de2218645791c",
+      "vocadito_22.wav": "6629d0ecd7acddd1ce2877d00bc7ef80dc01fdd20f3225b9c2ed907da12f989e",
+      "vocadito_22_f0.csv": "f6fbca9e262fe338f3ca8f99be5d08d8a4080a5b09337f4ba7f8366b0b159464",
+      "vocadito_23.wav": "3cade4af7d869e3175e3684075782a23f6af936942a8684bfbb4fdbe3a4f10e7",
+      "vocadito_23_f0.csv": "1bbb29db223ac10d5bf7219145deefe4336c3f46692bf8f5d3963077543f6930",
+      "vocadito_24.wav": "22fb2df57dc7b68987cda67b30171c626a7818b9ab7db02185e8ea0a0a6db7ee",
+      "vocadito_24_f0.csv": "e0b877b9679fcf7ee5eae7e41c8b1fd44328f681d2c9f2e2008f76559e0f54d4",
+      "vocadito_25.wav": "cf155e4fd681331d34f316e421803255c449acb0393fa55cd23079ed103b37af",
+      "vocadito_25_f0.csv": "bde7f5aca8cb7baacaed37d2e74178ba93b3c838280504dd488e47e2ab958e20",
+      "vocadito_26.wav": "27fcfb7c6150b412be3f22199202dfc2aab46e59e16cddd675b71c8325b3f66d",
+      "vocadito_26_f0.csv": "4ab0aef2a982eb729e24bca42941e5e453376c1aa5c802f0136c07ea45397d6b",
+      "vocadito_27.wav": "6300e1fc5981ea458074a24a1c32a1011a095df4162fbc8911d6b0240d182419",
+      "vocadito_27_f0.csv": "71d3640f13e4360837c9e77dfa611fcd599dd76c47aeb454cc51699c6261fc01",
+      "vocadito_28.wav": "f50830862faff98314bb7b28de452754ef2d939e187a6d89e5fb1ad56749aeb6",
+      "vocadito_28_f0.csv": "9bc2f3a1ececf51f4cde93010cfa75d2362ce971b27e91c2ca04d9161abbe346",
+      "vocadito_29.wav": "46a831ed09f60728c6bfb051e27582d2d47021805ea8c4500bf4b2d6396a71cb",
+      "vocadito_29_f0.csv": "f6c3f413e03265fdfbeb9b370ee4d2cabb1edfb0eec4eba7e41f6faaaf1b73fc",
+      "vocadito_30.wav": "ce2128d9bfcd434a9c1507d1f2fcd504677e0b1e0fb5fe8bbe07406158df144f",
+      "vocadito_30_f0.csv": "6f584e8d0aaf514efbb7986a049c01b0887491bf40bc43ec03a566c3a24f0924",
+      "vocadito_31.wav": "c3e68dddd4d6a6d34d135042f76ed74cf4b85208c2483a2d4a331d717af99356",
+      "vocadito_31_f0.csv": "33b5787525e86b1ef7851d8f4df257ece0c709315dd3ae18b83e7e05a42f3934",
+      "vocadito_32.wav": "1776573e0a80e0618258501c1fa877a75c36c3368ab24014aaebb522f92768b7",
+      "vocadito_32_f0.csv": "63ea4ef4788a54dc3ec9e3abb3a1b68bd5f47392d2d3359f36e5b131dc42f2fe",
+      "vocadito_33.wav": "896ae8828bfdc7eefc46a4781c328b979f519fea310c04c32cf5859c54ba4c7a",
+      "vocadito_33_f0.csv": "cf553bfb06c17445e36d24c9a1c13c6501d0ac0687aebc19c0e242b45d809dd4",
+      "vocadito_34.wav": "60cefc716230c7783889b1b46f8dcfba48669cf5be6cddb522c04e810c8d38d8",
+      "vocadito_34_f0.csv": "74e80a72860ff758162a015a213026939723ec4190635b17c9261d6b079d2740",
+      "vocadito_35.wav": "85c1c4268527cc53240e9f4f0d557d92f3bf9856d6d42ca50e80c7cbb02bea72",
+      "vocadito_35_f0.csv": "a2327fff128c5355ea4e6e9ca6f6fca04a8d04f5b4085cf082bd86952cebc1dc",
+      "vocadito_36.wav": "2e4eacabc71019752feb17da9e1b0228b9b5ba0ae97ec41107f80dac65750dbb",
+      "vocadito_36_f0.csv": "b9e8b5721a596f4f6272337072b976e0d8d92f9b5501f876a8f5afb6f46e8296",
+      "vocadito_37.wav": "53cb202ddabf1cb7591be49da9160f508cb81c6078c50c7e41a13efe109a0622",
+      "vocadito_37_f0.csv": "9d28fa1df8baf180fd35f5049c4cdd7a675b0a2c81857fa7893a04a39cbdfeb7",
+      "vocadito_38.wav": "2113abf18ddfb0e789021b8e2a2e42743b80d82c51aaca5fe9d228636883a239",
+      "vocadito_38_f0.csv": "59d2f8a9c8772e76021eeb61d69bee7f368f653ea323e7f6a4117cdd527463b0",
+      "vocadito_39.wav": "23badef22642b2e00b676cf3b998d2f2d2d1ee9949888dcd6f038b0b6621b9db",
+      "vocadito_39_f0.csv": "96c7462f7edcd3af715647b609a24559c60efabf0d6a77d6273062479991a6a6",
+      "vocadito_40.wav": "add1fc90659541163158bf025eeb0c09b7f738bdfcc812a835654ca1e8544b04",
+      "vocadito_40_f0.csv": "4ba1a1c1a8e8b068cee17affee35df893270900964b4974b8457fefc4ce93e8e"
+    }
+  },
+  "conditions": {
+    "sampleRate": 48000,
+    "blockSize": 480,
+    "leadInSeconds": 2,
+    "aecDelaySamples": 430,
+    "pitchWindowSamples": 4096,
+    "pitchHopSamples": 960,
+    "rawPitchOptions": {
+      "clarityThreshold": 0.66,
+      "rmsThreshold": 0.005
+    },
+    "aecPitchOptions": {
+      "clarityThreshold": 0.66,
+      "rmsThreshold": 0.008
+    },
+    "boundsHz": [
+      65,
+      1100
+    ],
+    "toleranceCents": 50
+  },
+  "environment": {
+    "node": "v26.8.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M1 Max"
+  },
+  "uniqueMixtureSeconds": 4264.38,
+  "scenarios": {
+    "clean": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.9060472567080496,
+        "missedVoicedRate": 0.03748498197837405,
+        "falseVoicedRate": 0.24976584452076178,
+        "medianAbsoluteCents": 7.1888553352569815
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.9022200849563197,
+        "missedVoicedRate": 0.04239801234271059,
+        "falseVoicedRate": 0.2281303602058319,
+        "medianAbsoluteCents": 7.060112483850672
+      }
+    },
+    "backing-quiet": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.3975170204245094,
+        "missedVoicedRate": 0.30548658390068084,
+        "falseVoicedRate": 0.07305650952232282,
+        "medianAbsoluteCents": 21.733751718596423
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.8234351206219443,
+        "missedVoicedRate": 0.08920413560952152,
+        "falseVoicedRate": 0.17791985030406987,
+        "medianAbsoluteCents": 7.818281594620566
+      }
+    },
+    "backing-equal": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.07360832999599519,
+        "missedVoicedRate": 0.6413295955146175,
+        "falseVoicedRate": 0.035279425538557604,
+        "medianAbsoluteCents": 1218.44808849276
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.7018514065881222,
+        "missedVoicedRate": 0.156848601426625,
+        "falseVoicedRate": 0.15000779666302821,
+        "medianAbsoluteCents": 9.052911617097621
+      }
+    },
+    "backing-loud": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.004805766920304365,
+        "missedVoicedRate": 0.8916299559471366,
+        "falseVoicedRate": 0.023103340618170466,
+        "medianAbsoluteCents": 1893.574996485797
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.5139857337501001,
+        "missedVoicedRate": 0.2529454195720125,
+        "falseVoicedRate": 0.1199126773740839,
+        "medianAbsoluteCents": 13.312454393549597
+      }
+    },
+    "reverberant": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.08201842210652784,
+        "missedVoicedRate": 0.6357228674409291,
+        "falseVoicedRate": 0.0451139556665626,
+        "medianAbsoluteCents": 1215.7296380362075
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.6916726777270177,
+        "missedVoicedRate": 0.1636611364911437,
+        "falseVoicedRate": 0.1481365975362545,
+        "medianAbsoluteCents": 9.140489751081267
+      }
+    },
+    "guide-vocal": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.22923508209851823,
+        "missedVoicedRate": 0.5499399279134962,
+        "falseVoicedRate": 0.31673431158289106,
+        "medianAbsoluteCents": 45.8506366017672
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.5991023483209105,
+        "missedVoicedRate": 0.24284683818225536,
+        "falseVoicedRate": 0.16388585685326681,
+        "medianAbsoluteCents": 10.928018436884056
+      }
+    },
+    "singer-silent": {
+      "raw": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 18891,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.39976708485522205,
+        "medianAbsoluteCents": null
+      },
+      "aec3": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 18890,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.02297511911064055,
+        "medianAbsoluteCents": null
+      }
+    },
+    "nonlinear-speaker": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.06359631557869444,
+        "missedVoicedRate": 0.649098918702443,
+        "falseVoicedRate": 0.03746487667811427,
+        "medianAbsoluteCents": 1253.969793571632
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.7030536186583314,
+        "missedVoicedRate": 0.1556463893564158,
+        "falseVoicedRate": 0.14610946514891626,
+        "medianAbsoluteCents": 8.996604922154566
+      }
+    },
+    "clock-drift": {
+      "raw": {
+        "voicedFrames": 12485,
+        "unvoicedFrames": 6406,
+        "pitchRecall50Cents": 0.07649179014817781,
+        "missedVoicedRate": 0.6395674809771726,
+        "falseVoicedRate": 0.03652825476116141,
+        "medianAbsoluteCents": 1214.797268395755
+      },
+      "aec3": {
+        "voicedFrames": 12477,
+        "unvoicedFrames": 6413,
+        "pitchRecall50Cents": 0.6443055221607759,
+        "missedVoicedRate": 0.18361785685661616,
+        "falseVoicedRate": 0.13488227038827383,
+        "medianAbsoluteCents": 10.004389826868941
+      }
+    }
+  },
+  "compute": {
+    "raw": {
+      "realTimeFactor": 0.01577966627692891,
+      "worstCaseP95BlockMs": 0.5503339999704622,
+      "maximumBlockMs": 53.66595900000539
+    },
+    "aec3": {
+      "realTimeFactor": 0.040933635060666156,
+      "worstCaseP95BlockMs": 0.9082499999785796,
+      "maximumBlockMs": 24.535875000001397
+    }
+  },
+  "gates": {
+    "cleanPreserved": true,
+    "equalBackingRecall": true,
+    "equalBackingImprovement": true,
+    "loudBackingRecall": true,
+    "silentFalseRate": true,
+    "silentImprovement": true
+  },
+  "casesFile": "held-out-cases.csv"
+}

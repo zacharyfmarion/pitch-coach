@@ -1,0 +1,906 @@
+{
+  "protocol": "speaker-benchmark-v1",
+  "split": "development",
+  "recordingIds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "excerpt": "first 12 seconds",
+  "seedRule": "recording ID * 73",
+  "dataset": {
+    "doi": "10.5281/zenodo.5578807",
+    "archiveMd5": "dea40fd18f14d899643c4ba221b33a46",
+    "license": "CC-BY-4.0",
+    "hashes": {
+      "vocadito_1.wav": "b509768315efad8120183b48e01d6090f1649d5bcc691241940dc7a100274ab8",
+      "vocadito_1_f0.csv": "dd10beba57b94d37b1d3263f5deca3b780adc7ec90f1d43bb00099b02c2878e5",
+      "vocadito_2.wav": "8dcc99c3b08a9a5800b793e3d65cccfb4464961f15cf8ccde25bd4c8b853d519",
+      "vocadito_2_f0.csv": "4d515029c036312e8d04545470c3d5dc5db3132dec54813624faee7d84cd6363",
+      "vocadito_3.wav": "73b6fe13bc3435ae9173ee1bdec247e2943526c70cd9b69ab2b35002fa4cb04d",
+      "vocadito_3_f0.csv": "18f48fc77df7dd43c1e4bc588a79482b1d330768d63b76b90e82998573582b6a",
+      "vocadito_4.wav": "fc07b202eb609c975d1549be5320db116a49be1bd1fc6904e70e31cd7e44ec23",
+      "vocadito_4_f0.csv": "fb0a5b73a66edc0bac5aaec64f82eccd95d5a54781b354ab9020056803cf3d08",
+      "vocadito_5.wav": "7cecfd126a9437f88db0a297cdab3075bb38faeef10f1a98f22ba22a2a939220",
+      "vocadito_5_f0.csv": "561eb6ac03530a3219cf1a8eab9f0c14b1c4571185f0e059b61643325e4642ca",
+      "vocadito_6.wav": "13816752a6366f2d66f21e71a70d55e22b6a44f0d1712d97abff5390bc0c1f3b",
+      "vocadito_6_f0.csv": "443e7f37172ef683f687fba39ab87710f22af2227e8fdb9031b2faa3002eb002",
+      "vocadito_7.wav": "db9542f0626f4c43ab1e4f26ae9e40834bcfe5f061b07c75a3925d95aaa79676",
+      "vocadito_7_f0.csv": "9dfd339c44bd32a8891288ea3625fcda703932fe76c4ce8f073c005874f63393",
+      "vocadito_8.wav": "05ce2b3f1991035d08db269df1c39b198d9ddc22130ce88f9a8d97e46cd7a310",
+      "vocadito_8_f0.csv": "d4865ca325062a0985f8c8cf099844d9430ad445668bbd8d6bc3f786a346b457"
+    }
+  },
+  "conditions": {
+    "sampleRate": 48000,
+    "blockSize": 480,
+    "leadInSeconds": 2,
+    "aecDelaySamples": 430,
+    "pitchWindowSamples": 4096,
+    "pitchHopSamples": 960,
+    "clarityThreshold": 0.66,
+    "rmsThreshold": 0.005,
+    "boundsHz": [
+      65,
+      1100
+    ],
+    "toleranceCents": 50
+  },
+  "environment": {
+    "node": "v26.8.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M1 Max"
+  },
+  "uniqueMixtureSeconds": 1080,
+  "scenarios": {
+    "clean": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.9335589049523224,
+        "missedVoicedRate": 0.027683789603199015,
+        "falseVoicedRate": 0.19431891542930924,
+        "medianAbsoluteCents": 5.334272914221304
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9320269442743417,
+        "missedVoicedRate": 0.026638089406001226,
+        "falseVoicedRate": 0.18057366362451108,
+        "medianAbsoluteCents": 5.418351882632371
+      }
+    },
+    "backing-quiet": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.40941248846508765,
+        "missedVoicedRate": 0.33374346354967704,
+        "falseVoicedRate": 0.05358295674628793,
+        "medianAbsoluteCents": 13.284976543319306
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8692590324556032,
+        "missedVoicedRate": 0.061543172075933864,
+        "falseVoicedRate": 0.14797913950456323,
+        "medianAbsoluteCents": 5.763438945987275
+      }
+    },
+    "backing-equal": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.0658258997231621,
+        "missedVoicedRate": 0.6604121808674254,
+        "falseVoicedRate": 0.030342156229825695,
+        "medianAbsoluteCents": 1203.1071211217425
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7731169626454378,
+        "missedVoicedRate": 0.12308634415186773,
+        "falseVoicedRate": 0.11734028683181226,
+        "medianAbsoluteCents": 6.233403094311653
+      }
+    },
+    "backing-loud": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.002153183635804368,
+        "missedVoicedRate": 0.8625038449707783,
+        "falseVoicedRate": 0.028405422853453842,
+        "medianAbsoluteCents": 1209.5291379491773
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6362522963870177,
+        "missedVoicedRate": 0.16625842008573177,
+        "falseVoicedRate": 0.0938722294654498,
+        "medianAbsoluteCents": 8.490192659580266
+      }
+    },
+    "reverberant": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.06244232543832667,
+        "missedVoicedRate": 0.661027376191941,
+        "falseVoicedRate": 0.030987734021949646,
+        "medianAbsoluteCents": 1203.4755011801983
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7403551745254133,
+        "missedVoicedRate": 0.12063686466625842,
+        "falseVoicedRate": 0.11538461538461539,
+        "medianAbsoluteCents": 6.813698605100142
+      }
+    },
+    "guide-vocal": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.2199323285143033,
+        "missedVoicedRate": 0.5533681944017226,
+        "falseVoicedRate": 0.27437056165267915,
+        "medianAbsoluteCents": 52.86232155892989
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6402327005511329,
+        "missedVoicedRate": 0.20453153704837723,
+        "falseVoicedRate": 0.1303780964797914,
+        "medianAbsoluteCents": 8.145207270810001
+      }
+    },
+    "singer-silent": {
+      "raw": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.39520833333333333,
+        "medianAbsoluteCents": null
+      },
+      "aec3": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.03875,
+        "medianAbsoluteCents": null
+      }
+    },
+    "nonlinear-speaker": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.0538295908951092,
+        "missedVoicedRate": 0.6745616733312827,
+        "falseVoicedRate": 0.029051000645577793,
+        "medianAbsoluteCents": 1203.6790112103115
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7743417023882425,
+        "missedVoicedRate": 0.12278015921616657,
+        "falseVoicedRate": 0.11799217731421122,
+        "medianAbsoluteCents": 6.240779889982838
+      }
+    },
+    "clock-drift": {
+      "raw": {
+        "voicedFrames": 3251,
+        "unvoicedFrames": 1549,
+        "pitchRecall50Cents": 0.06459550907413103,
+        "missedVoicedRate": 0.6631805598277453,
+        "falseVoicedRate": 0.030342156229825695,
+        "medianAbsoluteCents": 1203.0128520377878
+      },
+      "aec3": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7281077770973668,
+        "missedVoicedRate": 0.11788120024494794,
+        "falseVoicedRate": 0.11342894393741851,
+        "medianAbsoluteCents": 7.039226968176917
+      }
+    }
+  },
+  "tuning": {
+    "clarity=0.66,rms=0.005": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9320269442743417,
+        "missedVoicedRate": 0.026638089406001226,
+        "falseVoicedRate": 0.18057366362451108,
+        "medianAbsoluteCents": 5.418351882632371
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8692590324556032,
+        "missedVoicedRate": 0.061543172075933864,
+        "falseVoicedRate": 0.14797913950456323,
+        "medianAbsoluteCents": 5.763438945987275
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7731169626454378,
+        "missedVoicedRate": 0.12308634415186773,
+        "falseVoicedRate": 0.11734028683181226,
+        "medianAbsoluteCents": 6.233403094311653
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6362522963870177,
+        "missedVoicedRate": 0.16625842008573177,
+        "falseVoicedRate": 0.0938722294654498,
+        "medianAbsoluteCents": 8.490192659580266
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7403551745254133,
+        "missedVoicedRate": 0.12063686466625842,
+        "falseVoicedRate": 0.11538461538461539,
+        "medianAbsoluteCents": 6.813698605100142
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6402327005511329,
+        "missedVoicedRate": 0.20453153704837723,
+        "falseVoicedRate": 0.1303780964797914,
+        "medianAbsoluteCents": 8.145207270810001
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.03875,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7743417023882425,
+        "missedVoicedRate": 0.12278015921616657,
+        "falseVoicedRate": 0.11799217731421122,
+        "medianAbsoluteCents": 6.240779889982838
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7281077770973668,
+        "missedVoicedRate": 0.11788120024494794,
+        "falseVoicedRate": 0.11342894393741851,
+        "medianAbsoluteCents": 7.039226968176917
+      }
+    },
+    "clarity=0.66,rms=0.008": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9311083894672382,
+        "missedVoicedRate": 0.027556644213104716,
+        "falseVoicedRate": 0.1681877444589309,
+        "medianAbsoluteCents": 5.4179349422672125
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8668095529699938,
+        "missedVoicedRate": 0.06674831598285365,
+        "falseVoicedRate": 0.13754889178617993,
+        "medianAbsoluteCents": 5.715346283281891
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7672994488671158,
+        "missedVoicedRate": 0.1359461114513166,
+        "falseVoicedRate": 0.10691003911342895,
+        "medianAbsoluteCents": 6.150105236155054
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6270667483159829,
+        "missedVoicedRate": 0.19167176974892836,
+        "falseVoicedRate": 0.0788787483702738,
+        "medianAbsoluteCents": 8.242912326177535
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7348438456827924,
+        "missedVoicedRate": 0.1359461114513166,
+        "falseVoicedRate": 0.10560625814863103,
+        "medianAbsoluteCents": 6.617584608127254
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6344151867728107,
+        "missedVoicedRate": 0.2198407838334354,
+        "falseVoicedRate": 0.11473272490221642,
+        "medianAbsoluteCents": 7.960421018977836
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.030833333333333334,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7685241886099204,
+        "missedVoicedRate": 0.13533374157991426,
+        "falseVoicedRate": 0.10886571056062581,
+        "medianAbsoluteCents": 6.164389977237566
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7204531537048378,
+        "missedVoicedRate": 0.13441518677281078,
+        "falseVoicedRate": 0.0984354628422425,
+        "medianAbsoluteCents": 6.926529892415176
+      }
+    },
+    "clarity=0.66,rms=0.012": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9246785058175138,
+        "missedVoicedRate": 0.034292712798530314,
+        "falseVoicedRate": 0.14993481095176012,
+        "medianAbsoluteCents": 5.390868496730255
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.853949785670545,
+        "missedVoicedRate": 0.08573178199632578,
+        "falseVoicedRate": 0.11799217731421122,
+        "medianAbsoluteCents": 5.634566133524496
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7513778322106552,
+        "missedVoicedRate": 0.16289038579301898,
+        "falseVoicedRate": 0.08670143415906127,
+        "medianAbsoluteCents": 5.972118783110266
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6025719534598898,
+        "missedVoicedRate": 0.24035517452541336,
+        "falseVoicedRate": 0.06453715775749674,
+        "medianAbsoluteCents": 7.734805167463949
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7137170851194121,
+        "missedVoicedRate": 0.17176974892835273,
+        "falseVoicedRate": 0.08344198174706649,
+        "medianAbsoluteCents": 6.453301548616206
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6249234537660747,
+        "missedVoicedRate": 0.24525413349663197,
+        "falseVoicedRate": 0.09126466753585398,
+        "medianAbsoluteCents": 7.628447941779453
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.026458333333333334,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7538273116962645,
+        "missedVoicedRate": 0.16166564605021433,
+        "falseVoicedRate": 0.09061277705345502,
+        "medianAbsoluteCents": 5.970222477685418
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6984078383343539,
+        "missedVoicedRate": 0.17513778322106552,
+        "falseVoicedRate": 0.07561929595827901,
+        "medianAbsoluteCents": 6.627815123043326
+      }
+    },
+    "clarity=0.72,rms=0.005": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.92896509491733,
+        "missedVoicedRate": 0.03459889773423148,
+        "falseVoicedRate": 0.15514993481095177,
+        "medianAbsoluteCents": 5.386204125366781
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.863441518677281,
+        "missedVoicedRate": 0.07317819963257807,
+        "falseVoicedRate": 0.11538461538461539,
+        "medianAbsoluteCents": 5.638743145018335
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.758420085731782,
+        "missedVoicedRate": 0.14972443355786896,
+        "falseVoicedRate": 0.09191655801825294,
+        "medianAbsoluteCents": 5.972118783110266
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6267605633802817,
+        "missedVoicedRate": 0.19075321494182487,
+        "falseVoicedRate": 0.07561929595827901,
+        "medianAbsoluteCents": 8.144440666112212
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7259644825474587,
+        "missedVoicedRate": 0.14635639926515615,
+        "falseVoicedRate": 0.09452411994784876,
+        "medianAbsoluteCents": 6.570533695016918
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6289038579301899,
+        "missedVoicedRate": 0.22872014696876913,
+        "falseVoicedRate": 0.11016949152542373,
+        "medianAbsoluteCents": 7.863464680359868
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.03791666666666667,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7596448254745867,
+        "missedVoicedRate": 0.14543784445805266,
+        "falseVoicedRate": 0.09126466753585398,
+        "medianAbsoluteCents": 6.056269753440914
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7176974892835273,
+        "missedVoicedRate": 0.13962033067973056,
+        "falseVoicedRate": 0.09256844850065189,
+        "medianAbsoluteCents": 6.794457393256199
+      }
+    },
+    "clarity=0.72,rms=0.008": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9280465401102266,
+        "missedVoicedRate": 0.03551745254133497,
+        "falseVoicedRate": 0.1440677966101695,
+        "medianAbsoluteCents": 5.385957294943509
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8609920391916718,
+        "missedVoicedRate": 0.07838334353949786,
+        "falseVoicedRate": 0.11016949152542373,
+        "medianAbsoluteCents": 5.609554037201152
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7538273116962645,
+        "missedVoicedRate": 0.1595223515003062,
+        "falseVoicedRate": 0.08604954367666232,
+        "medianAbsoluteCents": 5.909793587868469
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6184935701163503,
+        "missedVoicedRate": 0.21034905082669933,
+        "falseVoicedRate": 0.06584093872229466,
+        "medianAbsoluteCents": 7.950980651993668
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7222902633190447,
+        "missedVoicedRate": 0.15799142682180037,
+        "falseVoicedRate": 0.08670143415906127,
+        "medianAbsoluteCents": 6.440108465799326
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.62369871402327,
+        "missedVoicedRate": 0.24188609920391918,
+        "falseVoicedRate": 0.10234680573663625,
+        "medianAbsoluteCents": 7.6494245280455235
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.030625,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7553582363747704,
+        "missedVoicedRate": 0.15554194733619106,
+        "falseVoicedRate": 0.08670143415906127,
+        "medianAbsoluteCents": 5.970222477685418
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7127985303123087,
+        "missedVoicedRate": 0.15217391304347827,
+        "falseVoicedRate": 0.08344198174706649,
+        "medianAbsoluteCents": 6.708094888536579
+      }
+    },
+    "clarity=0.72,rms=0.012": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9216166564605022,
+        "missedVoicedRate": 0.04225352112676056,
+        "falseVoicedRate": 0.1303780964797914,
+        "medianAbsoluteCents": 5.340726824739155
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8487446417636252,
+        "missedVoicedRate": 0.09583588487446418,
+        "falseVoicedRate": 0.09908735332464146,
+        "medianAbsoluteCents": 5.568418546048382
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.739742804654011,
+        "missedVoicedRate": 0.1827924066135946,
+        "falseVoicedRate": 0.07040417209908735,
+        "medianAbsoluteCents": 5.80852144007165
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.5946111451316595,
+        "missedVoicedRate": 0.2556644213104715,
+        "falseVoicedRate": 0.0560625814863103,
+        "medianAbsoluteCents": 7.475932930664714
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7026944274341702,
+        "missedVoicedRate": 0.19105939987752601,
+        "falseVoicedRate": 0.07040417209908735,
+        "medianAbsoluteCents": 6.31132387339051
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6154317207593386,
+        "missedVoicedRate": 0.2642375995101041,
+        "falseVoicedRate": 0.08213820078226858,
+        "medianAbsoluteCents": 7.3649026030095825
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.02625,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7431108389467238,
+        "missedVoicedRate": 0.17911818738518065,
+        "falseVoicedRate": 0.07301173402868318,
+        "medianAbsoluteCents": 5.850967098080972
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6919779546846295,
+        "missedVoicedRate": 0.19075321494182487,
+        "falseVoicedRate": 0.06584093872229466,
+        "medianAbsoluteCents": 6.4840611033319195
+      }
+    },
+    "clarity=0.8,rms=0.005": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9133496631965707,
+        "missedVoicedRate": 0.05572565829761176,
+        "falseVoicedRate": 0.11342894393741851,
+        "medianAbsoluteCents": 5.275860579393879
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8340477648499693,
+        "missedVoicedRate": 0.112369871402327,
+        "falseVoicedRate": 0.07627118644067797,
+        "medianAbsoluteCents": 5.441980166682514
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7216778934476423,
+        "missedVoicedRate": 0.20422535211267606,
+        "falseVoicedRate": 0.0560625814863103,
+        "medianAbsoluteCents": 5.5974019099428665
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.5976729944886712,
+        "missedVoicedRate": 0.2483159828536436,
+        "falseVoicedRate": 0.04889178617992177,
+        "medianAbsoluteCents": 7.393583634092514
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6886099203919167,
+        "missedVoicedRate": 0.20759338640538885,
+        "falseVoicedRate": 0.05867014341590613,
+        "medianAbsoluteCents": 6.223698725231368
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.5976729944886712,
+        "missedVoicedRate": 0.2872014696876914,
+        "falseVoicedRate": 0.08148631029986962,
+        "medianAbsoluteCents": 7.156174078589832
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.034791666666666665,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7146356399265156,
+        "missedVoicedRate": 0.21187997550520515,
+        "falseVoicedRate": 0.060625814863103,
+        "medianAbsoluteCents": 5.534877170233026
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6809552969993876,
+        "missedVoicedRate": 0.19902020820575628,
+        "falseVoicedRate": 0.058018252933507174,
+        "medianAbsoluteCents": 6.292398299527346
+      }
+    },
+    "clarity=0.8,rms=0.008": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9127372933251684,
+        "missedVoicedRate": 0.056338028169014086,
+        "falseVoicedRate": 0.10821382007822686,
+        "medianAbsoluteCents": 5.255532975080341
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8331292100428659,
+        "missedVoicedRate": 0.11481935088793631,
+        "falseVoicedRate": 0.07561929595827901,
+        "medianAbsoluteCents": 5.423839639396766
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7180036742192284,
+        "missedVoicedRate": 0.21096142069810164,
+        "falseVoicedRate": 0.05410691003911343,
+        "medianAbsoluteCents": 5.564464386652054
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.5930802204531537,
+        "missedVoicedRate": 0.2599510104102878,
+        "falseVoicedRate": 0.044980443285528034,
+        "medianAbsoluteCents": 7.342857217814337
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6861604409063075,
+        "missedVoicedRate": 0.21524800979791794,
+        "falseVoicedRate": 0.056714471968709254,
+        "medianAbsoluteCents": 6.132114591081734
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.5946111451316595,
+        "missedVoicedRate": 0.2951622780159216,
+        "falseVoicedRate": 0.07627118644067797,
+        "medianAbsoluteCents": 7.077572897012719
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.029375,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7121861604409063,
+        "missedVoicedRate": 0.2170851194121249,
+        "falseVoicedRate": 0.05867014341590613,
+        "medianAbsoluteCents": 5.517679204842437
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6775872627066748,
+        "missedVoicedRate": 0.2082057562767912,
+        "falseVoicedRate": 0.054758800521512385,
+        "medianAbsoluteCents": 6.200169564364128
+      }
+    },
+    "clarity=0.8,rms=0.012": {
+      "clean": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.9069197795468463,
+        "missedVoicedRate": 0.062461726883037354,
+        "falseVoicedRate": 0.10039113428943937,
+        "medianAbsoluteCents": 5.2258222562934336
+      },
+      "backing-quiet": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.8230251071647275,
+        "missedVoicedRate": 0.12951622780159217,
+        "falseVoicedRate": 0.07040417209908735,
+        "medianAbsoluteCents": 5.380678347600581
+      },
+      "backing-equal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7066748315982854,
+        "missedVoicedRate": 0.2290263319044703,
+        "falseVoicedRate": 0.04563233376792699,
+        "medianAbsoluteCents": 5.487402660091188
+      },
+      "backing-loud": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.5731781996325781,
+        "missedVoicedRate": 0.2969993876301286,
+        "falseVoicedRate": 0.04041720990873533,
+        "medianAbsoluteCents": 7.0293546748673625
+      },
+      "reverberant": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.6702388242498469,
+        "missedVoicedRate": 0.24035517452541336,
+        "falseVoicedRate": 0.04758800521512386,
+        "medianAbsoluteCents": 5.967100914174765
+      },
+      "guide-vocal": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.5887936313533374,
+        "missedVoicedRate": 0.31077770973668095,
+        "falseVoicedRate": 0.06453715775749674,
+        "medianAbsoluteCents": 6.880958189892755
+      },
+      "singer-silent": {
+        "voicedFrames": 0,
+        "unvoicedFrames": 4800,
+        "pitchRecall50Cents": null,
+        "missedVoicedRate": null,
+        "falseVoicedRate": 0.025208333333333333,
+        "medianAbsoluteCents": null
+      },
+      "nonlinear-speaker": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.7017758726270668,
+        "missedVoicedRate": 0.23545621555419474,
+        "falseVoicedRate": 0.050195567144719684,
+        "medianAbsoluteCents": 5.445607447890252
+      },
+      "clock-drift": {
+        "voicedFrames": 3266,
+        "unvoicedFrames": 1534,
+        "pitchRecall50Cents": 0.661053276178812,
+        "missedVoicedRate": 0.23576240048989588,
+        "falseVoicedRate": 0.04432855280312908,
+        "medianAbsoluteCents": 6.079965690040657
+      }
+    }
+  },
+  "compute": {
+    "raw": {
+      "realTimeFactor": 0.01575286554629541,
+      "worstCaseP95BlockMs": 0.33891700000003766,
+      "maximumBlockMs": 11.552916999993613
+    },
+    "aec3": {
+      "realTimeFactor": 0.04103367521573977,
+      "worstCaseP95BlockMs": 0.6518749999995634,
+      "maximumBlockMs": 13.590041999999812
+    }
+  },
+  "casesFile": "development-tuning-cases.csv"
+}

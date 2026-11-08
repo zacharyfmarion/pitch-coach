@@ -41,11 +41,12 @@ export default tseslint.config(
     }
   },
   {
-    files: ["src/audio/audio-input-processor.js"],
+    files: ["src/audio/audio-input-processor.js", "src/audio/speaker-input-processor.js"],
     languageOptions: {
       globals: {
         AudioWorkletProcessor: "readonly",
         currentTime: "readonly",
+        currentFrame: "readonly",
         registerProcessor: "readonly"
       }
     }
