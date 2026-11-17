@@ -181,7 +181,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         calibration.buffer = createAudioBufferFromStereo(context, createStereoBuffer(probe.left, probe.right, context.sampleRate));
         calibration.connect(playback);
         session.sources.push(calibration);
-        const launchTime = Math.round((context.currentTime + 0.15) * context.sampleRate) / context.sampleRate;
+        const launchTime = Math.round((context.currentTime + 0.45) * context.sampleRate) / context.sampleRate;
         config.onInputStatus?.("Listening to the four-second speaker check… Stay quiet until the music starts.");
         await new Promise<void>((resolve, reject) => {
           const timeout = window.setTimeout(() => reject(new Error("Speaker check timed out. Try again or use headphones.")), 15000);
@@ -191,7 +191,11 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
             session.rejectInitialization = undefined;
             reportCalibration(quality);
             if (quality.accepted) resolve();
-            else reject(new Error(calibrationAdvice(quality)));
+            else {
+              // Show the active input locally. Downloaded reports omit its label.
+              const input = track.label ? ` Microphone used: ${track.label}.` : "";
+              reject(new Error(calibrationAdvice(quality) + input));
+            }
           };
           session.worker!.postMessage({ type: "calibrate", startSample: Math.round(launchTime * context.sampleRate) });
           calibration.start(launchTime);

@@ -158,6 +158,7 @@ test("stopping calibration cancels it, and an uncorrelated microphone fails with
   await page.getByRole("button", { name: "Download speaker check report" }).click();
   const report = JSON.parse(await readFile((await (await pending).path())!, "utf8"));
   expect(report.session.calibration.accepted).toBe(false);
+  expect(report.session.calibration.ambientRms).toBeGreaterThanOrEqual(0);
   expect(report.session.calibration.failure).toMatch(/weak-input|clipped|poor-match/);
   expect(report.frames).toEqual([]);
   await page.screenshot({ path: "test-results/speaker-check-recovery.png" });

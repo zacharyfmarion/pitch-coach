@@ -340,7 +340,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
           reference,
           reference.analysisRange ?? createSongReferenceRange(settings.range)
         ),
-        deviceId: settings.preferredAudioInput?.deviceId,
+        // Settings can change while a song stays open. Resolve the input for each attempt.
+        deviceId: loadSettings().preferredAudioInput?.deviceId,
         vocalGuideGain,
         onPitchFrame: (frame) => {
           if (runId !== runIdRef.current) {
@@ -395,7 +396,6 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     services.practiceEngine,
     settings.range.highestMidi,
     settings.range.lowestMidi,
-    settings.preferredAudioInput?.deviceId,
     settings.toleranceCents,
     vocalGuideGain
   ]);
@@ -503,7 +503,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
   const setToleranceCents = useCallback(
     (toleranceCents: number) => {
       const nextSettings = normalizeSettings({
-        ...settings,
+        ...loadSettings(),
         toleranceCents
       });
       setSettingsState(nextSettings);
@@ -512,7 +512,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
         setScore(scoreSongAttempt(reference, liveFramesRef.current, nextSettings.toleranceCents));
       }
     },
-    [reference, settings]
+    [reference]
   );
 
   const setVocalGuideGain = useCallback(

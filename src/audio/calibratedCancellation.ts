@@ -106,6 +106,7 @@ export type CalibrationQuality = {
   failure: CalibrationFailure | null;
   inputPeak: number;
   denoised: boolean;
+  ambientRms?: number;
   repeats?: { left: RepeatMeasurement; right: RepeatMeasurement };
 };
 
@@ -141,7 +142,10 @@ export function calibrationAdvice(quality: CalibrationQuality): string {
     case "clipped":
       return "The microphone peaked during the check. Lower the speaker volume a little and retry.";
     default:
-      return `The echo was reduced by ${quality.reductionDb.toFixed(1)} dB. Speakers mode needs ${MIN_REDUCTION_DB} dB to keep the guide out of your pitch trace. Keep the microphone and speakers still for the next check.`;
+      if (quality.ambientRms !== undefined && quality.ambientRms > quality.echoRms * 10 ** (-MIN_REDUCTION_DB / 20)) {
+        return `The microphone picked up sound before the check started. At that level, the check reached ${quality.reductionDb.toFixed(1)} of the required ${MIN_REDUCTION_DB} dB. Pause other audio and retry.`;
+      }
+      return `The echo was reduced by ${quality.reductionDb.toFixed(1)} dB. Speakers mode needs ${MIN_REDUCTION_DB} dB to keep the guide out of your pitch trace. Pause audio in other tabs and apps, check the microphone selection, and retry at the same volume.`;
   }
 }
 
