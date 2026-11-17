@@ -2,7 +2,8 @@ import { createAudioBufferFromStereo, createStereoBuffer } from "./audioData";
 import { preparePlayAndRecordAudioSession, resumeAudioContext } from "../audio/audioSession";
 import { createAudioInputConstraints } from "../audio/inputConstraints";
 import { SPEAKER_PITCH_OPTIONS, SPEAKER_SAMPLE_RATE } from "../audio/speakerSettings";
-import { calibrationAdvice, createCalibrationProbe, type CalibrationQuality } from "../audio/calibratedCancellation";
+import { calibrationAdvice, type CalibrationQuality } from "../audio/calibratedCancellation";
+import { createSpeakerCheck, roomPitchDetector, SPEAKER_GUIDE_START } from "../audio/speakerCheck";
 import { speakerMixGain } from "../audio/speakerHeadroom";
 import { StreamingPitch } from "../audio/streamingPitch";
 import { PitchyPitchDetectorAdapter } from "../audio/pitchyDetector";
@@ -128,7 +129,8 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
       // These are browser-reported estimates, not measured acoustic latency.
       const inputLatency = (settings as MediaTrackSettings & { latency?: number }).latency ?? 0;
       const deviceDelayMs = (inputLatency + context.baseLatency + (context.outputLatency ?? 0)) * 1000;
-      const pitch = new StreamingPitch(config.detector, config.bounds, context.sampleRate);
+      let pitchThresholds: { rmsThreshold: number; clarityThreshold: number } = SPEAKER_PITCH_OPTIONS;
+      let pitch = new StreamingPitch(config.detector, config.bounds, context.sampleRate);
       const rawPitch = mode === "aec3" && config.onInputDiagnostic
         ? new StreamingPitch(new PitchyPitchDetectorAdapter(RAW_DIAGNOSTIC_THRESHOLDS), config.bounds, context.sampleRate)
         : null;
@@ -137,7 +139,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         outputLatencyMs: (context.outputLatency ?? 0) * 1000, baseLatencyMs: context.baseLatency * 1000,
         algorithmicDelayMs: 0,
         echoCancellation: settings.echoCancellation, noiseSuppression: settings.noiseSuppression,
-        autoGainControl: settings.autoGainControl, bounds: config.bounds, thresholds: SPEAKER_PITCH_OPTIONS, rawThresholds: RAW_DIAGNOSTIC_THRESHOLDS
+        autoGainControl: settings.autoGainControl, bounds: config.bounds, thresholds: pitchThresholds, rawThresholds: RAW_DIAGNOSTIC_THRESHOLDS
       });
       let receiveCalibration: ((quality: CalibrationQuality) => void) | undefined;
       const receive = (event: MessageEvent<AudioMessage>) => {
@@ -162,7 +164,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
             const raw = rawFrames[index];
             if (raw) config.onInputDiagnostic?.({
               raw: { ...raw, timeMs: raw.timeMs - session.startMs - deviceDelayMs },
-              processed: { ...frame, timeMs }, rejection: pitchRejection(frame, SPEAKER_PITCH_OPTIONS),
+              processed: { ...frame, timeMs }, rejection: pitchRejection(frame, pitchThresholds),
               guideGain: vocalGain.gain.value, processingMs: event.data.processingMs ?? 0, queueLagMs
             });
           }
@@ -176,19 +178,27 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         worklet.port.postMessage({ type: "connect", port: session.channel.port2 }, [session.channel.port2]);
       }
       if (mode === "aec3") {
-        const probe = createCalibrationProbe();
+        const probe = createSpeakerCheck();
         const calibration = context.createBufferSource();
         calibration.buffer = createAudioBufferFromStereo(context, createStereoBuffer(probe.left, probe.right, context.sampleRate));
         calibration.connect(playback);
         session.sources.push(calibration);
         const launchTime = Math.round((context.currentTime + 0.45) * context.sampleRate) / context.sampleRate;
-        config.onInputStatus?.("Listening to the four-second speaker check… Stay quiet until the music starts.");
+        config.onInputStatus?.("Checking speakers… Listen for a hiss and three notes. Start singing when the track begins.");
         await new Promise<void>((resolve, reject) => {
           const timeout = window.setTimeout(() => reject(new Error("Speaker check timed out. Try again or use headphones.")), 15000);
           session.rejectInitialization = (error) => { window.clearTimeout(timeout); reject(error); };
+          session.timer = window.setTimeout(() => {
+            if (current()) config.onInputStatus?.("Checking the guide. Listen to the three notes and wait for the track.");
+          }, (launchTime - context.currentTime + SPEAKER_GUIDE_START / context.sampleRate) * 1000);
           receiveCalibration = (quality) => {
+            window.clearTimeout(session.timer);
             window.clearTimeout(timeout);
             session.rejectInitialization = undefined;
+            if (quality.accepted && quality.roomCheck) {
+              pitchThresholds = { ...SPEAKER_PITCH_OPTIONS, rmsThreshold: quality.roomCheck.rmsThreshold };
+              pitch = new StreamingPitch(roomPitchDetector(pitchThresholds.rmsThreshold), config.bounds, context.sampleRate);
+            }
             reportCalibration(quality);
             if (quality.accepted) resolve();
             else {

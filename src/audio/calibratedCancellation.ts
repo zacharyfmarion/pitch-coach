@@ -95,7 +95,7 @@ export class StereoEchoFilter {
 }
 
 type CalibrationFailure = "weak-input" | "clipped" | "poor-match";
-const MIN_REDUCTION_DB = 22;
+export const MIN_REDUCTION_DB = 22;
 
 export type CalibrationQuality = {
   echoRms: number;
@@ -107,6 +107,8 @@ export type CalibrationQuality = {
   inputPeak: number;
   denoised: boolean;
   ambientRms?: number;
+  quietGapRms?: number;
+  roomCheck?: { rmsThreshold: number; reductionDb: number; guideFrames: number; guideDetections: number; worstHeldRecall: number };
   repeats?: { left: RepeatMeasurement; right: RepeatMeasurement };
 };
 
@@ -142,10 +144,12 @@ export function calibrationAdvice(quality: CalibrationQuality): string {
     case "clipped":
       return "The microphone peaked during the check. Lower the speaker volume a little and retry.";
     default:
-      if (quality.ambientRms !== undefined && quality.ambientRms > quality.echoRms * 10 ** (-MIN_REDUCTION_DB / 20)) {
-        return `The microphone picked up sound before the check started. At that level, the check reached ${quality.reductionDb.toFixed(1)} of the required ${MIN_REDUCTION_DB} dB. Pause other audio and retry.`;
+      if (quality.roomCheck?.guideDetections) return "The microphone still heard the test notes after cancellation. Lower the speaker volume slightly and retry.";
+      if (quality.roomCheck) return "The check lost some held notes at this noise level. Try bringing the microphone closer for singing, or use headphones.";
+      if (Math.max(quality.ambientRms ?? 0, quality.quietGapRms ?? 0) > quality.echoRms * 10 ** (-MIN_REDUCTION_DB / 20)) {
+        return "The microphone picked up background sound during setup. The room check could not verify pitch tracking at this level. Pause other audio if it is playing, then retry.";
       }
-      return `The echo was reduced by ${quality.reductionDb.toFixed(1)} dB. Speakers mode needs ${MIN_REDUCTION_DB} dB to keep the guide out of your pitch trace. Pause audio in other tabs and apps, check the microphone selection, and retry at the same volume.`;
+      return `The echo was reduced by ${quality.reductionDb.toFixed(1)} dB. The check could still pick up playback as singing. Pause audio in other tabs and apps, check the microphone selection, and retry at the same volume.`;
   }
 }
 

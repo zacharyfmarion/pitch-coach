@@ -8,7 +8,7 @@ test.use({
 });
 
 test("speaker demo calibrates a real audio graph, exports diagnostics, pauses, stops, and changes mode", async ({ page }) => {
-  await installSpeakerLoopback(page);
+  await installSpeakerLoopback(page, 0.0064);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const modelRequests: string[] = [];
@@ -41,7 +41,8 @@ test("speaker demo calibrates a real audio graph, exports diagnostics, pauses, s
   expect(reportPath).not.toBeNull();
   const report = JSON.parse(await readFile(reportPath!, "utf8"));
   expect(report.kind).toBe("pitch-coach-input-diagnostics");
-  expect(report.session).toMatchObject({ mode: "calibrated", calibration: { accepted: true }, sampleRate: 48000, echoCancellation: false, thresholds: { rmsThreshold: 0.008 } });
+  expect(report.session).toMatchObject({ mode: "calibrated", sampleRate: 48000, echoCancellation: false, calibration: { accepted: true, roomCheck: { guideDetections: 0 } } });
+  expect(report.session.thresholds.rmsThreshold).toBeGreaterThan(0.008);
   expect(report.summary.receivedFrames).toBeGreaterThan(0);
   expect(report.frames).toHaveLength(report.summary.receivedFrames);
   expect(report.frames.every((frame: { processed: { frequencyHz: number | null } }) => frame.processed.frequencyHz === null)).toBe(true);
@@ -77,11 +78,11 @@ test("actual worker preserves a three-second unison hold and rejects guide-only 
   test.setTimeout(30000);
   await page.goto("/songs");
   const result = await page.evaluate(async () => {
-    const { createCalibrationProbe } = await import("/src/audio/calibratedCancellation.ts");
+    const { createSpeakerCheck, roomPitchDetector } = await import("/src/audio/speakerCheck.ts");
     const { StreamingPitch } = await import("/src/audio/streamingPitch.ts");
     const { PitchyPitchDetectorAdapter } = await import("/src/audio/pitchyDetector.ts");
     const { SPEAKER_PITCH_OPTIONS } = await import("/src/audio/speakerSettings.ts");
-    const probe = createCalibrationProbe();
+    const probe = createSpeakerCheck();
     const practiceStart = probe.left.length + 24000;
     const length = practiceStart + 5 * 48000;
     const left = new Float32Array(length), right = new Float32Array(length), microphone = new Float32Array(length);
@@ -89,8 +90,10 @@ test("actual worker preserves a three-second unison hold and rejects guide-only 
     for (let i = practiceStart; i < length; i += 1) {
       left[i] = right[i] = 0.08 * Math.sin(2 * Math.PI * 220 * i / 48000);
     }
+    let seed = 1943;
     for (let i = 0; i < length; i += 1) {
-      microphone[i] = 0.4 * (left[i - 3120] ?? 0) + 0.25 * (right[i - 3120] ?? 0) + 0.1 * (left[i - 3361] ?? 0);
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      microphone[i] = 0.4 * (left[i - 3120] ?? 0) + 0.25 * (right[i - 3120] ?? 0) + 0.1 * (left[i - 3361] ?? 0) + 0.022 * (seed / 2 ** 32 - 0.5);
       if (i >= practiceStart + 48000 && i < practiceStart + 4 * 48000) microphone[i] += 0.07 * Math.sin(2 * Math.PI * 220 * i / 48000 + 1.1);
     }
     const context = new AudioContext({ sampleRate: 48000 });
@@ -112,13 +115,21 @@ test("actual worker preserves a three-second unison hold and rejects guide-only 
     const sink = context.createGain(); sink.gain.value = 0; node.connect(sink).connect(context.destination);
     const startSample = Math.round((context.currentTime + 0.15) * 48000);
     worker.postMessage({ type: "calibrate", startSample });
-    const tracker = new StreamingPitch(new PitchyPitchDetectorAdapter(SPEAKER_PITCH_OPTIONS), { minFrequencyHz: 65, maxFrequencyHz: 1100 }, 48000);
+    let tracker = new StreamingPitch(new PitchyPitchDetectorAdapter(SPEAKER_PITCH_OPTIONS), { minFrequencyHz: 65, maxFrequencyHz: 1100 }, 48000);
     const singing: Array<number | null> = [], silent: Array<number | null> = [];
     const failures: string[] = [];
-    let accepted = false, rawBlocks = 0;
+    let accepted = false, roomQualified = false, rawBlocks = 0;
     node.port.onmessage = (event) => failures.push(event.data.message);
     worker.onmessage = (event) => {
-      if (event.data.type === "calibrated") { accepted = event.data.quality.accepted; return; }
+      if (event.data.type === "calibrated") {
+        accepted = event.data.quality.accepted;
+        const check = event.data.quality.roomCheck;
+        if (accepted && check) {
+          roomQualified = true;
+          tracker = new StreamingPitch(roomPitchDetector(check.rmsThreshold), { minFrequencyHz: 65, maxFrequencyHz: 1100 }, 48000);
+        }
+        return;
+      }
       if (event.data.type === "error") { failures.push(event.data.message); return; }
       if (event.data.microphone) rawBlocks += 1;
       for (const frame of tracker.push(event.data.samples, event.data.startSample)) {
@@ -130,11 +141,12 @@ test("actual worker preserves a three-second unison hold and rejects guide-only 
     mic.start(startSample / 48000); reference.start(startSample / 48000);
     await new Promise<void>((resolve) => { mic.onended = () => setTimeout(resolve, 100); });
     worker.terminate(); node.disconnect(); await context.close();
-    return { accepted, failures, rawBlocks, singingFrames: singing.length, silentFrames: silent.length,
+    return { accepted, roomQualified, failures, rawBlocks, singingFrames: singing.length, silentFrames: silent.length,
       recall: singing.filter((f) => f !== null && Math.abs(1200 * Math.log2(f / 220)) <= 50).length / singing.length,
       falseRate: silent.filter((f) => f !== null).length / silent.length };
   });
   expect(result.accepted).toBe(true);
+  expect(result.roomQualified).toBe(true);
   expect(result.failures).toEqual([]);
   expect(result.rawBlocks).toBe(0);
   expect(result.singingFrames).toBeGreaterThan(130);
@@ -146,9 +158,9 @@ test("actual worker preserves a three-second unison hold and rejects guide-only 
 test("stopping calibration cancels it, and an uncorrelated microphone fails without scoring", async ({ page }) => {
   await page.goto("/songs");
   await page.getByRole("button", { name: "Try speaker prototype" }).click();
-  await expect(page.getByText(/four seconds of hiss/)).toBeVisible();
+  await expect(page.getByText(/short hiss and three notes/)).toBeVisible();
   await page.getByRole("button", { name: "Start song practice" }).click();
-  await expect(page.getByRole("status", { name: "Microphone status" })).toContainText("four-second speaker check");
+  await expect(page.getByRole("status", { name: "Microphone status" })).toContainText("Checking speakers");
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Stop", exact: true }).click();
   await page.getByRole("button", { name: "Start song practice" }).click();

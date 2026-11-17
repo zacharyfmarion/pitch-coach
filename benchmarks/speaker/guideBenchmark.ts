@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { CalibratedCancellation } from "../../src/audio/calibratedCancellation";
+import { calibrateSpeakers, createSpeakerCheck, roomPitchDetector } from "../../src/audio/speakerCheck";
+import { CALIBRATION_SAMPLES, type CalibrationQuality } from "../../src/audio/calibratedCancellation";
 import { AEC_DELAY_SAMPLES, SpeakerCancellation, loadEchoCanceller, SPEAKER_PITCH_OPTIONS } from "../../src/audio/speakerCancellation";
 import { StreamingPitch } from "../../src/audio/streamingPitch";
 import { PitchyPitchDetectorAdapter } from "../../src/audio/pitchyDetector";
@@ -14,14 +15,18 @@ import { combineCounts, measurePitch, summarize, type Counts } from "./metrics";
 const args = process.argv.slice(2);
 const option = (name: string, fallback: string) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const split = option("--split", "development");
-if (!["development", "regression", "synthetic"].includes(split)) throw new Error("Choose development, regression, or synthetic.");
+if (!["development", "regression", "synthetic", "ambient"].includes(split)) throw new Error("Choose development, regression, synthetic, or ambient.");
 // Keep the published recording-regression protocol fixed. Exercise this
 // quieter return in the development suite, including guide-only controls.
-const acousticCases = split === "regression" ? ACOUSTIC_CASES : [
+const ambient = split === "ambient";
+const acousticCases = ambient ? [
+  { id: "open-window", delayMs: 78, gain: 0.7, noise: 0.0064, street: true },
+] : split === "regression" ? ACOUSTIC_CASES : [
   ...ACOUSTIC_CASES,
   { id: "quiet-return", delayMs: 20, gain: 0.12, noise: 0.0003, tail: true }
 ];
-const ids = split === "development" ? Array.from({ length: 8 }, (_, i) => i + 1) : split === "regression" ? Array.from({ length: 32 }, (_, i) => i + 9) : [];
+const ids = split === "development" ? Array.from({ length: 8 }, (_, i) => i + 1)
+  : split === "regression" || ambient ? Array.from({ length: 32 }, (_, i) => i + 9) : [];
 const module = await loadEchoCanceller();
 const cases: unknown[] = [];
 const counts: Record<string, Counts[]> = { clean: [], calibrated: [], aec3: [], "calibrated-silent": [], "aec3-silent": [] };
@@ -32,8 +37,10 @@ let totalSeconds = 0, acceptedCalibrations = 0, refusedCalibrations = 0;
 let syntheticVoiced = true, syntheticSilent = true, stableCalibration = true, stressRefused = true;
 const round = (v: number) => Math.round(v * 10000) / 10000;
 
-function track(microphone: Float32Array, left: Float32Array, right: Float32Array, processor?: { process(m: Float32Array, l: Float32Array, r: Float32Array): Float32Array }, delay = 0, timeIt = false) {
-  const pitch = new StreamingPitch(new PitchyPitchDetectorAdapter(SPEAKER_PITCH_OPTIONS), { minFrequencyHz: 65, maxFrequencyHz: 1100 }, 48000, delay);
+function track(microphone: Float32Array, left: Float32Array, right: Float32Array, processor?: { quality?: CalibrationQuality; process(m: Float32Array, l: Float32Array, r: Float32Array): Float32Array }, delay = 0, timeIt = false) {
+  const room = processor?.quality?.roomCheck;
+  const detector = room ? roomPitchDetector(room.rmsThreshold) : new PitchyPitchDetectorAdapter(SPEAKER_PITCH_OPTIONS);
+  const pitch = new StreamingPitch(detector, { minFrequencyHz: 65, maxFrequencyHz: 1100 }, 48000, delay);
   const frames: PitchFrame[] = [];
   for (let start = 0; start < microphone.length; start += 480) {
     const begin = performance.now();
@@ -48,16 +55,16 @@ function track(microphone: Float32Array, left: Float32Array, right: Float32Array
 function legacy(cal: ReturnType<typeof calibrationRecording>) {
   const processor = new SpeakerCancellation(module);
   // The comparator gets the same quiet probe before the existing backing lead-in.
-  for (let i = 0; i < cal.microphone.length; i += 480) processor.process(cal.microphone.subarray(i, i + 480), cal.left.subarray(i, i + 480), cal.right.subarray(i, i + 480));
+  for (let i = 0; i < CALIBRATION_SAMPLES; i += 480) processor.process(cal.microphone.subarray(i, i + 480), cal.left.subarray(i, i + 480), cal.right.subarray(i, i + 480));
   const silence = new Float32Array(480);
   for (let i = 0; i < 50; i += 1) processor.process(silence, silence, silence);
   return processor;
 }
 
 if (split !== "regression") for (const room of acousticCases) {
-  const cal = calibrationRecording(room, 73);
+  const cal = calibrationRecording(room, 73, createSpeakerCheck);
   const start = performance.now();
-  const filter = new CalibratedCancellation(cal.microphone, cal.left, cal.right);
+  const filter = calibrateSpeakers(cal.microphone, cal.left, cal.right);
   calibrationTimings.push(performance.now() - start);
   for (const scenario of SUSTAIN_CASES as readonly SustainCase[]) {
     filter.reset();
@@ -71,7 +78,7 @@ if (split !== "regression") for (const room of acousticCases) {
     acceptedCalibrations += 1;
     if (stress) stressRefused = false;
     const m = createSustainMixture(scenario);
-    const echo = acousticEcho(m.render, m.render, room, 73);
+    const echo = acousticEcho(m.render, m.render, room, ambient ? 101 : 73);
     const microphone = m.near.map((sample, i) => sample + echo[i]);
     const old = legacy(cal);
     const outputs = { calibrated: track(microphone, m.render, m.render, filter, 0, true), aec3: track(microphone, m.render, m.render, old, AEC_DELAY_SAMPLES) };
@@ -110,10 +117,10 @@ for (const id of ids) {
   const end = 2000 + vocal.length / 48;
   const clean = measurePitch(track(m.near, m.left, m.right), truth, 2000, end);
   for (const room of acousticCases.filter((r) => !["clock-drift", "noisy-room", "clipped-speaker"].includes(r.id)).map((r) => split === "regression" && r.nonlinear ? { ...r, nonlinear: 7.3 } : r)) {
-    const cal = calibrationRecording(room, id * 73);
-    const echo = acousticEcho(m.left, m.right, room, id * 73);
+    const cal = calibrationRecording(room, id * 73, createSpeakerCheck);
+    const echo = acousticEcho(m.left, m.right, room, id * 73 + (ambient ? 4099 : 0));
     const start = performance.now();
-    const filter = new CalibratedCancellation(cal.microphone, cal.left, cal.right);
+    const filter = calibrateSpeakers(cal.microphone, cal.left, cal.right);
     calibrationTimings.push(performance.now() - start);
     for (const silent of [false, true]) {
       filter.reset();
@@ -140,7 +147,7 @@ const gates = {
   ...(ids.length ? { realPitchPreserved: summary.calibrated !== null && summary.clean !== null && summary.calibrated.pitchRecall50Cents! >= summary.clean.pitchRecall50Cents! - 0.03, realGuideOnlyFalseRate: summary["calibrated-silent"] !== null && summary["calibrated-silent"].falseVoicedRate! <= 0.01 } : {})
 };
 timings.sort((a, b) => a - b);
-const report = { protocol: "calibrated-guide-v1", split, recordingIds: ids, hashes, thresholds: SPEAKER_PITCH_OPTIONS, acousticCases, regressionNonlinearity: split === "regression" ? 7.3 : null, acceptedCalibrations, refusedCalibrations, gates, summary,
+const report = { protocol: ambient ? "ambient-guide-v1" : "calibrated-guide-v1", split, recordingIds: ids, hashes, thresholds: SPEAKER_PITCH_OPTIONS, acousticCases, regressionNonlinearity: split === "regression" ? 7.3 : null, acceptedCalibrations, refusedCalibrations, gates, summary,
   compute: { realTimeFactor: timings.reduce((sum, v) => sum + v, 0) / (totalSeconds * 1000), p95BlockMs: timings[Math.floor(timings.length * 0.95)], maximumBlockMs: timings.at(-1), maximumCalibrationMs: Math.max(...calibrationTimings) }, cases };
 await writeFile(option("--output", `.cache/speaker-benchmark/guide-${split}.json`), JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify({ summary, gates, compute: report.compute }, null, 2));

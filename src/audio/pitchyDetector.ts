@@ -15,7 +15,7 @@ export class PitchyPitchDetectorAdapter implements PitchDetectorAdapter {
   private readonly clarityThreshold: number;
   private readonly rmsThreshold: number;
 
-  constructor(options: PitchyPitchDetectorOptions = {}) {
+  constructor(options: PitchyPitchDetectorOptions = {}, private readonly peakThreshold = 0.9) {
     this.clarityThreshold = options.clarityThreshold ?? 0.72;
     this.rmsThreshold = options.rmsThreshold ?? 0.006;
   }
@@ -50,6 +50,7 @@ export class PitchyPitchDetectorAdapter implements PitchDetectorAdapter {
     }
 
     this.detector = PitchDetector.forFloat32Array(inputLength);
+    this.detector.clarityThreshold = this.peakThreshold;
     this.inputLength = inputLength;
   }
 }

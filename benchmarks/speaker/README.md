@@ -4,6 +4,19 @@ This prototype evaluates whether local echo cancellation improves **pitch tracki
 
 Speaker mode now uses a **calibrated playback model that stays fixed while singing**, replacing the continuously adapting AEC3 processor. It addresses the onset-only failure when the singer matches the guide. The historical AEC3 evaluation and diagnosis remain below; they are not the current implementation's acceptance evidence.
 
+## Room noise with the vocal guide playing
+
+The six-second check measures broadband echo, pauses, then plays three independent notes. Ordinary background sound can exceed the old check’s entire residual allowance. In that case a shorter stereo filter can qualify if it predicts unused broadband samples with at least 10 dB reduction. The pitch floor is fixed at twice the remaining RMS, bounded between 0.008 and 0.022. The test rejects a model that produces any guide-only pitch or misses more than 5% of the frames for any of six digitally added held tones. The live detector uses the same pitch floor and autocorrelation peak selection as the check. Calibration never receives the singer’s target notes.
+
+Run the annotated recording benchmark with a matching vocal guide, simulated low-frequency street noise and intermittent chirps using the command below. The calibration noise and practice noise have different seeds. The report counts singer-silent false detections, onset and sustain recall, and the percentage of human-labeled voiced frames within 50 cents. Recordings 9–40 are a regression set. The simulator covers a stationary speaker position and a repeatable noise distribution.
+
+```bash
+pnpm benchmark:speakers:prepare
+pnpm benchmark:speakers:guide --split ambient --check
+```
+
+The [ambient benchmark result](results/guide-ambient.json) covers 32 annotated recordings. Pitch recall within 50 cents was 87.79%, compared with 90.16% for isolated singing. The tracker produced zero pitches in 18,891 guide-only frames. Synthetic matching-note tests reached 100% onset and sustain recall.
+
 ## Quiet speaker return on a laptop microphone
 
 A quiet room can still fail the speaker check when the microphone picks up little playback. We reproduced one cause using a stable 20 ms reflected path, gain 0.12 and microphone noise RMS 0.0003 (seed 73). The original fit kept noise across the entire 341 ms impulse response. Its prediction amplified that noise, yielding 17.61 dB reduction on independent validation. A second candidate shrinks response blocks at the estimated noise floor. The fitter selects it on separate samples only when it improves a quiet return. The same validation segment then measured 25.13 dB and passed the original 22 dB requirement.
@@ -12,11 +25,11 @@ The development command below includes this case with both an independent singer
 
 ## Calibrated guide-on cancellation
 
-The same production processor is exercised by `guideBenchmark.ts` and the real browser worker. It never receives singer-only audio, target notes, f0 annotations, or simulator room parameters. Pitch windows, the 0.008 RMS / 0.66 clarity gates, and scoring remain unchanged. There is no raw-pitch fallback, held-pitch interpolation, or target-note substitution.
+The same production processor is exercised by `guideBenchmark.ts` and the real browser worker. It never receives singer-only audio, target notes, f0 annotations, or simulator room parameters. The quiet-room path uses a 0.008 RMS floor and a 0.66 clarity gate. There is no raw-pitch fallback, held-pitch interpolation, or target-note substitution.
 
 Before each attempt, a 3.74-second probe measures the left and right speaker paths separately. Periodic broadband training is followed by different stereo noise: an initial portion chooses a simple soft-saturation parameter, and a final unused portion validates cancellation. The model consists of that fixed memoryless speaker response and two measured 16384-sample causal impulse responses (341 ms at 48 kHz). A partitioned FFT filter subtracts predicted playback in 480-sample blocks without adding the old AEC3's 430-sample delay. Filters do not adapt during singing.
 
-Calibration must achieve **at least 22 dB echo reduction on its unused validation segment**, have a measurable speaker return, and avoid microphone clipping. Unreliable checks stop practice; no raw signal is scored. Scoring starts after a quiet tail. Pause/resume includes a 450 ms settling interval because physical room echoes decay while the audio clock is suspended. Reports include calibration acceptance, measured reduction and estimated nonlinearity. No calibration recordings or filter coefficients are saved or uploaded.
+The quiet-room model must achieve **at least 22 dB echo reduction on its unused validation segment**, have a measurable speaker return, and avoid microphone clipping. Unreliable checks stop practice; no raw signal is scored. Scoring starts after a quiet tail. Pause/resume includes a 450 ms settling interval because physical room echoes decay while the audio clock is suspended. Reports include calibration acceptance, measured reduction and estimated nonlinearity. No calibration recordings or filter coefficients are saved or uploaded.
 
 ```bash
 pnpm benchmark:speakers:prepare

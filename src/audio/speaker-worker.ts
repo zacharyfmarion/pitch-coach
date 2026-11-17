@@ -1,14 +1,14 @@
-import { CALIBRATION_SAMPLES, CalibratedCancellation } from "./calibratedCancellation";
+import { calibrateSpeakers, SPEAKER_CHECK_SAMPLES } from "./speakerCheck";
 
 type AudioBlock = { microphone: Float32Array; left: Float32Array; right: Float32Array; startSample: number };
-let processor: CalibratedCancellation | undefined;
+let processor: ReturnType<typeof calibrateSpeakers> | undefined;
 let calibration: { startSample: number; received: number; ambientEnergy: number; ambientSamples: number; microphone: Float32Array; left: Float32Array; right: Float32Array } | undefined;
 let port: MessagePort;
 let diagnostics = false;
 
 self.onmessage = (event: MessageEvent<{ type: "init" | "calibrate"; port: MessagePort; diagnostics?: boolean; startSample: number }>) => {
   if (event.data.type === "calibrate") {
-    calibration = { startSample: event.data.startSample, received: 0, ambientEnergy: 0, ambientSamples: 0, microphone: new Float32Array(CALIBRATION_SAMPLES), left: new Float32Array(CALIBRATION_SAMPLES), right: new Float32Array(CALIBRATION_SAMPLES) };
+    calibration = { startSample: event.data.startSample, received: 0, ambientEnergy: 0, ambientSamples: 0, microphone: new Float32Array(SPEAKER_CHECK_SAMPLES), left: new Float32Array(SPEAKER_CHECK_SAMPLES), right: new Float32Array(SPEAKER_CHECK_SAMPLES) };
     return;
   }
   port = event.data.port;
@@ -27,7 +27,7 @@ self.onmessage = (event: MessageEvent<{ type: "init" | "calibrate"; port: Messag
           calibration.ambientSamples++;
         }
         const from = Math.max(0, calibration.startSample - startSample);
-        const to = Math.min(microphone.length, calibration.startSample + CALIBRATION_SAMPLES - startSample);
+        const to = Math.min(microphone.length, calibration.startSample + SPEAKER_CHECK_SAMPLES - startSample);
         if (to <= from) return;
         const at = startSample + from - calibration.startSample;
         if (at !== calibration.received) throw new Error("Speaker check lost audio frames. Try again or use headphones.");
@@ -35,11 +35,11 @@ self.onmessage = (event: MessageEvent<{ type: "init" | "calibrate"; port: Messag
         calibration.left.set(left.subarray(from, to), at);
         calibration.right.set(right.subarray(from, to), at);
         calibration.received += to - from;
-        if (calibration.received === CALIBRATION_SAMPLES) {
-          processor = new CalibratedCancellation(calibration.microphone, calibration.left, calibration.right);
-          if (calibration.ambientSamples >= 4800) {
-            processor.quality.ambientRms = Math.sqrt(calibration.ambientEnergy / calibration.ambientSamples);
-          }
+        if (calibration.received === SPEAKER_CHECK_SAMPLES) {
+          const ambientRms = calibration.ambientSamples >= 4800
+            ? Math.sqrt(calibration.ambientEnergy / calibration.ambientSamples)
+            : undefined;
+          processor = calibrateSpeakers(calibration.microphone, calibration.left, calibration.right, ambientRms);
           calibration = undefined;
           self.postMessage({ type: "calibrated", quality: processor.quality });
           if (!processor.quality.accepted) processor = undefined;

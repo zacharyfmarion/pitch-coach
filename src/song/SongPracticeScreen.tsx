@@ -175,7 +175,7 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
             {speakerMode && song.canPractice && !isActivePractice && !song.errorMessage ? (
               <div className="speaker-check-note">
                 <Headphones size={18} aria-hidden="true" />
-                <div><strong>Before you sing</strong><p>Pause other music and videos. You’ll hear four seconds of hiss while we measure the speakers. Sing when the track starts.</p></div>
+                <div><strong>Before you sing</strong><p>Pause other music and videos. Listen for a short hiss and three notes. Start singing when the track begins, about six seconds later.</p></div>
               </div>
             ) : null}
             {speakerMode && isActivePractice && song.inputStatus ? (
