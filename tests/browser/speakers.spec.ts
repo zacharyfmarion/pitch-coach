@@ -146,17 +146,22 @@ test("actual worker preserves a three-second unison hold and rejects guide-only 
 test("stopping calibration cancels it, and an uncorrelated microphone fails without scoring", async ({ page }) => {
   await page.goto("/songs");
   await page.getByRole("button", { name: "Try speaker prototype" }).click();
-  await page.getByRole("switch", { name: "Debug microphone" }).click();
+  await expect(page.getByText(/four seconds of hiss/)).toBeVisible();
   await page.getByRole("button", { name: "Start song practice" }).click();
   await expect(page.getByRole("status", { name: "Microphone status" })).toContainText("four-second speaker check");
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Stop", exact: true }).click();
   await page.getByRole("button", { name: "Start song practice" }).click();
-  await expect(page.getByRole("alert")).toContainText("could not isolate playback reliably", { timeout: 20000 });
-  await expect(page.getByRole("button", { name: "Start song practice" })).toBeEnabled();
+  await expect(page.getByRole("alert")).toContainText("Speaker check needs another try", { timeout: 20000 });
+  await expect(page.getByRole("button", { name: "Retry speaker check" })).toBeEnabled();
   const pending = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download input report" }).click();
+  await page.getByRole("button", { name: "Download speaker check report" }).click();
   const report = JSON.parse(await readFile((await (await pending).path())!, "utf8"));
   expect(report.session.calibration.accepted).toBe(false);
+  expect(report.session.calibration.failure).toMatch(/weak-input|clipped|poor-match/);
   expect(report.frames).toEqual([]);
+  await page.screenshot({ path: "test-results/speaker-check-recovery.png" });
+  await page.getByRole("button", { name: "Use browser cancellation" }).click();
+  await expect(page.getByRole("button", { name: "Browser", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });

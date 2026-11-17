@@ -1,3 +1,4 @@
+import { SPEAKER_PITCH_OPTIONS } from "./speakerSettings";
 import FFT from "fft.js";
 import { calculateRms } from "./pitchyDetector";
 
@@ -93,7 +94,56 @@ export class StereoEchoFilter {
   }
 }
 
-export type CalibrationQuality = { echoRms: number; residualRms: number; reductionDb: number; accepted: boolean; nonlinearity: number };
+type CalibrationFailure = "weak-input" | "clipped" | "poor-match";
+const MIN_REDUCTION_DB = 22;
+
+export type CalibrationQuality = {
+  echoRms: number;
+  residualRms: number;
+  reductionDb: number;
+  accepted: boolean;
+  nonlinearity: number;
+  failure: CalibrationFailure | null;
+  inputPeak: number;
+  denoised: boolean;
+  repeats?: { left: RepeatMeasurement; right: RepeatMeasurement };
+};
+
+type RepeatMeasurement = { correlation: number; shiftSamples: number; alignedCorrelation: number };
+
+// Each speaker plays the same period twice. Compare the ends of those periods,
+// after the supported room tail, to expose timing changes in failed checks.
+function measureRepeat(input: Float32Array, offset: number): RepeatMeasurement {
+  const start = offset + PERIOD - 4096 - 32;
+  function correlation(shift: number) {
+    let cross = 0, first = 0, second = 0;
+    for (let i = start; i < start + 4096; i++) {
+      const a = input[i], b = input[i + PERIOD + shift];
+      cross += a * b;
+      first += a * a;
+      second += b * b;
+    }
+    return cross / Math.max(1e-20, Math.sqrt(first * second));
+  }
+  const aligned = correlation(0);
+  let best = aligned, shiftSamples = 0;
+  for (let shift = -32; shift <= 32; shift++) {
+    const value = correlation(shift);
+    if (value > best) { best = value; shiftSamples = shift; }
+  }
+  return { alignedCorrelation: aligned, correlation: best, shiftSamples };
+}
+
+export function calibrationAdvice(quality: CalibrationQuality): string {
+  switch (quality.failure) {
+    case "weak-input":
+      return "The microphone barely picked up the speaker check. Check the selected input and raise the speaker volume slightly, then retry.";
+    case "clipped":
+      return "The microphone peaked during the check. Lower the speaker volume a little and retry.";
+    default:
+      return `The echo was reduced by ${quality.reductionDb.toFixed(1)} dB. Speakers mode needs ${MIN_REDUCTION_DB} dB to keep the guide out of your pitch trace. Keep the microphone and speakers still for the next check.`;
+  }
+}
 
 export class CalibratedCancellation {
   private filter: StereoEchoFilter;
@@ -106,11 +156,12 @@ export class CalibratedCancellation {
   constructor(microphone: Float32Array, left: Float32Array, right: Float32Array) {
     if ([microphone, left, right].some((channel) => channel.length !== CALIBRATION_SAMPLES)) throw new Error("Incomplete speaker calibration.");
     const candidates = new Map<number, ReturnType<typeof evaluate>>();
+    let denoised = false;
     function evaluate(strength: number) {
       const l = distort(left, strength), r = distort(right, strength);
-      const impulses: [Float32Array, Float32Array] = [estimatePath(l.subarray(PERIOD, 2 * PERIOD), microphone.subarray(PERIOD, 2 * PERIOD)), estimatePath(r.subarray(3 * PERIOD, 4 * PERIOD), microphone.subarray(3 * PERIOD, 4 * PERIOD))];
+      const impulses: [Float32Array, Float32Array] = [estimatePath(l.subarray(PERIOD, 2 * PERIOD), microphone.subarray(PERIOD, 2 * PERIOD), denoised), estimatePath(r.subarray(3 * PERIOD, 4 * PERIOD), microphone.subarray(3 * PERIOD, 4 * PERIOD), denoised)];
       const validation = new StereoEchoFilter(impulses);
-      let inputEnergy = 0, errorEnergy = 0, samples = 0, fittingError = 0;
+      let inputEnergy = 0, errorEnergy = 0, samples = 0, fittingError = 0, fittingEnergy = 0, fittingSamples = 0;
       // Only warm the reference history needed by validation. Earlier samples
       // cannot contribute through a finite 16384-sample causal filter.
       for (let start = Math.floor(CALIBRATION_TRAIN_SAMPLES / 480) * 480; start < CALIBRATION_SAMPLES; start += 480) {
@@ -118,17 +169,35 @@ export class CalibratedCancellation {
         if (start < CALIBRATION_TRAIN_SAMPLES + FILTER_LENGTH) continue;
         for (let i = 0; i < prediction.length; i += 1) {
           const input = microphone[start + i], error = (input - prediction[i]) ** 2;
-          if (start < CALIBRATION_TRAIN_SAMPLES + 32000) fittingError += error;
+          if (start < CALIBRATION_TRAIN_SAMPLES + 32000) {
+            fittingError += error;
+            fittingEnergy += input * input;
+            fittingSamples += 1;
+          }
           else { inputEnergy += input * input; errorEnergy += error; samples += 1; }
         }
       }
-      return { impulses, fittingError, echoRms: Math.sqrt(inputEnergy / samples), residualRms: Math.sqrt(errorEnergy / samples), strength };
+      return { impulses, fittingError, fittingEnergy, fittingSamples, echoRms: Math.sqrt(inputEnergy / samples), residualRms: Math.sqrt(errorEnergy / samples), strength };
     }
     const candidate = (strength: number) => {
       if (!candidates.has(strength)) candidates.set(strength, evaluate(strength));
       return candidates.get(strength)!;
     };
     let best = candidate(0);
+    // When a weak return is close to the detector floor, compare a model
+    // with noise-dominated impulse-response blocks removed. Select using only
+    // the fitting segment, leaving the independent acceptance segment untouched.
+    if (best.fittingError * 10 ** (MIN_REDUCTION_DB / 10) > best.fittingEnergy &&
+        best.fittingError / best.fittingSamples < (SPEAKER_PITCH_OPTIONS.rmsThreshold / 4) ** 2) {
+      denoised = true;
+      const cleaned = evaluate(0);
+      if (cleaned.fittingError < best.fittingError) {
+        best = cleaned;
+        candidates.set(0, cleaned);
+      } else {
+        denoised = false;
+      }
+    }
     for (const strength of [4, 8, 12, 16]) { const next = candidate(strength); if (next.fittingError < best.fittingError) best = next; }
     for (const step of [2, 1, 0.5]) {
       const center = best.strength;
@@ -140,7 +209,15 @@ export class CalibratedCancellation {
     const reductionDb = 20 * Math.log10(Math.max(echoRms, 1e-9) / Math.max(residualRms, 1e-9));
     // Acceptance uses the FINAL, unused part of the independent probe, not the
     // segment used to choose a soft-saturation parameter.
-    this.quality = { echoRms, residualRms, reductionDb, nonlinearity: best.strength, accepted: echoRms >= 0.0005 && reductionDb >= 22 && !microphone.some((v) => Math.abs(v) >= 0.98) };
+    const inputPeak = microphone.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0);
+    let failure: CalibrationFailure | null = null;
+    if (inputPeak >= 0.98) failure = "clipped";
+    else if (echoRms < 0.0005) failure = "weak-input";
+    else if (reductionDb < MIN_REDUCTION_DB) failure = "poor-match";
+    this.quality = { echoRms, residualRms, reductionDb, nonlinearity: best.strength, inputPeak, denoised, failure, accepted: failure === null };
+    if (failure === "poor-match") {
+      this.quality.repeats = { left: measureRepeat(microphone, 0), right: measureRepeat(microphone, 2 * PERIOD) };
+    }
     this.impulses = best.impulses;
     // New reference history; the browser leaves a quiet tail before practice.
     this.filter = new StereoEchoFilter(this.impulses);
@@ -163,7 +240,7 @@ function distort(input: Float32Array, strength: number, output = new Float32Arra
   return output;
 }
 
-function estimatePath(reference: Float32Array, microphone: Float32Array): Float32Array {
+function estimatePath(reference: Float32Array, microphone: Float32Array, denoised: boolean): Float32Array {
   if (calculateRms(reference) < 0.001) throw new Error("Calibration playback was not captured. Try again or use headphones.");
   const fft = new FFT(PERIOD);
   const x = new Float64Array(PERIOD * 2), y = new Float64Array(PERIOD * 2), h = new Float64Array(PERIOD * 2);
@@ -179,5 +256,23 @@ function estimatePath(reference: Float32Array, microphone: Float32Array): Float3
   }
   const inverse = new Float64Array(PERIOD * 2);
   fft.inverseTransform(inverse, h);
-  return Float32Array.from({ length: FILTER_LENGTH }, (_, i) => inverse[i * 2]);
+  const impulse = Float32Array.from({ length: FILTER_LENGTH }, (_, i) => inverse[i * 2]);
+  if (denoised) {
+    // The second half is outside the supported causal path. Its median block
+    // power estimates the noise in this measurement without a room model.
+    const blockSize = 32;
+    const powerAt = (start: number) => {
+      let energy = 0;
+      for (let i = start; i < start + blockSize; i++) energy += inverse[2 * i] ** 2;
+      return energy;
+    };
+    const tail = Array.from({ length: (PERIOD - FILTER_LENGTH) / blockSize },
+      (_, i) => powerAt(FILTER_LENGTH + i * blockSize)).sort((a, b) => a - b);
+    const noise = tail[Math.floor(tail.length / 2)];
+    for (let start = 0; start < FILTER_LENGTH; start += blockSize) {
+      const gain = Math.max(0, 1 - 2 * noise / Math.max(powerAt(start), 1e-30));
+      for (let i = start; i < start + blockSize; i++) impulse[i] *= gain;
+    }
+  }
+  return impulse;
 }

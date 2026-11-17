@@ -3,6 +3,7 @@ import { CalibratedCancellation, createCalibrationProbe, StereoEchoFilter } from
 import { PitchyPitchDetectorAdapter } from "./pitchyDetector";
 import { StreamingPitch } from "./streamingPitch";
 import { SPEAKER_PITCH_OPTIONS } from "./speakerCancellation";
+import { calibrationRecording } from "../../benchmarks/speaker/calibratedFixtures";
 import { speakerMixGain } from "./speakerHeadroom";
 
 describe("calibrated playback cancellation", () => {
@@ -49,6 +50,16 @@ describe("calibrated playback cancellation", () => {
     expect(silent.every((f) => f.frequencyHz === null)).toBe(true);
   });
 
+  it("recovers a quiet speaker return on independent validation and identifies clipping", () => {
+    const room = { id: "quiet-return", delayMs: 20, gain: 0.12, noise: 0.0003, tail: true };
+    const { microphone, left, right } = calibrationRecording(room, 73);
+    const result = new CalibratedCancellation(microphone, left, right).quality;
+    expect(result).toMatchObject({ accepted: true, denoised: true, failure: null });
+    expect(result.reductionDb).toBeGreaterThan(22);
+    microphone[300] = -1;
+    expect(new CalibratedCancellation(microphone, left, right).quality.failure).toBe("clipped");
+  });
+
   it("refuses independent voice/noise during calibration and never passes raw input through", () => {
     const probe = createCalibrationProbe();
     const microphone = probe.left.map((_, i) => 0.06 * Math.sin(2 * Math.PI * 220 * i / 48000));
@@ -56,7 +67,7 @@ describe("calibrated playback cancellation", () => {
     expect(filter.quality.accepted).toBe(false);
     expect(() => filter.process(new Float32Array(480), new Float32Array(480), new Float32Array(480))).toThrow(/calibration was not reliable/);
     const silent = new CalibratedCancellation(new Float32Array(probe.left.length), probe.left, probe.right);
-    expect(silent.quality.accepted).toBe(false);
+    expect(silent.quality).toMatchObject({ accepted: false, failure: "weak-input" });
   });
 
   it("estimates distortion between search-grid values without counting the distorted guide", () => {

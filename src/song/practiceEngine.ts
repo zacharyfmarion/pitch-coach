@@ -2,7 +2,7 @@ import { createAudioBufferFromStereo, createStereoBuffer } from "./audioData";
 import { preparePlayAndRecordAudioSession, resumeAudioContext } from "../audio/audioSession";
 import { createAudioInputConstraints } from "../audio/inputConstraints";
 import { SPEAKER_PITCH_OPTIONS, SPEAKER_SAMPLE_RATE } from "../audio/speakerSettings";
-import { createCalibrationProbe, type CalibrationQuality } from "../audio/calibratedCancellation";
+import { calibrationAdvice, createCalibrationProbe, type CalibrationQuality } from "../audio/calibratedCancellation";
 import { speakerMixGain } from "../audio/speakerHeadroom";
 import { StreamingPitch } from "../audio/streamingPitch";
 import { PitchyPitchDetectorAdapter } from "../audio/pitchyDetector";
@@ -182,7 +182,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
         calibration.connect(playback);
         session.sources.push(calibration);
         const launchTime = Math.round((context.currentTime + 0.15) * context.sampleRate) / context.sampleRate;
-        config.onInputStatus?.("Stay quiet for the four-second speaker check. Sing when the song starts.");
+        config.onInputStatus?.("Listening to the four-second speaker check… Stay quiet until the music starts.");
         await new Promise<void>((resolve, reject) => {
           const timeout = window.setTimeout(() => reject(new Error("Speaker check timed out. Try again or use headphones.")), 15000);
           session.rejectInitialization = (error) => { window.clearTimeout(timeout); reject(error); };
@@ -191,7 +191,7 @@ export class BrowserSongPracticeEngine implements SongPracticeEngine {
             session.rejectInitialization = undefined;
             reportCalibration(quality);
             if (quality.accepted) resolve();
-            else reject(new Error("Speaker check could not isolate playback reliably. Stay quiet, check speaker and microphone levels, and retry. If it keeps failing, use headphones."));
+            else reject(new Error(calibrationAdvice(quality)));
           };
           session.worker!.postMessage({ type: "calibrate", startSample: Math.round(launchTime * context.sampleRate) });
           calibration.start(launchTime);

@@ -15,6 +15,12 @@ const args = process.argv.slice(2);
 const option = (name: string, fallback: string) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const split = option("--split", "development");
 if (!["development", "regression", "synthetic"].includes(split)) throw new Error("Choose development, regression, or synthetic.");
+// Keep the published recording-regression protocol fixed. Exercise this
+// quieter return in the development suite, including guide-only controls.
+const acousticCases = split === "regression" ? ACOUSTIC_CASES : [
+  ...ACOUSTIC_CASES,
+  { id: "quiet-return", delayMs: 20, gain: 0.12, noise: 0.0003, tail: true }
+];
 const ids = split === "development" ? Array.from({ length: 8 }, (_, i) => i + 1) : split === "regression" ? Array.from({ length: 32 }, (_, i) => i + 9) : [];
 const module = await loadEchoCanceller();
 const cases: unknown[] = [];
@@ -48,7 +54,7 @@ function legacy(cal: ReturnType<typeof calibrationRecording>) {
   return processor;
 }
 
-if (split !== "regression") for (const room of ACOUSTIC_CASES) {
+if (split !== "regression") for (const room of acousticCases) {
   const cal = calibrationRecording(room, 73);
   const start = performance.now();
   const filter = new CalibratedCancellation(cal.microphone, cal.left, cal.right);
@@ -103,7 +109,7 @@ for (const id of ids) {
   const m = createMixture(vocal, { id: "unison-guide", sirDb: 0, delayMs: 65, guide: true, guideSemitones: 0 }, id * 73);
   const end = 2000 + vocal.length / 48;
   const clean = measurePitch(track(m.near, m.left, m.right), truth, 2000, end);
-  for (const room of ACOUSTIC_CASES.filter((r) => !["clock-drift", "noisy-room", "clipped-speaker"].includes(r.id)).map((r) => split === "regression" && r.nonlinear ? { ...r, nonlinear: 7.3 } : r)) {
+  for (const room of acousticCases.filter((r) => !["clock-drift", "noisy-room", "clipped-speaker"].includes(r.id)).map((r) => split === "regression" && r.nonlinear ? { ...r, nonlinear: 7.3 } : r)) {
     const cal = calibrationRecording(room, id * 73);
     const echo = acousticEcho(m.left, m.right, room, id * 73);
     const start = performance.now();
@@ -134,7 +140,7 @@ const gates = {
   ...(ids.length ? { realPitchPreserved: summary.calibrated !== null && summary.clean !== null && summary.calibrated.pitchRecall50Cents! >= summary.clean.pitchRecall50Cents! - 0.03, realGuideOnlyFalseRate: summary["calibrated-silent"] !== null && summary["calibrated-silent"].falseVoicedRate! <= 0.01 } : {})
 };
 timings.sort((a, b) => a - b);
-const report = { protocol: "calibrated-guide-v1", split, recordingIds: ids, hashes, thresholds: SPEAKER_PITCH_OPTIONS, acousticCases: ACOUSTIC_CASES, regressionNonlinearity: split === "regression" ? 7.3 : null, acceptedCalibrations, refusedCalibrations, gates, summary,
+const report = { protocol: "calibrated-guide-v1", split, recordingIds: ids, hashes, thresholds: SPEAKER_PITCH_OPTIONS, acousticCases, regressionNonlinearity: split === "regression" ? 7.3 : null, acceptedCalibrations, refusedCalibrations, gates, summary,
   compute: { realTimeFactor: timings.reduce((sum, v) => sum + v, 0) / (totalSeconds * 1000), p95BlockMs: timings[Math.floor(timings.length * 0.95)], maximumBlockMs: timings.at(-1), maximumCalibrationMs: Math.max(...calibrationTimings) }, cases };
 await writeFile(option("--output", `.cache/speaker-benchmark/guide-${split}.json`), JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify({ summary, gates, compute: report.compute }, null, 2));

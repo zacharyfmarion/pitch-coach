@@ -4,6 +4,12 @@ This prototype evaluates whether local echo cancellation improves **pitch tracki
 
 Speaker mode now uses a **calibrated playback model that stays fixed while singing**, replacing the continuously adapting AEC3 processor. It addresses the onset-only failure when the singer matches the guide. The historical AEC3 evaluation and diagnosis remain below; they are not the current implementation's acceptance evidence.
 
+## Quiet speaker return on a laptop microphone
+
+A quiet room can still fail the speaker check when the microphone picks up little playback. We reproduced one cause using a stable 20 ms reflected path, gain 0.12 and microphone noise RMS 0.0003 (seed 73). The original fit kept noise across the entire 341 ms impulse response. Its prediction amplified that noise, yielding 17.61 dB reduction on independent validation. A second candidate shrinks response blocks at the estimated noise floor. The fitter selects it on separate samples only when it improves a quiet return. The same validation segment then measured 25.13 dB and passed the original 22 dB requirement.
+
+The development command below includes this case with both an independent singer and guide-only playback. The original recording-regression split stays fixed. Reports from unsuccessful checks now include the failed criterion, peak input, and whether the alternate fit was selected. For poor matches, they also compare timing and correlation between repetitions of the same probe in each speaker. These measurements can help distinguish unstable timing from a weak return. The simulated path alone cannot identify the cause on a particular Mac.
+
 ## Calibrated guide-on cancellation
 
 The same production processor is exercised by `guideBenchmark.ts` and the real browser worker. It never receives singer-only audio, target notes, f0 annotations, or simulator room parameters. Pitch windows, the 0.008 RMS / 0.66 clarity gates, and scoring remain unchanged. There is no raw-pitch fallback, held-pitch interpolation, or target-note substitution.

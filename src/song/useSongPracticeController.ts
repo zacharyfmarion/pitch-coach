@@ -323,8 +323,8 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
         onInputDiagnostic: inputDebugEnabled && inputMode === "aec3" ? (frame) => {
           if (runId === runIdRef.current) receiveInputDebug(frame);
         } : undefined,
-        onInputDiagnosticSession: inputDebugEnabled && inputMode === "aec3" ? (session) => {
-          if (runId === runIdRef.current) receiveInputDebugSession(session);
+        onInputDiagnosticSession: inputMode === "aec3" ? (session) => {
+          if (runId === runIdRef.current && (inputDebugEnabled || session.calibration?.accepted === false)) receiveInputDebugSession(session);
         } : undefined,
         onInputStatus: (message) => { if (runId === runIdRef.current) setInputStatus(message); },
         onError: (message) => {
@@ -478,7 +478,7 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     setTrimEndMsState(demo.reference.durationMs);
     setVocalGuideGainState(0.35);
     setInputMode("aec3");
-    setInputStatus("Start practice, stay quiet for the speaker check, then sing with the guide.");
+    setInputStatus("");
     setErrorMessage(null);
     setAnalysisProgress({ modelProgress: 1, separationProgress: 1, transcriptionProgress: 1, status: "Generated melody — ready to sing. No model download needed." });
     setStage("ready");
@@ -563,7 +563,13 @@ export function useSongPracticeController(options: SongPracticeControllerOptions
     inputDebug,
     isDemo,
     loadSpeakerDemo,
-    setInputMode,
+    setInputMode: (next: SongInputMode) => {
+      if (next === inputMode) return;
+      setInputMode(next);
+      resetInputDebug();
+      setErrorMessage(null);
+      setInputStatus("");
+    },
     canAnalyze,
     canPractice,
     chooseFile,

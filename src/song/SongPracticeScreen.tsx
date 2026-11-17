@@ -44,6 +44,8 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
   const theme = usePitchCoachTheme(song.themePreference);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const isActivePractice = song.stage === "practicing" || song.stage === "paused";
+  const speakerMode = song.inputMode === "aec3";
+  const failedCheck = speakerMode && song.inputDebug.session?.calibration?.accepted === false && Boolean(song.errorMessage);
   const pauseResumeLabel = song.stage === "paused" ? "Resume" : "Pause";
   const durationMs = song.reference?.durationMs ?? song.selectedDurationMs ?? SONG_SECTION_LIMITS.defaultMs;
   const autoAnalyzeKeyRef = useRef<string | null>(null);
@@ -74,7 +76,11 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
       song.trimStartMs
     ]
   );
-  const songStatusView = createSongStatusView(song.stage);
+  const songStatusView: SongStatusView = failedCheck
+    ? { label: "Check speakers", detail: "Review the speaker check below.", tone: "warning", bubbleTone: "warning" }
+    : speakerMode && song.isPreparing
+    ? { label: "Speaker check", detail: "Wait for the music before singing.", tone: "info", bubbleTone: "info" }
+    : createSongStatusView(song.stage);
   const pipelineSteps = createSongPipelineSteps(song);
   const hasLoadedSong = Boolean(song.fileName || song.decodedAudio || song.reference);
   const isProcessingSong =
@@ -158,57 +164,77 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
               score={song.score}
               totalDurationMs={Math.max(durationMs, 1000)}
               currentTimeMs={song.currentPlaybackTimeMs}
-              isPlaying={song.stage === "practicing"}
+              isPlaying={song.stage === "practicing" && !song.isPreparing}
               themeName={theme.name}
               debugEnabled={debugEnabled}
               debugEnergy={debugEnergy}
             />
           </Card>
 
-          <Card className="mock-song-transport" variant="mock" padding="none">
-            <Button
-              className="primary-action"
-              variant="song"
-              size="lg"
-              onClick={() => void song.startPractice()}
-              disabled={!song.canPractice || song.stage === "practicing"}
-              aria-label="Start song practice"
-              title="Start song practice"
-            >
-              <Play size={18} />
-              <span>Start practice</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="lg"
-              onClick={() =>
-                song.stage === "paused" ? void song.resumePractice() : void song.pausePractice()
-              }
-              disabled={!isActivePractice || song.isPreparing}
-              aria-label={pauseResumeLabel}
-              title={pauseResumeLabel}
-            >
-              {song.stage === "paused" ? <Play size={18} /> : <Pause size={18} />}
-              <span>{pauseResumeLabel}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="lg"
-              onClick={() => void song.stopPractice()}
-              disabled={!isActivePractice}
-              aria-label="Stop"
-              title="Stop"
-            >
-              <Square size={18} />
-              <span>Stop</span>
-            </Button>
-          </Card>
-
-          {song.errorMessage ? (
-            <div className="error-banner" role="alert">
-              {song.errorMessage}
-            </div>
-          ) : null}
+          <div className="song-transport-group">
+            {speakerMode && song.canPractice && !isActivePractice && !song.errorMessage ? (
+              <div className="speaker-check-note">
+                <Headphones size={18} aria-hidden="true" />
+                <div><strong>Before you sing</strong><p>You’ll hear four seconds of hiss while we measure the speakers. Stay quiet until the music starts.</p></div>
+              </div>
+            ) : null}
+            {speakerMode && isActivePractice && song.inputStatus ? (
+              <div className="speaker-check-note" role="status" aria-label="Microphone status">
+                <Mic size={18} aria-hidden="true" /><strong>{song.inputStatus}</strong>
+              </div>
+            ) : null}
+            {failedCheck ? (
+              <div className="speaker-check-note speaker-check-note--failed" role="alert">
+                <Headphones size={18} aria-hidden="true" />
+                <div>
+                  <strong>Speaker check needs another try</strong>
+                  <p>{song.errorMessage}</p>
+                  <div className="speaker-check-actions">
+                    <button type="button" className="speaker-check-link" onClick={() => song.setInputMode("browser")}>Use browser cancellation</button>
+                    <button type="button" className="speaker-check-link" onClick={song.inputDebug.download}>Download speaker check report</button>
+                  </div>
+                </div>
+              </div>
+            ) : song.errorMessage ? <div className="error-banner" role="alert">{song.errorMessage}</div> : null}
+            <Card className="mock-song-transport" variant="mock" padding="none">
+              <Button
+                className="primary-action"
+                variant="song"
+                size="lg"
+                onClick={() => void song.startPractice()}
+                disabled={!song.canPractice || song.stage === "practicing"}
+                aria-label={failedCheck ? "Retry speaker check" : "Start song practice"}
+                title="Start song practice"
+              >
+                <Play size={18} />
+                <span>{song.isPreparing && speakerMode ? "Preparing speakers…" : failedCheck ? "Retry speaker check" : "Start practice"}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                onClick={() =>
+                  song.stage === "paused" ? void song.resumePractice() : void song.pausePractice()
+                }
+                disabled={!isActivePractice || song.isPreparing}
+                aria-label={pauseResumeLabel}
+                title={pauseResumeLabel}
+              >
+                {song.stage === "paused" ? <Play size={18} /> : <Pause size={18} />}
+                <span>{pauseResumeLabel}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                onClick={() => void song.stopPractice()}
+                disabled={!isActivePractice}
+                aria-label="Stop"
+                title="Stop"
+              >
+                <Square size={18} />
+                <span>Stop</span>
+              </Button>
+            </Card>
+          </div>
         </div>
 
         <aside className="mock-song-side-panel" aria-label="Song controls and feedback">
@@ -382,12 +408,12 @@ export function SongPracticeScreen({ services }: SongPracticeScreenProps) {
                   />
                   <p className="history-empty">
                     {song.inputMode === "aec3"
-                      ? "Use a moderate volume for the speaker check before each attempt. Keep volume and device positions unchanged afterward; restart practice if either changes. Processing stays on your device."
+                      ? "Keep your speaker volume and microphone position steady after the check."
                       : song.inputMode === "browser"
                         ? "Uses your browser’s echo cancellation. Results vary by browser and microphone."
                         : "Use headphones. Captures your microphone without playback cancellation."}
                   </p>
-                  {song.inputStatus ? <p className="history-empty" role="status" aria-label="Microphone status">{song.inputStatus}</p> : null}
+                  {song.inputStatus && !(speakerMode && isActivePractice) && !failedCheck ? <p className="history-empty" role="status" aria-label="Microphone status">{song.inputStatus}</p> : null}
                   <label>
                     <span>Guide</span>
                     <input
