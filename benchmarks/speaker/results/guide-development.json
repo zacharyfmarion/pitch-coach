@@ -1,0 +1,153 @@
+{
+  "protocol": "calibrated-guide-v1",
+  "split": "development",
+  "recordingIds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "hashes": {
+    "vocadito_1.wav": "b509768315efad8120183b48e01d6090f1649d5bcc691241940dc7a100274ab8",
+    "vocadito_1_f0.csv": "dd10beba57b94d37b1d3263f5deca3b780adc7ec90f1d43bb00099b02c2878e5",
+    "vocadito_2.wav": "8dcc99c3b08a9a5800b793e3d65cccfb4464961f15cf8ccde25bd4c8b853d519",
+    "vocadito_2_f0.csv": "4d515029c036312e8d04545470c3d5dc5db3132dec54813624faee7d84cd6363",
+    "vocadito_3.wav": "73b6fe13bc3435ae9173ee1bdec247e2943526c70cd9b69ab2b35002fa4cb04d",
+    "vocadito_3_f0.csv": "18f48fc77df7dd43c1e4bc588a79482b1d330768d63b76b90e82998573582b6a",
+    "vocadito_4.wav": "fc07b202eb609c975d1549be5320db116a49be1bd1fc6904e70e31cd7e44ec23",
+    "vocadito_4_f0.csv": "fb0a5b73a66edc0bac5aaec64f82eccd95d5a54781b354ab9020056803cf3d08",
+    "vocadito_5.wav": "7cecfd126a9437f88db0a297cdab3075bb38faeef10f1a98f22ba22a2a939220",
+    "vocadito_5_f0.csv": "561eb6ac03530a3219cf1a8eab9f0c14b1c4571185f0e059b61643325e4642ca",
+    "vocadito_6.wav": "13816752a6366f2d66f21e71a70d55e22b6a44f0d1712d97abff5390bc0c1f3b",
+    "vocadito_6_f0.csv": "443e7f37172ef683f687fba39ab87710f22af2227e8fdb9031b2faa3002eb002",
+    "vocadito_7.wav": "db9542f0626f4c43ab1e4f26ae9e40834bcfe5f061b07c75a3925d95aaa79676",
+    "vocadito_7_f0.csv": "9dfd339c44bd32a8891288ea3625fcda703932fe76c4ce8f073c005874f63393",
+    "vocadito_8.wav": "05ce2b3f1991035d08db269df1c39b198d9ddc22130ce88f9a8d97e46cd7a310",
+    "vocadito_8_f0.csv": "d4865ca325062a0985f8c8cf099844d9430ad445668bbd8d6bc3f786a346b457"
+  },
+  "thresholds": {
+    "clarityThreshold": 0.66,
+    "rmsThreshold": 0.008
+  },
+  "acousticCases": [
+    {
+      "id": "short",
+      "delayMs": 35,
+      "gain": 0.5,
+      "noise": 0.0003
+    },
+    {
+      "id": "room",
+      "delayMs": 65,
+      "gain": 1,
+      "tail": true,
+      "noise": 0.0003
+    },
+    {
+      "id": "loud-room",
+      "delayMs": 110,
+      "gain": 2,
+      "tail": true,
+      "noise": 0.0003
+    },
+    {
+      "id": "noisy-room",
+      "delayMs": 65,
+      "gain": 1,
+      "tail": true,
+      "noise": 0.002
+    },
+    {
+      "id": "nonlinear",
+      "delayMs": 65,
+      "gain": 1,
+      "nonlinear": 6,
+      "noise": 0.0003
+    },
+    {
+      "id": "clock-drift",
+      "delayMs": 65,
+      "gain": 1,
+      "driftPpm": 200,
+      "noise": 0.0003
+    },
+    {
+      "id": "clipped-speaker",
+      "delayMs": 65,
+      "gain": 1,
+      "hardClip": 0.05,
+      "noise": 0.0003
+    }
+  ],
+  "regressionNonlinearity": null,
+  "acceptedCalibrations": 92,
+  "refusedCalibrations": 21,
+  "gates": {
+    "stableCalibration": true,
+    "syntheticHeldNotes": true,
+    "syntheticGuideOnly": true,
+    "stressCalibrationRefused": true,
+    "realPitchPreserved": true,
+    "realGuideOnlyFalseRate": true
+  },
+  "summary": {
+    "clean": {
+      "voicedFrames": 13004,
+      "unvoicedFrames": 6196,
+      "pitchRecall50Cents": 0.9329437096278068,
+      "missedVoicedRate": 0.02891418025223008,
+      "falseVoicedRate": 0.18076178179470626,
+      "medianAbsoluteCents": 5.329805873339399
+    },
+    "calibrated": {
+      "voicedFrames": 13004,
+      "unvoicedFrames": 6196,
+      "pitchRecall50Cents": 0.9324054137188558,
+      "missedVoicedRate": 0.02914487849892341,
+      "falseVoicedRate": 0.1804389928986443,
+      "medianAbsoluteCents": 5.329097216191192
+    },
+    "aec3": {
+      "voicedFrames": 13064,
+      "unvoicedFrames": 6136,
+      "pitchRecall50Cents": 0.40225045927740355,
+      "missedVoicedRate": 0.49364666258420087,
+      "falseVoicedRate": 0.05361799217731421,
+      "medianAbsoluteCents": 11.686900073011211
+    },
+    "calibrated-silent": {
+      "voicedFrames": 0,
+      "unvoicedFrames": 19200,
+      "pitchRecall50Cents": null,
+      "missedVoicedRate": null,
+      "falseVoicedRate": 0,
+      "medianAbsoluteCents": null
+    },
+    "aec3-silent": {
+      "voicedFrames": 0,
+      "unvoicedFrames": 19200,
+      "pitchRecall50Cents": null,
+      "missedVoicedRate": null,
+      "falseVoicedRate": 0,
+      "medianAbsoluteCents": null
+    }
+  },
+  "compute": {
+    "realTimeFactor": 0.041017501794572704,
+    "p95BlockMs": 0.6260000000183936,
+    "maximumBlockMs": 38.580958999998984,
+    "maximumCalibrationMs": 342.020875000002
+  },
+  "casesFile": "guide-development-cases.csv",
+  "acceptedCalibrationsMeaning": "Count of evaluated cases sharing per-room/per-recording fitted calibration; refused cases never enter accuracy denominators.",
+  "environment": {
+    "node": "v26.8.1",
+    "host": "Apple M1 Max",
+    "platform": "Darwin",
+    "arch": "arm64"
+  }
+}

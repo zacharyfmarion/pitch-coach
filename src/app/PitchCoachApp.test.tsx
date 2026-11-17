@@ -1,3 +1,4 @@
+import { loadSettings, saveSettings } from "../storage/settingsStorage";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -457,9 +458,11 @@ describe("PitchCoachApp", () => {
     fireEvent.click(screen.getByLabelText("Debug note timing"));
     expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/C4 MIDI 60/);
     expect(screen.getByLabelText("Song debug audit").textContent).toMatch(/conf 0\.900 amp 0\.900/);
+    saveSettings({ ...loadSettings(), preferredAudioInput: { deviceId: "new-input", label: "New input" } });
     fireEvent.click(screen.getByRole("button", { name: "Start song practice" }));
 
     await waitFor(() => expect(screen.getByLabelText("Song feedback").textContent).toMatch(/Strong match/i));
+    expect(songServices.practiceEngine.lastConfig?.deviceId).toBe("new-input");
     expect(songServices.separator.separate).toHaveBeenCalled();
     expect(songServices.transcriber.transcribe).toHaveBeenCalledWith(
       expect.anything(),
